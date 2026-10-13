@@ -55,10 +55,10 @@ Règles (voir `CLAUDE.md`) :
 - [x] Tests : calculs (H fourni ou U·A, ponts thermiques), priorité `computed` vs `audit`, héritage
 
 ## Étape 5 — Systèmes (§3.8)
-- [ ] `System`, `Generator`, `HeatingGenerator`, `CoolingGenerator`, `DHWGenerator`
+- [x] `System`, `Generator`, `HeatingGenerator`, `CoolingGenerator`, `DHWGenerator`
       (`storage_volume`), `Ventilation`, `SolarPV`
-- [ ] Avertissements de cohérence des ratios de performance selon `technology`
-- [ ] Tests : construction, avertissements (chaudière > 1,1 ; PAC < 1), unités déclarées
+- [x] Avertissements de cohérence des ratios de performance selon `technology`
+- [x] Tests : construction, avertissements (chaudière > 1,1 ; PAC < 1), unités déclarées
 
 ## Étape 6 — Site et Building (§3.5, §3.6)
 - [ ] Attributs descriptifs communs (`description.py`) avec le drapeau d'héritage de chaque champ

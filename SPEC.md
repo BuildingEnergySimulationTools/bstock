@@ -298,8 +298,13 @@ HeatingPlant, CoolingPlant, DomesticHotWater) :
 groupe froid, chaudière à condensation sur PCI. Il remplace le `COP` du draw.io et sert pour toutes les
 technologies. Les deux ratios sont optionnels et indépendants.
 
-Validation (avertissement, pas d'erreur) : un ratio > 1,1 pour une technologie à combustion ou à effet
-Joule, ou un ratio < 1 pour une PAC.
+Validation (avertissement `PerformanceRatioWarning`, pas d'erreur), relancée à chaque modification de la
+technologie ou d'un ratio : un ratio > 1,1 pour une technologie à combustion, à effet Joule ou une
+sous-station, ou un ratio < 1 pour une PAC, un groupe froid ou un chauffe-eau thermodynamique. Les PAC
+hybrides et le solaire thermique ne sont pas contrôlés.
+
+Chaque classe de système a un `kind` (`heating`, `cooling`, `dhw`, `ventilation`, `pv`) qui sert de préfixe
+aux ids générés et de filtre dans `building.systems(kind=...)`.
 
 `DHWGenerator` ajoute `storage_volume` (sourcé `float`, L) : volume de stockage, `None` = production
 instantanée ou inconnue (open data DPE : `volume_stockage_generateur_n*_ecs_n1`).
@@ -308,14 +313,14 @@ instantanée ou inconnue (open data DPE : `volume_stockage_generateur_n*_ecs_n1`
 
 | Attribut | Type | Unité | Description |
 |---|---|---|---|
-| `air_change_rate` | sourcé `float` | vol/h | |
+| `air_change_rate` | sourcé `float` | 1/h | Renouvellements d'air par heure |
 | `heat_recovery_efficiency` | sourcé `float` | – | Efficacité de l'échangeur ; `None` = pas d'échangeur |
 
 **SolarPV(System)** (référencé dans le draw.io mais pas défini)
 
 | Attribut | Type | Unité | Description |
 |---|---|---|---|
-| `peak_power` | sourcé `float` | kWc | |
+| `peak_power` | sourcé `float` | kWp | |
 | `area` | sourcé `float` | m² | |
 | `azimuth` | sourcé `float` | ° | 0 = nord, 180 = sud |
 | `tilt` | sourcé `float` | ° | 0 = horizontal |

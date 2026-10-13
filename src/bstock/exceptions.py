@@ -35,3 +35,7 @@ class BstockWarning(UserWarning):
 
 class UnknownAttributeWarning(BstockWarning):
     """Loaded data contains a sourced attribute unknown to the model class; it is kept as is."""
+
+
+class PerformanceRatioWarning(BstockWarning):
+    """A generator performance ratio looks inconsistent with its technology."""
