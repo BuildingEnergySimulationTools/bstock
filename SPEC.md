@@ -264,8 +264,12 @@ env.compute_heat_loss_coefficient()  # Σ H des parois
 env.compute_loss_area()              # Σ A des parois hors ponts thermiques
 env.compute_u_bat()                  # heat_loss_coefficient / loss_area (valeurs effectives)
 env.compute_window_shgc()  # moyenne des shgc pondérée par la surface des vitrages
-env.components_by(kind="WINDOW", orientation="S")   # filtrage
+env.components_by(kind="window", orientation="s")   # filtrage
+env.add_component(c), env.remove_component(id)    # gestion des parois (ids uniques dans l'enveloppe)
 ```
+
+Un calcul impossible (aucune paroi, surface ou U manquant) lève `IncompleteDataError` en citant les parois
+concernées.
 
 `"computed"` figure dans la priorité par défaut, après `"audit"` (§4.3). Un candidat calculé est un
 instantané : il n'est pas recalculé automatiquement si les parois changent. Il faut relancer le calcul.

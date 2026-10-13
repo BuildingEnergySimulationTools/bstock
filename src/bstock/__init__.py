@@ -18,11 +18,13 @@ from bstock.enums import (
     InsulationLevel,
     Orientation,
 )
+from bstock.envelope import COMPUTED_SOURCE, Envelope, EnvelopeComponent, Window
 from bstock.exceptions import (
     BstockError,
     BstockWarning,
     DuplicateIdError,
     EntityInUseError,
+    IncompleteDataError,
     InvalidIdError,
     UnknownAttributeWarning,
     UnknownFieldError,
@@ -43,6 +45,7 @@ except PackageNotFoundError:  # pragma: no cover - package not installed
     __version__ = "0.0.0"
 
 __all__ = [
+    "COMPUTED_SOURCE",
     "DEFAULT_SOURCE_PRIORITY",
     "Adjacency",
     "BstockError",
@@ -53,9 +56,12 @@ __all__ = [
     "EndUse",
     "EnergyType",
     "EntityInUseError",
+    "Envelope",
+    "EnvelopeComponent",
     "FrameType",
     "GeneratorTechnology",
     "GlazingType",
+    "IncompleteDataError",
     "Inertia",
     "InsulationLevel",
     "InvalidIdError",
@@ -67,6 +73,7 @@ __all__ = [
     "UnknownAttributeWarning",
     "UnknownFieldError",
     "UnknownIdError",
+    "Window",
     "__version__",
     "sourced",
 ]

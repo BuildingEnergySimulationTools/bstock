@@ -48,11 +48,11 @@ Règles (voir `CLAUDE.md`) :
       hérité, entité sans parent
 
 ## Étape 4 — Enveloppe (§3.7)
-- [ ] `Envelope` (synthèse + `components`), `EnvelopeComponent`, `Window`
-- [ ] Héritage de l'enveloppe d'un bâtiment depuis celle de son site
-- [ ] Calculs `compute_heat_loss_coefficient`, `compute_loss_area`, `compute_u_bat`,
+- [x] `Envelope` (synthèse + `components`), `EnvelopeComponent`, `Window`
+- [x] Héritage de l'enveloppe d'un bâtiment depuis celle de son site
+- [x] Calculs `compute_heat_loss_coefficient`, `compute_loss_area`, `compute_u_bat`,
       `compute_window_shgc` (candidats `source="computed"`) ; filtre `components_by`
-- [ ] Tests : calculs (H fourni ou U·A, ponts thermiques), priorité `computed` vs `audit`, héritage
+- [x] Tests : calculs (H fourni ou U·A, ponts thermiques), priorité `computed` vs `audit`, héritage
 
 ## Étape 5 — Systèmes (§3.8)
 - [ ] `System`, `Generator`, `HeatingGenerator`, `CoolingGenerator`, `DHWGenerator`

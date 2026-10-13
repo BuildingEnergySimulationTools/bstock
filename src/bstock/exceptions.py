@@ -25,6 +25,10 @@ class UnknownFieldError(BstockError, AttributeError):
     """The requested name is not a sourced attribute of the model."""
 
 
+class IncompleteDataError(BstockError, ValueError):
+    """A computation lacks some of the values it needs."""
+
+
 class BstockWarning(UserWarning):
     """Base class for all bstock warnings."""
 
