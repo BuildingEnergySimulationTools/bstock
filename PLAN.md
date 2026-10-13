@@ -11,14 +11,14 @@ Règles (voir `CLAUDE.md`) :
 ---
 
 ## Étape 0 — Squelette du projet
-- [ ] `pyproject.toml` : métadonnées, `requires-python = ">=3.11"`, dépendances (`pydantic>=2`, `pandas`,
+- [x] `pyproject.toml` : métadonnées, `requires-python = ">=3.11"`, dépendances (`pydantic>=2`, `pandas`,
       `pyarrow`), extras `[plot]` (plotly) et `[dev]` (pytest, ruff)
-- [ ] Configuration ruff (règles, longueur de ligne, `target-version = "py311"`) et pytest (marqueur
+- [x] Configuration ruff (règles, longueur de ligne, `target-version = "py311"`) et pytest (marqueur
       `network`, `testpaths`)
-- [ ] Arborescence `src/bstock/` + `tests/`, `__init__.py` avec `__version__` et `__all__`
-- [ ] `exceptions.py` : `BstockError`, `DuplicateIdError`, `UnknownIdError`, `EntityInUseError`…
-- [ ] `README.md` minimal (objectif, installation, lien vers la SPEC)
-- [ ] Installation éditable dans le `.venv` ; `pytest` et `ruff` tournent sur un test trivial
+- [x] Arborescence `src/bstock/` + `tests/`, `__init__.py` avec `__version__` et `__all__`
+- [x] `exceptions.py` : `BstockError`, `DuplicateIdError`, `UnknownIdError`, `EntityInUseError`…
+- [x] `README.md` minimal (objectif, installation, lien vers la SPEC)
+- [x] Installation éditable dans le `.venv` ; `pytest` et `ruff` tournent sur un test trivial
 
 ## Étape 1 — Enums (§3.9)
 - [ ] `enums.py` : `BuildingUsage`, `EnergyType`, `GeneratorTechnology`, `Inertia`, `InsulationLevel`,
