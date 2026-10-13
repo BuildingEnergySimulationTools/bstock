@@ -1,6 +1,6 @@
 # bstock — Spécification
 
-> Statut : **v0.2**, issue de l'interview de conception du 2026-10-13. Les choix sont validés ; les points
+> Statut : **v0.3**, issue de l'interview de conception du 2026-10-13. Les choix sont validés ; les points
 > encore ouverts sont listés au §11.
 
 ---
@@ -83,14 +83,16 @@ Toutes les entités (`Site`, `Building`, `Envelope`, systèmes, `Meter`) hérite
     (`"bldg-1f3a"`) ou choisi par l'utilisateur. Il ne change jamais, même si le `rnb_id` est corrigé plus
     tard : `scope`, `serves` et les tags tide restent valides ;
   - `Site.id` : choisi par l'utilisateur (code client, par exemple) ;
-  - systèmes et Meters : choisis par l'utilisateur ou générés automatiquement (`"heating-1f3a"`).
+  - systèmes, parois et Meters : choisis par l'utilisateur ou générés automatiquement (préfixe + 8
+    caractères hexadécimaux, ex. `"heating-1f3a9c0b"`).
 - Les ids ne doivent pas contenir `__`, qui sert de séparateur aux tags tide. Cette règle est vérifiée à
   la création.
 - `park.get(id)` renvoie l'entité correspondante ; `park.get_by_rnb(rnb_id)` retrouve un bâtiment par son
   identifiant RNB.
 - `rnb_id` est optionnel (bâtiment neuf, pas encore apparié) mais **unique dans le parc** quand il est
   renseigné. Il est modifiable.
-- Formats des identifiants externes (pour validation légère) :
+- Formats des identifiants externes (validation légère : un format inattendu émet un avertissement, pas
+  une erreur) :
   - RNB : 12 caractères alphanumériques (ex. `8K3CTZKZ9R27`) ;
   - BDNB : `bdnb-bg-XXXX-XXXX-XXXX` pour un groupe, `bdnb-bc-XXXX-XXXX-XXXX` pour une construction ;
   - DPE : 13 caractères (ex. `2611E0031228S`).
@@ -98,11 +100,15 @@ Toutes les entités (`Site`, `Building`, `Envelope`, systèmes, `Meter`) hérite
 ### 3.3 Conventions
 
 - **Unités SI fixées par champ**, sans bibliothèque d'unités. L'unité est déclarée dans les métadonnées du
-  champ : elle apparaît dans le JSON Schema, dans `Model.field_info("heated_area").unit` et dans le tag
-  `unit` de tide.
+  champ : elle apparaît dans le JSON Schema, dans `Building.sourced_fields()["heated_area"].unit` et dans
+  le tag `unit` de tide.
 - Les attributs **descriptifs** sont « sourcés » (§4). Les **identifiants et relations** (`id`, `rnb_id`,
   listes d'enfants, `scope`, `serves`) sont des valeurs simples.
 - Tous les attributs sourcés sont optionnels : une valeur inconnue vaut `None`.
+- **Les collections (sites, bâtiments, systèmes, parois, compteurs) se modifient uniquement via les
+  méthodes du parc ou des entités** (`new_*`, `add_*`, `remove`, `move`). Ces méthodes maintiennent l'index
+  des ids, les liens vers le parent et les contrôles de cohérence. La modification directe des listes
+  n'est pas supportée.
 
 ### 3.4 BuildingPark
 
@@ -116,6 +122,20 @@ Toutes les entités (`Site`, `Building`, `Envelope`, systèmes, `Meter`) hérite
 | `source_priority` | `SourcePriority` | Règles de résolution (§4.3) |
 | `site_cls` | `type[Site]` | Classe utilisée pour créer et charger les sites (non sérialisée, §5) |
 | `building_cls` | `type[Building]` | Idem pour les bâtiments |
+
+Méthodes principales :
+
+| Méthode | Rôle |
+|---|---|
+| `new_site(id, parent=None, source=None, **attrs)` | Crée un site (instance de `site_cls`) au premier niveau ou sous `parent` |
+| `new_building(rnb_id=None, id=None, site=None, source=None, **attrs)` | Crée un bâtiment (instance de `building_cls`) |
+| `add_site(site, parent=None)`, `add_building(building, site=None)` | Ajoute un objet déjà construit (contrôle de classe et d'unicité des ids) |
+| `add_system(system, owner)` | Ajoute un système à un bâtiment ou à un site (`owner` = objet ou id) |
+| `add_meter(meter)` | Ajoute un compteur ; les ids du `scope` doivent exister |
+| `get(id)`, `get_by_rnb(rnb_id)` | Recherche |
+| `iter_sites()`, `iter_buildings()`, `iter_systems()` | Parcours de tout l'arbre |
+| `move(id, new_parent)` | Déplace un site ou un bâtiment (`new_parent` = site, ou `None` pour le premier niveau) |
+| `remove(id)` | Supprime une entité. Lève une erreur si elle est référencée (`scope` d'un Meter, `serves` d'un système), sauf avec `force=True`, qui retire aussi les références |
 
 > Changement par rapport au draw.io : `municipality`, `country`, `lat` et `lon` sont déplacés vers
 > Site et Building. Un parc peut couvrir plusieurs communes.
@@ -247,7 +267,8 @@ env.compute_window_shgc()  # moyenne des shgc pondérée par la surface des vitr
 env.components_by(kind="WINDOW", orientation="S")   # filtrage
 ```
 
-`"computed"` figure dans la priorité par défaut, après `"audit"` (§4.3).
+`"computed"` figure dans la priorité par défaut, après `"audit"` (§4.3). Un candidat calculé est un
+instantané : il n'est pas recalculé automatiquement si les parois changent. Il faut relancer le calcul.
 
 ### 3.8 Systèmes
 
@@ -256,6 +277,7 @@ Classe de base commune `System` : `id: str`, `name` (sourcé `str`), `serves: li
 - `serves` n'a de sens que pour un système de **site** : c'est la liste des `id` des bâtiments desservis. `None`
   signifie « tous les bâtiments du site et de ses sous-sites ».
 - Un système porté par un bâtiment dessert implicitement ce seul bâtiment.
+- Les ids de `serves` doivent désigner des bâtiments du site ou de ses sous-sites (vérifié par le parc).
 
 **Generator(System)**, base de `HeatingGenerator`, `CoolingGenerator` et `DHWGenerator` (draw.io :
 HeatingPlant, CoolingPlant, DomesticHotWater) :
@@ -298,7 +320,8 @@ instantanée ou inconnue (open data DPE : `volume_stockage_generateur_n*_ecs_n1`
 
 Les enums sont **compactes et en anglais**. Les connecteurs traduisent les libellés des sources (tables
 de correspondance en annexe A), et le libellé d'origine est conservé dans `SourcedValue.raw` (§4.1).
-Elles sont sérialisées par leur valeur texte (`"natural_gas"`).
+Ce sont des `StrEnum` dont la valeur est le nom en minuscules (`EnergyType.NATURAL_GAS == "natural_gas"`).
+Elles sont sérialisées par cette valeur, et les API acceptent indifféremment le membre ou la chaîne.
 
 | Enum | Valeurs |
 |---|---|
@@ -312,7 +335,7 @@ Elles sont sérialisées par leur valeur texte (`"natural_gas"`).
 | `ComponentKind` | `WALL`, `ROOF`, `FLOOR`, `WINDOW`, `DOOR`, `THERMAL_BRIDGE` |
 | `Orientation` | `N`, `NE`, `E`, `SE`, `S`, `SW`, `W`, `NW`, `HORIZONTAL` (le DPE n'utilise que N, E, S, O, horizontal) |
 | `Adjacency` | `EXTERIOR`, `UNHEATED_SPACE`, `GROUND`, `ADJACENT_BUILDING` |
-| `Usage` (Meters) | `HEATING`, `COOLING`, `DHW`, `VENTILATION`, `LIGHTING`, `APPLIANCES`, `PV_PRODUCTION`, `TOTAL`, `OTHER` |
+| `EndUse` (Meters) | `HEATING`, `COOLING`, `DHW`, `VENTILATION`, `LIGHTING`, `APPLIANCES`, `PV_PRODUCTION`, `TOTAL`, `OTHER` |
 
 Dans la BDNB, l'énergie est souvent intégrée au libellé du générateur (« chaudiere gaz condensation »). Le
 connecteur découpe ce libellé en `technology` + `energy_type`.
@@ -343,6 +366,7 @@ La **valeur effective** est choisie parmi les candidats selon la priorité des s
 ```python
 b.year_construction                    # -> 1972 (valeur effective) ou None
 b.year_construction = 1968             # équivaut à b.set(..., source="manual")
+b.year_construction = None             # retire le candidat "manual" (équivaut à unset(source="manual"))
 
 b.set("year_construction", 1970, source="bdnb", date=date(2024, 10, 1))
 b.set("year_construction", 1972, source="dpe", ref="2364E0123456X")
@@ -370,7 +394,7 @@ Règles :
 
 ```python
 park.source_priority = SourcePriority(
-    default=["manual", "audit", "computed", "dpe", "bdnb", "rnb", "assumption"],
+    default=["manual", "audit", "computed", "dpe", "bdnb", "rnb", "*", "assumption"],
     per_attribute={
         "heated_area": ["bayonne_xlsx_2024", "audit", "dpe", "bdnb"],
     },
@@ -380,7 +404,8 @@ park.source_priority = SourcePriority(
 Algorithme pour un attribut :
 1. On prend la liste `per_attribute[attr]` si elle existe, sinon `default`.
 2. Le candidat retenu est celui dont la source est la mieux classée.
-3. Les sources absentes de la liste passent après les sources listées.
+3. Les sources absentes de la liste (ex. `"bayonne_xlsx_2024"`) prennent le rang du joker `"*"`. Sans
+   joker, elles passent après toutes les sources listées.
 4. En cas d'égalité, la date la plus récente l'emporte, puis le candidat ajouté en dernier.
 
 La priorité est portée par le **parc** : une entité détachée de tout parc utilise la priorité par défaut
@@ -398,7 +423,7 @@ en remontant la hiérarchie :
    réputée plus précise.
 
 ```python
-site.year_construction = 1972                 # posé sur le groupe BDNB
+site.set("year_construction", 1972, source="bdnb")   # posé sur le groupe BDNB
 b.year_construction                           # -> 1972 (hérité)
 b.origin("year_construction")                 # -> "bdnb-bg-1111-1HRT-8SVH" (id de l'entité qui fournit la valeur)
 b.sources("year_construction")                # -> [] (candidats propres seulement)
@@ -413,6 +438,8 @@ b.set("year_construction", 1985, source="audit")   # valeur propre : masque l'h�
 - Un champ ajouté par un projet choisit son comportement : `sourced(inherit=True)`. Par défaut, il n'est
   pas hérité.
 - Un bâtiment ou un site sans parent n'hérite de rien.
+- L'enveloppe suit la même règle : l'`Envelope` d'un bâtiment hérite de celle de son site parent (ex. le
+  Ubat d'un DPE immeuble posé sur le site).
 
 ### 4.5 Implémentation (indicatif)
 
@@ -490,8 +517,8 @@ Règles :
 | `id` | `str` | Identifiant unique (ex. numéro de PDL) |
 | `name` | sourcé `str` | |
 | `scope` | `list[str]` | Ids des entités concernées : site, bâtiment ou système |
-| `energy_type` | sourcé `EnergyType \| None` | Pour un compteur d'énergie |
-| `usage` | sourcé `Usage` | Usage mesuré |
+| `energy_type` | sourcé `EnergyType` | Pour un compteur d'énergie |
+| `usage` | sourcé `EndUse` | Usage mesuré |
 | `timestep` | sourcé `str` | Pas de temps nominal (`"10min"`, `"1h"`, `"1D"`…) |
 | `channels` | `list[Channel]` | Grandeurs mesurées (une colonne par grandeur) |
 | `source` | `DataSource \| None` | Où lire les données |
@@ -541,7 +568,8 @@ class ParquetSource(DataSource): type = "parquet"; path
 ```python
 m.load()                 # source.load() -> sélection et renommage des colonnes -> m.data
 m.data                   # DataFrame au format décrit ci-dessous
-m.data = df_nettoye      # affectation directe (validée)
+m.data = df_nettoye      # affectation directe (validée) ; colonnes nommées par channel.name
+                         # ou déjà au format tide
 ```
 
 Contraintes sur `m.data` :
@@ -575,6 +603,8 @@ Plumber(df).show()
 - Les index sont convertis dans un fuseau unique (`tz="UTC"` par défaut, paramétrable), puis unis
   (outer join), sans rééchantillonnage : c'est le rôle de tide.
 - `load=True` appelle `load()` sur les compteurs dont `data` est vide.
+- Filtres : `usage`, `energy_type`, `meters` (ids), `buildings` / `sites` (ids ou objets). Un filtre sur
+  des bâtiments retient les compteurs dont le `scope` contient ces bâtiments ou leurs systèmes propres.
 - Un doublon de nom de colonne lève une erreur.
 
 ---
@@ -608,7 +638,7 @@ traçabilité. Le parc sauvegardé est alors **autonome**.
   "site_cls": "projet_bayonne.model.BayonneSite",
   "building_cls": "projet_bayonne.model.BayonneBuilding",
   "name": "Ville de Bayonne",
-  "source_priority": {"default": ["manual", "audit", "computed", "dpe", "bdnb", "rnb", "assumption"],
+  "source_priority": {"default": ["manual", "audit", "computed", "dpe", "bdnb", "rnb", "*", "assumption"],
                       "per_attribute": {}},
   "sites": [{
     "id": "site-ecole-A",
@@ -662,9 +692,10 @@ b = park.get("A1B2C3D4E5F6")
 b.set("heated_area", 1250.0, source="audit", date=date(2025, 3, 12), comment="relevé sur plans")
 b.envelope.u_bat = 0.9                         # source "manual"
 
-b.site.heating.append(HeatingGenerator(id="heating-chaufferie-A", technology="condensing_boiler",
-                                       energy_type="natural_gas", nominal_power=450.0,
-                                       seasonal_performance_ratio=0.95, source="audit"))
+park.add_system(HeatingGenerator(id="heating-chaufferie-A", technology="boiler_condensing",
+                                  energy_type="natural_gas", nominal_power=450.0,
+                                  seasonal_performance_ratio=0.95, source="audit"),
+                 owner=b.site)
 
 park.add_meter(Meter(id="PDL_123", scope=[b.site.id], usage="total", timestep="30min",
                      energy_type="electricity",
@@ -687,10 +718,12 @@ park2.get("A1B2C3D4E5F6").sources("heated_area")
 src/bstock/
   __init__.py          # API publique
   provenance.py        # SourcedValue, SourcedModel, sourced(), SourcePriority
-  enums.py             # EnergyType, BuildingUsage, Inertia, Usage
+  enums.py             # toutes les enums (§3.9)
   park.py              # BuildingPark
+  description.py       # attributs descriptifs communs à Site et Building
   site.py              # Site
-  building.py          # Building, Envelope
+  building.py          # Building
+  envelope.py          # Envelope, EnvelopeComponent, Window
   systems.py           # System, Generator, Heating/Cooling/DHWGenerator, Ventilation, SolarPV
   meters.py            # Meter, Channel, conventions tide
   sources.py           # DataSource, CsvSource, ParquetSource, registre
@@ -703,8 +736,7 @@ tests/
 - Dépendances : `pydantic>=2`, `pandas`, `pyarrow` (Parquet). Extras : `[plot]` (plotly, seule lib de
   graphiques), `[dev]` (pytest, ruff). tide n'est **pas** une dépendance : bstock
   respecte seulement sa convention de nommage.
-- Tests : pytest. Couvrir en priorité la résolution des priorités, l'aller-retour JSON (y compris avec
-  sous-classes et attributs inconnus), la génération des noms tide et la sauvegarde Parquet.
+- Outillage et conventions : voir `CLAUDE.md`. Plan de réalisation : `PLAN.md`.
 
 ---
 
