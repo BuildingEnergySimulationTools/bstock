@@ -475,7 +475,7 @@ class BuildingPark(BaseModel):
         """
         entity = self._resolve(entity, (Site, Building, System, Meter))
         removed_ids = set(self._subtree_ids(entity))
-        references = self.references_to(removed_ids)
+        references = self._references_to(removed_ids)
         outside = [ref for ref in references if ref[0] not in removed_ids]
         if outside and not force:
             raise EntityInUseError(
@@ -497,7 +497,7 @@ class BuildingPark(BaseModel):
         entity._container = None
         return entity
 
-    def references_to(self, ids: set[str]) -> list[tuple[str, Any]]:
+    def _references_to(self, ids: set[str]) -> list[tuple[str, Any]]:
         """Return the references to ``ids``, as ``(referencing_id, drop_callback)`` pairs."""
         references: list[tuple[str, Any]] = []
         for system in self.iter_systems():

@@ -6,6 +6,7 @@ from typing import Annotated, Any
 
 import pandas as pd
 from pydantic import (
+    AfterValidator,
     BaseModel,
     BeforeValidator,
     ConfigDict,
@@ -26,6 +27,18 @@ __all__ = ["TAG_NAMES", "Channel", "Meter", "tide_column"]
 
 TAG_NAMES = ("bloc", "sub_bloc")
 """Tags of a meter that may be overridden through ``Meter.tags``."""
+
+
+def _check_timestep(value: str) -> str:
+    try:
+        pd.tseries.frequencies.to_offset(value)
+    except ValueError as error:
+        raise ValueError(f"invalid timestep {value!r}: {error}") from error
+    return value
+
+
+Timestep = Annotated[str, AfterValidator(_check_timestep)]
+"""A pandas offset alias such as ``"30min"`` or ``"1h"``."""
 
 AnySource = Annotated[SerializeAsAny[DataSource], BeforeValidator(data_source_from_dict)]
 
@@ -111,7 +124,9 @@ class Meter(SourcedModel):
     name = sourced(str)
     energy_type = sourced(EnergyType)
     end_use = sourced(EndUse, description="Measured end use")
-    timestep = sourced(str, description="Nominal time step, as a pandas offset ('30min', '1h')")
+    timestep = sourced(
+        Timestep, description="Nominal time step, as a pandas offset ('30min', '1h')"
+    )
 
     _data: pd.DataFrame | None = PrivateAttr(default=None)
 
@@ -146,15 +161,6 @@ class Meter(SourcedModel):
         if name == "scope" and self._container is not None:
             self._container._check_scope(self.id, value)
         super().__setattr__(name, value)
-
-    def set(self, name: str, value: Any, **provenance: Any) -> Any:
-        """Set a sourced attribute (see :meth:`SourcedModel.set`); validates ``timestep``."""
-        if name == "timestep" and value is not None:
-            try:
-                pd.tseries.frequencies.to_offset(value)
-            except ValueError as error:
-                raise ValueError(f"invalid timestep {value!r}: {error}") from error
-        return super().set(name, value, **provenance)
 
     # --- tide naming --------------------------------------------------------------------------
 

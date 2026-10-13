@@ -17,8 +17,8 @@ class Part(SourcedModel):
     u_value = sourced(float, inherit=True)
     area = sourced(float)
 
-    def inheritance_parent(self):
-        owner_parent = self._container.inheritance_parent() if self._container else None
+    def _inheritance_parent(self):
+        owner_parent = self._container._inheritance_parent() if self._container else None
         return owner_parent.part if owner_parent is not None else None
 
 
@@ -32,7 +32,7 @@ class Node(SourcedModel):
     def model_post_init(self, context):
         self.part._container = self
 
-    def inheritance_parent(self):
+    def _inheritance_parent(self):
         return self._container if isinstance(self._container, Node) else None
 
 

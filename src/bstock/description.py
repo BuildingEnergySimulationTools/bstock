@@ -98,7 +98,7 @@ class DescribedEntity(SourcedModel):
             node = node._container
         return node
 
-    def inheritance_parent(self) -> SourcedModel | None:
+    def _inheritance_parent(self) -> SourcedModel | None:
         """Inherited values come from the parent site."""
         return self.parent
 

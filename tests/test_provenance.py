@@ -1,5 +1,7 @@
+import copy
 import datetime
 import json
+import pickle
 import warnings
 
 import pytest
@@ -8,7 +10,10 @@ from pydantic import BaseModel, ValidationError
 from bstock.enums import EnergyType
 from bstock.exceptions import UnknownAttributeWarning, UnknownFieldError
 from bstock.provenance import (
+    COMPUTED_SOURCE,
     DEFAULT_SOURCE_PRIORITY,
+    MANUAL_SOURCE,
+    WILDCARD_SOURCE,
     SourcedModel,
     SourcedValue,
     SourcePriority,
@@ -275,6 +280,36 @@ def test_tie_broken_by_most_recent_date_then_last_added():
     assert chosen.source == "y"
     chosen = priority.select("area", candidates(("x", None), ("y", None)))
     assert chosen.source == "y"
+
+
+@pytest.mark.parametrize(
+    ("mutate", "error"),
+    [
+        (lambda p: setattr(p, "default", ("dpe",)), ValidationError),
+        (lambda p: p.default.append("dpe"), AttributeError),
+        (lambda p: p.per_attribute.__setitem__("area", ("dpe",)), TypeError),
+        (lambda p: p.per_attribute.update(area=("dpe",)), TypeError),
+    ],
+)
+def test_source_priority_is_immutable(mutate, error):
+    priority = SourcePriority(per_attribute={"year": ["bdnb"]})
+    with pytest.raises(error):
+        mutate(priority)
+    assert priority == SourcePriority(per_attribute={"year": ["bdnb"]})
+
+
+def test_source_priority_copies_pickles_and_serialises():
+    priority = SourcePriority(per_attribute={"year": ["bdnb", "dpe"]})
+    assert copy.deepcopy(priority) == priority
+    assert pickle.loads(pickle.dumps(priority)) == priority
+    assert json.loads(priority.model_dump_json())["per_attribute"] == {"year": ["bdnb", "dpe"]}
+    assert SourcePriority.model_validate_json(priority.model_dump_json()) == priority
+
+
+def test_reserved_source_names_are_used_by_default():
+    assert DEFAULT_SOURCE_PRIORITY.default[0] == MANUAL_SOURCE
+    assert COMPUTED_SOURCE in DEFAULT_SOURCE_PRIORITY.default
+    assert WILDCARD_SOURCE in DEFAULT_SOURCE_PRIORITY.default
 
 
 def test_no_candidate_selects_none():

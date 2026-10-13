@@ -430,6 +430,11 @@ Algorithme pour un attribut :
    joker, elles passent après toutes les sources listées.
 4. En cas d'égalité, la date la plus récente l'emporte, puis le candidat ajouté en dernier.
 
+`SourcePriority` est **immuable** (listes stockées en tuples, `per_attribute` en lecture seule) : on change
+la priorité d'un parc en lui affectant une nouvelle instance. `DEFAULT_SOURCE_PRIORITY`, utilisée hors parc,
+ne peut donc pas être modifiée par accident. Les noms de sources réservés sont exportés : `MANUAL_SOURCE`
+(`"manual"`), `COMPUTED_SOURCE` (`"computed"`) et `WILDCARD_SOURCE` (`"*"`).
+
 La priorité est portée par le **parc** : une entité détachée de tout parc utilise la priorité par défaut
 de la lib.
 
@@ -483,11 +488,13 @@ b.set("construction_year", 1985, source="audit")   # valeur propre : masque l'h�
   constructeur en candidats dans un validateur `mode="before"`.
 - Le mécanisme est **hérité** : un champ `sourced(...)` ajouté dans une sous-classe projet est traité
   exactement comme un champ du socle.
-- L'héritage des valeurs repose sur deux méthodes surchargées par les entités :
-  `inheritance_parent()` renvoie l'objet dont on hérite (le site parent pour un site ou un bâtiment,
-  l'enveloppe du site parent pour une enveloppe), et `entity_id()` renvoie l'id affiché par `provider_id()` (une
+- L'héritage des valeurs repose sur deux méthodes internes surchargées par les entités :
+  `_inheritance_parent()` renvoie l'objet dont on hérite (le site parent pour un site ou un bâtiment,
+  l'enveloppe du site parent pour une enveloppe), et `_entity_id()` renvoie l'id affiché par `provider_id()` (une
   enveloppe renvoie l'id de son propriétaire). L'héritage s'arrête au premier ancêtre qui ne déclare pas
   l'attribut.
+- Les sous-classes qui doivent réagir à un changement de candidats (contrôle des ratios d'un générateur)
+  surchargent le hook interne `_on_change(name)`, appelé par `set` et `unset`, plutôt que `set`.
 
 ---
 

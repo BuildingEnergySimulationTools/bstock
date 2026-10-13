@@ -17,14 +17,23 @@ from __future__ import annotations
 
 import datetime
 import warnings
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 from typing import Annotated, Any, ClassVar, Generic, Literal, Self, TypeVar, overload
 
-from pydantic import BaseModel, ConfigDict, Field, PrivateAttr, TypeAdapter, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    PrivateAttr,
+    TypeAdapter,
+    field_validator,
+    model_validator,
+)
 
 from bstock.exceptions import UnknownAttributeWarning, UnknownFieldError
 
 __all__ = [
+    "COMPUTED_SOURCE",
     "DEFAULT_SOURCE_PRIORITY",
     "MANUAL_SOURCE",
     "WILDCARD_SOURCE",
@@ -39,6 +48,9 @@ T = TypeVar("T")
 
 MANUAL_SOURCE = "manual"
 """Source used for direct assignment and constructor keyword arguments."""
+
+COMPUTED_SOURCE = "computed"
+"""Source of the values derived by bstock computations (e.g. ``Envelope.compute_*``)."""
 
 WILDCARD_SOURCE = "*"
 """Placeholder, in a priority list, for every source that is not listed explicitly."""
@@ -73,8 +85,24 @@ class SourcedValue(BaseModel):
     raw: Any | None = None
 
 
+class _ReadOnlyDict(dict[str, Any]):
+    """A dict that refuses modification; still copyable and picklable."""
+
+    def _refuse(self, *args: Any, **kwargs: Any) -> None:
+        raise TypeError("this mapping is read-only; build a new SourcePriority instead")
+
+    __setitem__ = __delitem__ = __ior__ = _refuse  # type: ignore[assignment]
+    clear = pop = popitem = setdefault = update = _refuse  # type: ignore[assignment]
+
+    def __reduce__(self) -> tuple[Any, ...]:
+        return (type(self), (dict(self),))
+
+
 class SourcePriority(BaseModel):
     """Rules choosing the effective value among the candidates of an attribute (SPEC §4.3).
+
+    Instances are immutable: to change the priority of a park, assign a new one
+    (``park.source_priority = SourcePriority(...)``).
 
     Parameters
     ----------
@@ -85,23 +113,28 @@ class SourcePriority(BaseModel):
         Priority lists overriding ``default`` for given attribute names.
     """
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", frozen=True)
 
-    default: list[str] = Field(
-        default_factory=lambda: [
-            "manual",
-            "audit",
-            "computed",
-            "dpe",
-            "bdnb",
-            "rnb",
-            WILDCARD_SOURCE,
-            "assumption",
-        ]
+    default: tuple[str, ...] = (
+        MANUAL_SOURCE,
+        "audit",
+        COMPUTED_SOURCE,
+        "dpe",
+        "bdnb",
+        "rnb",
+        WILDCARD_SOURCE,
+        "assumption",
     )
-    per_attribute: dict[str, list[str]] = Field(default_factory=dict)
+    per_attribute: Mapping[str, tuple[str, ...]] = Field(
+        default_factory=dict, validate_default=True
+    )
 
-    def order_for(self, attribute: str) -> list[str]:
+    @field_validator("per_attribute")
+    @classmethod
+    def _read_only(cls, value: Mapping[str, tuple[str, ...]]) -> Mapping[str, tuple[str, ...]]:
+        return _ReadOnlyDict(value)
+
+    def order_for(self, attribute: str) -> tuple[str, ...]:
         """Return the priority list that applies to ``attribute``."""
         return self.per_attribute.get(attribute, self.default)
 
@@ -396,6 +429,7 @@ class SourcedModel(BaseModel):
         )
         others = [c for c in self.values.get(name, []) if c.source != source]
         self.values[name] = [*others, candidate]
+        self._on_change(name)
         return candidate
 
     def unset(self, name: str, *, source: str | None = None) -> None:
@@ -407,14 +441,17 @@ class SourcedModel(BaseModel):
             If ``name`` is not a sourced attribute.
         """
         self._field(name)
-        if source is None:
-            self.values.pop(name, None)
-            return
-        remaining = [c for c in self.values.get(name, []) if c.source != source]
+        remaining = (
+            [] if source is None else [c for c in self.values.get(name, []) if c.source != source]
+        )
         if remaining:
             self.values[name] = remaining
         else:
             self.values.pop(name, None)
+        self._on_change(name)
+
+    def _on_change(self, name: str) -> None:
+        """React to a change of the candidates of ``name``; called by ``set`` and ``unset``."""
 
     @overload
     def candidates(self, name: str, *, inherited: Literal[False] = False) -> list[SourcedValue]: ...
@@ -448,7 +485,7 @@ class SourcedModel(BaseModel):
         if not inherited:
             return list(self.values.get(name, []))
         return [
-            (node.entity_id(), candidate)
+            (node._entity_id(), candidate)
             for node in self._inheritance_chain(name)
             for candidate in node.values.get(name, [])
         ]
@@ -478,17 +515,17 @@ class SourcedModel(BaseModel):
             If ``name`` is not a sourced attribute.
         """
         provider = self._provider(name)
-        return None if provider is None else provider.entity_id()
+        return None if provider is None else provider._entity_id()
 
-    def entity_id(self) -> str | None:
+    def _entity_id(self) -> str | None:
         """Return the id identifying this object, or the one of its owner if it has none."""
         own_id = getattr(self, "id", None)
         if isinstance(own_id, str):
             return own_id
         owner = self._container
-        return owner.entity_id() if isinstance(owner, SourcedModel) else None
+        return owner._entity_id() if isinstance(owner, SourcedModel) else None
 
-    def inheritance_parent(self) -> SourcedModel | None:
+    def _inheritance_parent(self) -> SourcedModel | None:
         """Return the object this one inherits values from, or ``None``.
 
         The base implementation inherits from nothing. Sites, buildings and envelopes override it.
@@ -501,12 +538,12 @@ class SourcedModel(BaseModel):
         chain: list[SourcedModel] = [self]
         if field is None or not field.inherit:
             return chain
-        node = self.inheritance_parent()
+        node = self._inheritance_parent()
         while node is not None and name in node.__sourced_fields__:
             if any(node is seen for seen in chain):
                 raise RuntimeError(f"inheritance cycle detected on {name!r}")
             chain.append(node)
-            node = node.inheritance_parent()
+            node = node._inheritance_parent()
         return chain
 
     def _provider(self, name: str) -> SourcedModel | None:

@@ -89,6 +89,11 @@ def test_channel_name_cannot_contain_separator():
         Channel(name="a__b", unit="W")
 
 
+def test_timestep_is_validated_at_construction():
+    with pytest.raises(ValidationError, match="timestep"):
+        Meter(channels=[Channel(name="e", unit="kWh")], timestep="every now and then")
+
+
 def test_timestep_is_validated():
     meter = Meter(channels=[Channel(name="e", unit="kWh")], timestep="30min")
     assert meter.timestep == "30min"

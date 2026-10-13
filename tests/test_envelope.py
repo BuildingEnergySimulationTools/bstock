@@ -184,7 +184,7 @@ class Owner(SourcedModel):
     def model_post_init(self, context):
         self.envelope._container = self
 
-    def inheritance_parent(self):
+    def _inheritance_parent(self):
         return self._container if isinstance(self._container, Owner) else None
 
 
@@ -202,7 +202,7 @@ def test_envelope_inherits_from_parent_owner_envelope():
 
 
 def test_envelope_without_owner_inherits_nothing():
-    assert Envelope().inheritance_parent() is None
+    assert Envelope()._inheritance_parent() is None
     assert Envelope().u_bat is None
 
 

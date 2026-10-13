@@ -21,7 +21,7 @@ from bstock.enums import (
     Orientation,
     SystemKind,
 )
-from bstock.envelope import COMPUTED_SOURCE, Envelope, EnvelopeComponent, Window
+from bstock.envelope import Envelope, EnvelopeComponent, Window
 from bstock.exceptions import (
     BstockError,
     BstockWarning,
@@ -43,7 +43,10 @@ from bstock.exceptions import (
 from bstock.meters import Channel, Meter, tide_column
 from bstock.park import BuildingPark
 from bstock.provenance import (
+    COMPUTED_SOURCE,
     DEFAULT_SOURCE_PRIORITY,
+    MANUAL_SOURCE,
+    WILDCARD_SOURCE,
     SourcedField,
     SourcedModel,
     SourcedValue,
@@ -70,6 +73,8 @@ except PackageNotFoundError:  # pragma: no cover - package not installed
 __all__ = [
     "COMPUTED_SOURCE",
     "DEFAULT_SOURCE_PRIORITY",
+    "MANUAL_SOURCE",
+    "WILDCARD_SOURCE",
     "Adjacency",
     "BstockError",
     "BstockWarning",

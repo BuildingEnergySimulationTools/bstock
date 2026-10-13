@@ -161,6 +161,16 @@ def test_check_runs_when_values_change_later():
         generator.set("nominal_performance_ratio", 0.7, source="audit")
 
 
+def test_check_runs_when_a_candidate_is_removed():
+    generator = HeatingGenerator(seasonal_performance_ratio=0.9)
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        generator.set("technology", "heat_pump_air_water", source="dpe")
+        generator.set("technology", "boiler_condensing", source="manual")
+    with pytest.warns(PerformanceRatioWarning, match="below 1"):
+        generator.unset("technology", source="manual")  # the heat pump becomes effective
+
+
 def test_check_returns_messages():
     with pytest.warns(PerformanceRatioWarning):
         generator = HeatingGenerator(technology="boiler_standard", nominal_performance_ratio=2.0)

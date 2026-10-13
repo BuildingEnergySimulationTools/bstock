@@ -10,7 +10,7 @@ from pydantic import Field, field_validator, model_validator
 from bstock._ids import check_id, new_id
 from bstock.enums import EnergyType, GeneratorTechnology, SystemKind
 from bstock.exceptions import PerformanceRatioWarning
-from bstock.provenance import SourcedModel, SourcedValue, sourced
+from bstock.provenance import SourcedModel, sourced
 
 __all__ = [
     "CoolingGenerator",
@@ -129,12 +129,10 @@ class Generator(System):
         """Check the performance ratios given at construction."""
         self.check_performance_ratios()
 
-    def set(self, name: str, value: Any, **provenance: Any) -> SourcedValue | None:
-        """Set a sourced attribute (see :meth:`SourcedModel.set`), then check the ratios."""
-        candidate = super().set(name, value, **provenance)
+    def _on_change(self, name: str) -> None:
+        """Check the ratios again when the technology or a ratio changes."""
         if name == "technology" or name in _RATIO_FIELDS:
             self.check_performance_ratios()
-        return candidate
 
     def check_performance_ratios(self) -> list[str]:
         """Warn about effective ratios inconsistent with the effective technology.
@@ -158,7 +156,7 @@ class Generator(System):
             elif technology in THERMODYNAMIC and ratio < 1:
                 messages.append(f"{self.id}: {name}={ratio} is below 1 for a {technology}")
         for message in messages:
-            warnings.warn(message, PerformanceRatioWarning, stacklevel=3)
+            warnings.warn(message, PerformanceRatioWarning, stacklevel=4)
         return messages
 
 

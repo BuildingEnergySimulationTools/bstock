@@ -18,12 +18,9 @@ from bstock.enums import (
     Orientation,
 )
 from bstock.exceptions import DuplicateIdError, IncompleteDataError, UnknownIdError
-from bstock.provenance import SourcedModel, SourcedValue, sourced
+from bstock.provenance import COMPUTED_SOURCE, SourcedModel, SourcedValue, sourced
 
 __all__ = ["COMPUTED_SOURCE", "Envelope", "EnvelopeComponent", "Window"]
-
-COMPUTED_SOURCE = "computed"
-"""Source of the values derived by the ``compute_*`` methods."""
 
 
 class EnvelopeComponent(SourcedModel):
@@ -121,10 +118,10 @@ class Envelope(SourcedModel):
             seen.add(component.id)
             component._container = self
 
-    def inheritance_parent(self) -> Envelope | None:
+    def _inheritance_parent(self) -> Envelope | None:
         """Return the envelope of the parent site of the owner, if any."""
         owner = self._container
-        parent = owner.inheritance_parent() if isinstance(owner, SourcedModel) else None
+        parent = owner._inheritance_parent() if isinstance(owner, SourcedModel) else None
         envelope = getattr(parent, "envelope", None)
         return envelope if isinstance(envelope, Envelope) else None
 
