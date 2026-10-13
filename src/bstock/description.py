@@ -10,7 +10,7 @@ from pydantic import Field, field_validator
 from bstock._ids import check_external_id, check_id
 from bstock.enums import BuildingUsage, SystemKind
 from bstock.envelope import Envelope
-from bstock.exceptions import DuplicateIdError, UnknownIdError
+from bstock.exceptions import DuplicateIdError, HierarchyError, UnknownIdError, UnknownKindError
 from bstock.provenance import SourcedModel, sourced
 from bstock.systems import (
     SYSTEM_CLASSES,
@@ -123,7 +123,7 @@ class DescribedEntity(SourcedModel):
         ------
         DuplicateIdError
             If the entity, or the park it belongs to, already uses the id.
-        ValueError
+        HierarchyError
             If ``serves`` is set on a system added to a building.
         UnknownIdError
             If ``serves`` names a building outside the site.
@@ -156,7 +156,9 @@ class DescribedEntity(SourcedModel):
     def _check_served(self, serves: list[str] | None) -> None:
         """Check the ``serves`` of a system owned by this entity; only sites accept one."""
         if serves is not None:
-            raise ValueError(f"'serves' only applies to systems owned by a site, not {self.id!r}")
+            raise HierarchyError(
+                f"'serves' only applies to systems owned by a site, not {self.id!r}"
+            )
 
     def meters(self) -> list[Any]:
         """Return the park meters whose scope contains this entity or one of its own systems.
@@ -178,4 +180,6 @@ def _check_kind(kind: SystemKind | str) -> SystemKind:
         return SystemKind(kind)
     except ValueError:
         expected = [str(k) for k in SystemKind]
-        raise ValueError(f"unknown system kind {kind!r}; expected one of {expected}") from None
+        raise UnknownKindError(
+            f"unknown system kind {kind!r}; expected one of {expected}"
+        ) from None

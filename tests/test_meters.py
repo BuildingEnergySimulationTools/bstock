@@ -9,6 +9,7 @@ from bstock.enums import EndUse
 from bstock.exceptions import (
     DataSourceError,
     EntityInUseError,
+    InvalidTagError,
     NoDataWarning,
     TimeSeriesError,
     UnknownIdError,
@@ -41,7 +42,7 @@ def park():
 
 def test_tide_column():
     assert tide_column("PDL_power", "W", "site-A", "total") == "PDL_power__W__site-A__total"
-    with pytest.raises(ValueError, match="tide tag"):
+    with pytest.raises(InvalidTagError, match="tide tag"):
         tide_column("a__b", "W", "x", "y")
 
 

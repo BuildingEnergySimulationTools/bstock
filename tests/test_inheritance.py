@@ -9,7 +9,7 @@ from __future__ import annotations
 import pytest
 from pydantic import BaseModel
 
-from bstock.exceptions import UnknownFieldError
+from bstock.exceptions import HierarchyError, UnknownFieldError
 from bstock.provenance import SourcedModel, SourcedValue, SourcePriority, sourced
 
 
@@ -170,5 +170,5 @@ def test_inheritance_cycle_is_detected():
     first, second = Node(id="a"), Node(id="b")
     attach(first, second)
     attach(second, first)
-    with pytest.raises(RuntimeError, match="cycle"):
+    with pytest.raises(HierarchyError, match="cycle"):
         _ = first.year

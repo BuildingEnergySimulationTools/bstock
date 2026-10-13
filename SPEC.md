@@ -101,8 +101,9 @@ Toutes les entités (`Site`, `Building`, `Envelope`, systèmes, `Meter`) hérite
 
 ### 3.3 Conventions
 
-- **Unités SI fixées par champ**, sans bibliothèque d'unités. L'unité est déclarée dans les métadonnées du
-  champ : elle apparaît dans le JSON Schema, dans `Building.sourced_fields()["heated_area"].unit` et dans
+- **Unité fixée par champ**, sans bibliothèque d'unités : SI, ou unité usuelle du métier telle que la
+  donnent les sources (kW, kWp, L, °, m³/(h.m²)), pour éviter des conversions dans les connecteurs. L'unité
+  est déclarée dans les métadonnées du champ : elle apparaît dans le JSON Schema, dans `Building.sourced_fields()["heated_area"].unit` et dans
   le tag `unit` de tide.
 - Les attributs **descriptifs** sont « sourcés » (§4). Les **identifiants et relations** (`id`, `rnb_id`,
   listes d'enfants, `scope`, `serves`) sont des valeurs simples.
@@ -288,7 +289,7 @@ Classe de base commune `System` : `id: str`, `name` (sourcé `str`), `serves: li
 - `serves` n'a de sens que pour un système de **site** : c'est la liste des `id` des bâtiments desservis. `None`
   signifie « tous les bâtiments du site et de ses sous-sites ».
 - Un système porté par un bâtiment dessert implicitement ce seul bâtiment : son `serves` doit rester `None`
-  (sinon `ValueError`).
+  (sinon `HierarchyError`).
 - Les ids de `serves` doivent désigner des bâtiments du site ou de ses sous-sites (sinon `UnknownIdError`).
   C'est vérifié par `add_system` (celui du parc comme celui du site ou du bâtiment) et à chaque affectation
   de `system.serves` sur un système rattaché. Une modification en place (`system.serves.append(...)`) n'est
@@ -542,7 +543,7 @@ Règles :
   `site.add_building` font le même contrôle quand le site appartient à un parc, de même que la construction
   directe `BuildingPark(..., site_cls=..., building_cls=..., sites=[...])`. Dans ce dernier cas, les
   entités données sous forme de dict sont créées avec ces classes. Une instance d'une autre classe lève
-  `TypeError`.
+  `ProjectClassError`.
 - **Chargement** : `BuildingPark.load(path, site_cls=BayonneSite, building_cls=BayonneBuilding)`. Si un
   fichier contient des attributs inconnus de la classe utilisée (par exemple, un parc Bayonne rechargé avec
   `Building`), ils sont **conservés tels quels** et réécrits à la sauvegarde. Un avertissement est émis :

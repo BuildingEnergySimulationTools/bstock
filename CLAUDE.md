@@ -42,8 +42,8 @@ SPEC.md            # spécification
 - **Docstrings** au format NumPy pour toute fonction ou classe publique : description, `Parameters`,
   `Returns`, `Raises`, et unité des grandeurs physiques.
 - **Pydantic v2** pour les modèles de données. Pas de dataclasses pour les entités du modèle.
-- **Unités SI** fixées par champ et déclarées dans les métadonnées (`sourced(unit="m²")`). Jamais d'unité
-  implicite.
+- **Unité fixée par champ** et déclarée dans les métadonnées (`sourced(unit="m²")`) : SI, ou unité usuelle
+  du métier telle que la donnent les sources (kW, kWp, L, °). Jamais d'unité implicite.
 - Pas de `print` dans la lib : `warnings.warn` pour les avertissements utilisateur, `logging`
   (`logging.getLogger(__name__)`) pour le diagnostic.
 - Exceptions spécifiques à la lib dans `bstock/exceptions.py` (héritant d'une `BstockError`). Ne pas lever

@@ -30,7 +30,7 @@ from pydantic import (
     model_validator,
 )
 
-from bstock.exceptions import UnknownAttributeWarning, UnknownFieldError
+from bstock.exceptions import HierarchyError, UnknownAttributeWarning, UnknownFieldError
 
 __all__ = [
     "COMPUTED_SOURCE",
@@ -541,7 +541,7 @@ class SourcedModel(BaseModel):
         node = self._inheritance_parent()
         while node is not None and name in node.__sourced_fields__:
             if any(node is seen for seen in chain):
-                raise RuntimeError(f"inheritance cycle detected on {name!r}")
+                raise HierarchyError(f"inheritance cycle detected on {name!r}")
             chain.append(node)
             node = node._inheritance_parent()
         return chain

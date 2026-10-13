@@ -17,7 +17,9 @@ from bstock.enums import EndUse, EnergyType, SystemKind
 from bstock.exceptions import (
     DuplicateIdError,
     EntityInUseError,
+    HierarchyError,
     NoDataWarning,
+    ProjectClassError,
     UnknownIdError,
 )
 from bstock.meters import Meter
@@ -256,7 +258,7 @@ class BuildingPark(BaseModel):
 
         Raises
         ------
-        TypeError
+        ProjectClassError
             If a site of the subtree is not an instance of :attr:`site_cls`, or a building of
             :attr:`building_cls`.
         DuplicateIdError
@@ -277,7 +279,7 @@ class BuildingPark(BaseModel):
 
         Raises
         ------
-        TypeError
+        ProjectClassError
             If ``building`` is not an instance of :attr:`building_cls`.
         DuplicateIdError
             If its id, RNB id or one of its system ids is already used in the park.
@@ -425,7 +427,7 @@ class BuildingPark(BaseModel):
         ------
         UnknownIdError
             If ``entity`` or ``new_parent`` is not in the park.
-        ValueError
+        HierarchyError
             If a site would be moved inside itself.
         EntityInUseError
             If a system of a site left behind serves a moved building and ``force`` is False.
@@ -437,7 +439,7 @@ class BuildingPark(BaseModel):
             and isinstance(entity, Site)
             and (target is entity or any(target is s for s in entity.iter_sites()))
         ):
-            raise ValueError(f"cannot move {entity.id!r} inside itself")
+            raise HierarchyError(f"cannot move {entity.id!r} inside itself")
         moved = {e.id for e in _walk(entity) if isinstance(e, Building)}
         stale = _systems_left_serving(entity, target, moved)
         if stale and not force:
@@ -571,7 +573,7 @@ class BuildingPark(BaseModel):
                 continue
             expected = self.site_cls if isinstance(item, Site) else self.building_cls
             if not isinstance(item, expected):
-                raise TypeError(
+                raise ProjectClassError(
                     f"{item.id!r}: expected an instance of {expected.__name__}, "
                     f"got {type(item).__name__}"
                 )

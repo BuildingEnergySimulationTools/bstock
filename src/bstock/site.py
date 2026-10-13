@@ -10,7 +10,7 @@ from pydantic import Field, ValidationInfo, field_validator, model_validator
 from bstock._ids import check_external_id
 from bstock.building import Building
 from bstock.description import DescribedEntity
-from bstock.exceptions import DuplicateIdError, UnknownIdError
+from bstock.exceptions import DuplicateIdError, HierarchyError, UnknownIdError
 
 __all__ = ["Site"]
 
@@ -82,7 +82,7 @@ class Site(DescribedEntity):
         ------
         DuplicateIdError
             If the id is already used by a direct child or in the park.
-        TypeError
+        ProjectClassError
             If the site belongs to a park and a site or building of the added subtree is not an
             instance of the park ``site_cls`` or ``building_cls``.
         """
@@ -99,7 +99,7 @@ class Site(DescribedEntity):
         ------
         DuplicateIdError
             If the id is already used by a direct child or in the park.
-        TypeError
+        ProjectClassError
             If the site belongs to a park and a site or building of the added subtree is not an
             instance of the park ``site_cls`` or ``building_cls``.
         """
@@ -128,7 +128,7 @@ class Site(DescribedEntity):
 
     def _check_new_child(self, child: Site | Building) -> None:
         if child is self or any(child is s for s in self._ancestor_sites()):
-            raise ValueError(f"cannot attach {child.id!r} inside itself")
+            raise HierarchyError(f"cannot attach {child.id!r} inside itself")
         if any(c.id == child.id for c in [*self.sites, *self.buildings]):
             raise DuplicateIdError(f"id {child.id!r} is already used in site {self.id!r}")
         park = self.park

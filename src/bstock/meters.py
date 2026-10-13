@@ -19,7 +19,7 @@ from pydantic import (
 
 from bstock._ids import TIDE_SEPARATOR, check_id, new_id
 from bstock.enums import EndUse, EnergyType
-from bstock.exceptions import DataSourceError, TimeSeriesError
+from bstock.exceptions import DataSourceError, InvalidTagError, TimeSeriesError
 from bstock.provenance import SourcedModel, sourced
 from bstock.sources import DataSource, data_source_from_dict, ensure_time_index
 
@@ -45,13 +45,13 @@ def tide_column(name: str, unit: str, bloc: str, sub_bloc: str) -> str:
 
     Raises
     ------
-    ValueError
+    InvalidTagError
         If a tag is empty or contains the separator ``__``.
     """
     tags = (name, unit, bloc, sub_bloc)
     for tag in tags:
         if not tag or TIDE_SEPARATOR in tag:
-            raise ValueError(f"invalid tide tag {tag!r}")
+            raise InvalidTagError(f"invalid tide tag {tag!r}")
     return TIDE_SEPARATOR.join(tags)
 
 

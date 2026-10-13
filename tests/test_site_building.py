@@ -6,7 +6,13 @@ from pydantic import ValidationError
 
 from bstock.building import Building
 from bstock.enums import BuildingUsage, Inertia
-from bstock.exceptions import DuplicateIdError, IdentifierFormatWarning, UnknownIdError
+from bstock.exceptions import (
+    DuplicateIdError,
+    HierarchyError,
+    IdentifierFormatWarning,
+    UnknownIdError,
+    UnknownKindError,
+)
 from bstock.site import Site
 from bstock.systems import HeatingGenerator, SolarPV
 
@@ -181,7 +187,7 @@ def test_duplicate_child_id_is_rejected(tree):
 
 def test_site_cannot_contain_itself(tree):
     client, group, _, _, _ = tree
-    with pytest.raises(ValueError, match="inside itself"):
+    with pytest.raises(HierarchyError, match="inside itself"):
         group.add_site(client)
 
 
@@ -221,7 +227,7 @@ def test_shared_systems_serve_buildings(tree):
 
 
 def test_unknown_system_kind_is_rejected():
-    with pytest.raises(ValueError, match="unknown system kind"):
+    with pytest.raises(UnknownKindError, match="unknown system kind"):
         Building().systems("geothermal")
 
 

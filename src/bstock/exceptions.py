@@ -21,6 +21,26 @@ class EntityInUseError(BstockError):
     """An entity cannot be removed because other entities still reference it."""
 
 
+class InvalidTagError(BstockError, ValueError):
+    """A tide tag is empty or contains the separator ``__``."""
+
+
+class UnknownKindError(BstockError, ValueError):
+    """A system kind is not one of :class:`~bstock.enums.SystemKind`."""
+
+
+class HierarchyError(BstockError, ValueError):
+    """An operation would break the park hierarchy.
+
+    For example: a site moved or attached inside itself, an inheritance cycle, or ``serves`` set on
+    a system owned by a building.
+    """
+
+
+class ProjectClassError(BstockError, TypeError):
+    """A site or building is not an instance of the class configured on the park (SPEC §5)."""
+
+
 class UnknownFieldError(BstockError, AttributeError):
     """The requested name is not a sourced attribute of the model."""
 

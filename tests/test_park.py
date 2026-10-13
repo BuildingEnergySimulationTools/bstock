@@ -2,7 +2,13 @@ import pytest
 from pydantic import ValidationError
 
 from bstock.building import Building
-from bstock.exceptions import DuplicateIdError, EntityInUseError, UnknownIdError
+from bstock.exceptions import (
+    DuplicateIdError,
+    EntityInUseError,
+    HierarchyError,
+    ProjectClassError,
+    UnknownIdError,
+)
 from bstock.park import BuildingPark
 from bstock.provenance import SourcePriority, sourced
 from bstock.site import Site
@@ -159,16 +165,16 @@ def test_new_entities_use_project_classes():
 
 def test_add_checks_project_class():
     park = BuildingPark(name="Bayonne", building_cls=BayonneBuilding)
-    with pytest.raises(TypeError, match="BayonneBuilding"):
+    with pytest.raises(ProjectClassError, match="BayonneBuilding"):
         park.add_building(Building(rnb_id=RNB_A))
 
 
 def test_site_methods_check_project_class():
     park = BuildingPark(name="Bayonne", site_cls=BayonneSite, building_cls=BayonneBuilding)
     site = park.new_site("s1")
-    with pytest.raises(TypeError, match="BayonneBuilding"):
+    with pytest.raises(ProjectClassError, match="BayonneBuilding"):
         site.add_building(Building(rnb_id=RNB_A))
-    with pytest.raises(TypeError, match="BayonneSite"):
+    with pytest.raises(ProjectClassError, match="BayonneSite"):
         site.add_site(Site(id="s2"))
     assert site.buildings == []
     assert site.sites == []
@@ -177,7 +183,7 @@ def test_site_methods_check_project_class():
 
 def test_add_site_checks_classes_of_subtree():
     park = BuildingPark(name="Bayonne", site_cls=BayonneSite, building_cls=BayonneBuilding)
-    with pytest.raises(TypeError, match="BayonneBuilding"):
+    with pytest.raises(ProjectClassError, match="BayonneBuilding"):
         park.add_site(BayonneSite(id="s1", buildings=[Building(rnb_id=RNB_A)]))
     assert "s1" not in park
 
@@ -196,7 +202,7 @@ def test_park_built_from_data_uses_project_classes():
 
 
 def test_park_built_with_other_classes_is_rejected():
-    with pytest.raises(TypeError, match="BayonneBuilding"):
+    with pytest.raises(ProjectClassError, match="BayonneBuilding"):
         BuildingPark(
             name="Bayonne",
             building_cls=BayonneBuilding,
@@ -218,7 +224,7 @@ def test_add_shared_system_checks_served_buildings(park):
     assert park["bldg-isolated"].systems("heating") == []
     with pytest.raises(UnknownIdError):
         park.add_system(HeatingGenerator(serves=["bldg-isolated"]), "site-ecole-A")
-    with pytest.raises(ValueError, match="serves"):
+    with pytest.raises(HierarchyError, match="serves"):
         park.add_system(HeatingGenerator(serves=[RNB_A]), RNB_A)
 
 
@@ -227,7 +233,7 @@ def test_add_shared_system_checks_served_buildings(park):
     [
         ("site-ecole-A", ["bldg-isolated"], UnknownIdError),
         (GROUP, [RNB_C], UnknownIdError),  # in the parent site, not in the group
-        (RNB_A, [RNB_A], ValueError),
+        (RNB_A, [RNB_A], HierarchyError),
     ],
 )
 def test_entity_add_system_checks_served_buildings(park, owner, serves, error):
@@ -246,7 +252,7 @@ def test_serves_assignment_is_checked(park):
     plant.serves = [RNB_A, RNB_C]
     assert plant.serves == [RNB_A, RNB_C]
     own = park.add_system(HeatingGenerator(id="own"), RNB_A)
-    with pytest.raises(ValueError, match="serves"):
+    with pytest.raises(HierarchyError, match="serves"):
         own.serves = [RNB_A]
     assert own.serves is None
 
@@ -308,7 +314,7 @@ def test_move_inside_serving_site_keeps_references(park):
 
 
 def test_site_cannot_move_inside_itself(park):
-    with pytest.raises(ValueError, match="inside itself"):
+    with pytest.raises(HierarchyError, match="inside itself"):
         park.move("site-ecole-A", GROUP)
 
 
