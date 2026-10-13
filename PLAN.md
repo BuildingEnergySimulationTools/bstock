@@ -1,12 +1,19 @@
-# PLAN — réalisation de bstock v1
-
-Périmètre v1 (SPEC §10) : modèle, provenance multi-sources et héritage, extension par projet, compteurs
-et sources CSV/Parquet, `timeseries()` au format tide, persistance JSON + Parquet.
+# PLAN — réalisation de bstock
 
 Règles (voir `CLAUDE.md`) :
 - chaque étape se termine par `ruff check`, `ruff format` et `pytest` au vert, puis un commit ;
 - une case n'est cochée que si le code **et** ses tests sont faits ;
 - un écart avec la SPEC passe d'abord par une mise à jour de `SPEC.md`.
+
+Sommaire : [v1](#v1--terminée) (terminée, 0.1.0 puis ajustements d'API en 0.2.0) ·
+[v2](#v2--connecteurs-emprise-et-exports) (en cours) · [v3](#v3--rappel-de-la-feuille-de-route)
+
+---
+
+# v1 — terminée
+
+Périmètre v1 (SPEC §10) : modèle, provenance multi-sources et héritage, extension par projet, compteurs
+et sources CSV/Parquet, `timeseries()` au format tide, persistance JSON + Parquet.
 
 ---
 
@@ -106,8 +113,152 @@ Règles (voir `CLAUDE.md`) :
 
 ---
 
-## Après la v1 (rappel de la feuille de route)
-- v2 : connecteurs RNB, BDNB, DPE (tables de correspondance de l'annexe A) ; exports pandas, GeoPandas,
-  GeoPackage, GeoParquet ; emprise au sol
-- v3 : filtrage, agrégations des grandeurs extensives, rapport de complétude et de provenance ; graphiques
+# v2 — connecteurs, emprise et exports
+
+Périmètre v2 (SPEC §10) : connecteurs API RNB, BDNB et DPE, emprise au sol (`footprint`), exports
+`to_dataframe()`, `to_geodataframe()`, GeoPackage et GeoParquet. Version cible : **0.3.0**.
+
+## Décisions de conception (interview du 2026-10-13)
+
+À reporter dans `SPEC.md` à l'étape 11 avant tout code.
+
+| # | Sujet | Décision |
+|---|---|---|
+| D1 | Client HTTP | `requests`, dans un extra `[connectors]`, importé dans les fonctions qui en ont besoin (message clair s'il manque) |
+| D2 | Géométrie | `footprint` = dict GeoJSON (`Polygon` / `MultiPolygon`) en **WGS84**, dans le socle, sans dépendance. shapely, geopandas et pyproj dans un extra `[geo]` : exports géographiques et reprojection des géométries BDNB (Lambert-93, EPSG:2154) |
+| D3 | API des connecteurs | En couches, pour chaque source : **client** brut (`RnbClient`, `BdnbClient`, `DpeClient` ; URL de base, session et clé d'API configurables), **correspondances** pures (réponse → candidats, avec `raw` et `ref`), **fonctions de haut niveau** sur le parc (`rnb.add_buildings`, `rnb.enrich`, `bdnb.enrich`, `dpe.enrich`) qui acceptent un `client=` injectable |
+| D4 | Groupe BDNB | Groupe à plusieurs bâtiments → sous-site `bdnb-bg-…` créé sous le parent commun, bâtiments déplacés (`group_sites=True` par défaut, désactivable). Bâtiments du groupe dans des parents différents : pas de restructuration, avertissement |
+| D5 | Jeux DPE | `dpe03existant`, `dpe02neuf` (même schéma) et `dpe01tertiaire`. XML DPE hors v2 |
+| D6 | Sélection des DPE | Seuls les DPE à l'échelle du bâtiment (immeuble, maison, tertiaire) alimentent les attributs ; le plus récent l'emporte (`date` = date d'établissement, `ref` = n° DPE). Les DPE d'appartement sont seulement ajoutés à `dpe_ids` |
+| D7 | Groupe BDNB à un seul bâtiment du parc | On compte les constructions **dans la BDNB**, pas dans le parc : un groupe de plusieurs constructions devient un sous-site même s'il ne contient qu'un bâtiment du parc (intensifs hérités, extensifs du groupe sur le site, sans double compte). Valeurs portées par le bâtiment seulement si le groupe n'a qu'une construction |
+| D8 | Surface DPE | Surface habitable (DPE logement) et surface utile (DPE tertiaire) → `heated_area`, avec un `comment` qui nomme la surface d'origine. `floor_area` (surface de plancher) n'est jamais alimentée par le DPE |
+| D9 | `footprint_area` calculée | `compute_footprint_area()` ajoute un candidat `"computed"` à partir de `footprint`, sans dépendance : projection équirectangulaire locale autour du centroïde puis formule du lacet (écart < 0,1 % à l'échelle d'un bâtiment). La valeur BDNB (`s_geom_cstr`) reste un candidat `"bdnb"` |
+| D10 | Bâtiments sans `rnb_id` | `rnb.suggest_matches(park, ...)` propose des candidats RNB par point (`lat`/`lon`) ou par adresse, dans un DataFrame (distance, adresse, emprise) validé par l'utilisateur. Aucune affectation automatique, sauf `assign="unique"` (un seul candidat dans le rayon) |
+
+Principes communs aux connecteurs (proposés, à valider avec la SPEC) :
+- noms de source `"rnb"`, `"bdnb"` et `"dpe"`, déjà présents dans la priorité par défaut ;
+- **idempotence** : relancer un enrichissement remplace les candidats de la même source (un candidat par
+  source, §4.2) et met à jour les systèmes déjà créés au lieu de les dupliquer. Les systèmes créés par
+  un connecteur ont donc un id déterministe (ex. `heating-<owner_id>-bdnb-1`) ;
+- un libellé source inconnu des tables de correspondance n'arrête pas l'import : la valeur prend `OTHER`
+  quand l'enum l'a, sinon elle n'est pas posée, et un `UnmappedValueWarning` cite le libellé ;
+- les fonctions de haut niveau renvoient un **rapport** (entités créées, enrichies, non trouvées,
+  ambiguës) plutôt que de tout signaler par des avertissements ;
+- pas de cache dans bstock : l'utilisateur sauvegarde le parc enrichi, ou passe sa propre session
+  (`requests-cache` par exemple) au client ;
+- le format JSON ne change pas (`schema_version` reste 1) : `footprint` est un attribut sourcé comme les
+  autres.
+
+## Étape 11 — SPEC v2
+- [ ] Reporter D1 à D10 et les principes communs dans `SPEC.md` : nouvelle section « Connecteurs »,
+      `footprint` et `compute_footprint_area()` au §3.6, exports au §7 ou dans une section dédiée,
+      extras au §9 ; retirer de §10 la règle « groupe à un seul bâtiment » au profit de D7
+- [ ] Vérifier les contrats d'API actuels (endpoints, pagination, quotas, champs) et les noter en annexe A,
+      en particulier la recherche RNB par point (bâtiment le plus proche) et par adresse pour D10 ;
+      évaluer le besoin d'un géocodage BAN pour les adresses
+- [ ] Compléter l'annexe A : tables BDNB et DPE des générateurs (A.5), correspondances des surfaces (D8)
+      et de l'usage DPE
+
+## Étape 12 — Emprise au sol (socle)
+- [ ] Champ `footprint` (sourcé, dict GeoJSON, `inherit=False`) sur Site et Building
+- [ ] Validation légère sans dépendance : type `Polygon` / `MultiPolygon`, anneaux fermés,
+      coordonnées dans les bornes WGS84 (erreur de validation sinon)
+- [ ] `compute_footprint_area()` sur Site et Building (D9) : candidat `"computed"`, trous et
+      `MultiPolygon` pris en compte, `IncompleteDataError` sans emprise
+- [ ] Tests : validation, aller-retour JSON, non hérité, JSON Schema, aire calculée comparée à une
+      valeur de référence (écart < 0,1 %), priorité `computed` vs `bdnb`
+
+## Étape 13 — Export tabulaire
+- [ ] `park.to_dataframe(kind="building" | "site")` : une ligne par entité, colonnes = id, `rnb_id`,
+      ids BDNB, id du parent, valeurs effectives des attributs sourcés (héritage compris, y compris les
+      champs ajoutés par une sous-classe projet)
+- [ ] Option de provenance : colonnes `<attr>_source` (et `<attr>_provider` pour une valeur héritée)
+- [ ] Types : enums en chaînes, listes conservées, `footprint` exclu par défaut
+- [ ] Tests : sous-classe projet, héritage, provenance, parc vide
+
+## Étape 14 — Socle des connecteurs
+- [ ] Extras `[connectors]` (`requests>=2`) et `[geo]` (`shapely>=2`, `geopandas>=1`, `pyproj>=3`) dans
+      `pyproject.toml`
+- [ ] Paquet `bstock.connectors` : `_http.py` (session, timeout, nouvel essai sur 429/5xx avec attente,
+      pagination, en-tête User-Agent), import paresseux de `requests`
+- [ ] Exceptions et avertissements : `ConnectorError` (erreur HTTP ou réponse inattendue),
+      `MissingDependencyError` (extra absent), `UnmappedValueWarning`
+- [ ] Rapport d'import (`ImportReport` : créés, enrichis, non trouvés, ambigus)
+- [ ] Convention de test : réponses réelles enregistrées dans `tests/data/{rnb,bdnb,dpe}/`, un faux
+      client injecté pour les tests unitaires, tests `@pytest.mark.network` qui vérifient le contrat
+- [ ] Tests : retry, pagination, erreurs HTTP, dépendance manquante (session factice, sans réseau)
+
+## Étape 15 — Tables de correspondance (annexe A)
+- [ ] Module interne `connectors/_mappings.py` : fonctions pures libellé → enum, avec normalisation
+      (casse, accents, tiret demi-cadratin, apostrophe typographique)
+- [ ] `BuildingUsage` (A.2), `EnergyType` (A.3), enveloppe DPE (A.4)
+- [ ] Générateurs : libellés BDNB → `technology` + `energy_type` ; types DPE via `categorie_open_data`
+      puis libellé (A.5)
+- [ ] Tests paramétrés sur chaque ligne des tables, libellé inconnu → `OTHER` ou rien, avec
+      `UnmappedValueWarning`
+
+## Étape 16 — Connecteur RNB
+- [ ] `RnbClient` : bâtiment par `rnb_id`, liste par ids (et par emprise/commune si utile à
+      `add_buildings`)
+- [ ] Correspondances : `point` → `lat`/`lon`, `shape` → `footprint`, adresses → `address`,
+      `municipality`, `insee_code` ; `ext_ids` BDNB → `bdnb_batiment_construction_id`
+- [ ] `rnb.add_buildings(park, rnb_ids, parent=None)` : crée les bâtiments absents via
+      `park.new_building` (donc avec `building_cls`), enrichit les existants
+- [ ] `rnb.enrich(park, buildings=None)` : bâtiments du parc qui ont un `rnb_id`
+- [ ] Bâtiment démoli ou id inconnu du RNB : signalé dans le rapport, rien n'est supprimé
+- [ ] `rnb.suggest_matches(park, buildings=None, radius=..., assign=None)` (D10) : candidats par point
+      et/ou par adresse → DataFrame (id du bâtiment, `rnb_id` candidat, distance, adresse RNB) ;
+      `assign="unique"` pose le `rnb_id` (source de la décision tracée dans le rapport) quand il n'y a
+      qu'un candidat ; `rnb_id` déjà pris dans le parc → candidat signalé, jamais affecté
+- [ ] Tests : correspondances sur réponses enregistrées, classe projet respectée, idempotence,
+      suggestions (zéro, un, plusieurs candidats ; `rnb_id` déjà utilisé) ; un test `network`
+
+## Étape 17 — Connecteur BDNB
+- [ ] `BdnbClient` (clé d'API optionnelle) : construction par `rnb_id`, groupe par
+      `batiment_groupe_id`, constructions d'un groupe
+- [ ] Correspondances construction → bâtiment : `bdnb_batiment_construction_id`, `height`,
+      `footprint_area` (`s_geom_cstr`), `footprint` (reprojeté, extra `[geo]` ; sans l'extra, ignoré
+      avec un avertissement)
+- [ ] Correspondances groupe : `usage`, `construction_year`, `dwelling_count`, `level_count`,
+      emprise du groupe, générateurs de chauffage, d'ECS et de froid (systèmes à id déterministe)
+- [ ] Règle des groupes (D4, D7) : groupe de plusieurs constructions BDNB → sous-site `bdnb-bg-…` sous
+      le parent commun avec `park.move`, même avec un seul bâtiment du parc ; groupe d'une seule
+      construction → valeurs portées par le bâtiment ; `group_sites=False` pour désactiver ;
+      avertissement si les bâtiments ont des parents différents ; sous-site existant réutilisé
+- [ ] `bdnb.enrich(park, buildings=None, group_sites=True)`
+- [ ] Tests : groupe à un et à plusieurs bâtiments, parents différents, relance idempotente, héritage
+      des valeurs de groupe, systèmes de site ; un test `network`
+
+## Étape 18 — Connecteur DPE
+- [ ] `DpeClient` (API data-fair de l'ADEME) : DPE par numéro, par `id_rnb`, sur les trois jeux (D5)
+- [ ] Sélection (D6) : DPE à l'échelle du bâtiment seulement, le plus récent ; DPE d'appartement
+      ajoutés à `dpe_ids` sans poser d'attributs
+- [ ] Correspondances logement : surfaces, `construction_year` / période, `u_bat`, inertie, qualité
+      d'isolation, un `EnvelopeComponent` par poste avec `heat_loss_coefficient`, générateurs
+      (`technology`, `energy_type`, ratios, `storage_volume`)
+- [ ] Surfaces (D8) : surface habitable ou utile → `heated_area`, `comment` = nom de la surface d'origine
+- [ ] Correspondances tertiaire : surface utile, usage, énergie
+- [ ] `dpe.enrich(park, buildings=None)` : par `rnb_id` et par `dpe_ids` déjà connus
+- [ ] Tests : sélection (appartement ignoré, plus récent retenu), correspondances sur réponses
+      enregistrées, idempotence des parois et systèmes ; un test `network` par jeu
+
+## Étape 19 — Exports géographiques (extra `[geo]`)
+- [ ] `park.to_geodataframe(kind=..., geometry="footprint" | "point")` (CRS EPSG:4326 ; entités sans
+      géométrie conservées avec une géométrie vide)
+- [ ] `park.to_geopackage(path)` (une couche sites, une couche bâtiments) et `park.to_geoparquet(path)`
+- [ ] Listes, enums et dicts convertis pour les formats qui ne les acceptent pas (JSON en chaîne)
+- [ ] Tests (sautés si `[geo]` absent) : aller-retour de lecture GeoPackage et GeoParquet dans
+      `tmp_path`, erreur claire sans l'extra
+
+## Étape 20 — Finalisation v0.3.0
+- [ ] Exemple de bout en bout `examples/connectors.py` : RNB → BDNB → DPE → export, exécuté dans les
+      tests avec le faux client
+- [ ] Revue de l'API publique (`__all__`, `bstock.connectors`) et des docstrings NumPy
+- [ ] README (installation des extras, exemple court) ; statut de la SPEC passé en v2
+- [ ] Version `0.3.0` et tag git
+
+---
+
+# v3 — rappel de la feuille de route
+- Filtrage, agrégations des grandeurs extensives, rapport de complétude et de provenance ; graphiques
   plotly
