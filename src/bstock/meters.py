@@ -23,10 +23,7 @@ from bstock.exceptions import DataSourceError, TimeSeriesError
 from bstock.provenance import SourcedModel, sourced
 from bstock.sources import DataSource, data_source_from_dict, ensure_time_index
 
-__all__ = ["TAG_NAMES", "Channel", "Meter", "tide_column"]
-
-TAG_NAMES = ("bloc", "sub_bloc")
-"""Tags of a meter that may be overridden through ``Meter.tags``."""
+__all__ = ["Channel", "Meter", "tide_column"]
 
 
 def _check_timestep(value: str) -> str:
@@ -110,8 +107,8 @@ class Meter(SourcedModel):
         Where to read the data.
     original_data_source
         Source the data came from before being saved in the park directory.
-    tags
-        Overrides of the tide tags ``bloc`` and ``sub_bloc``.
+    bloc, sub_bloc
+        Tide tags of the columns; ``None`` (default) derives them, see :meth:`tide_tags`.
     """
 
     id: str = Field(default_factory=lambda: new_id("meter"), frozen=True)
@@ -119,7 +116,8 @@ class Meter(SourcedModel):
     channels: list[Channel] = Field(min_length=1)
     data_source: AnySource | None = None
     original_data_source: AnySource | None = None
-    tags: dict[str, str] = Field(default_factory=dict)
+    bloc: str | None = None
+    sub_bloc: str | None = None
 
     name = sourced(str)
     energy_type = sourced(EnergyType)
@@ -140,14 +138,11 @@ class Meter(SourcedModel):
     def _check_scope(cls, value: list[str]) -> list[str]:
         return [check_id(v) for v in value]
 
-    @field_validator("tags")
+    @field_validator("bloc", "sub_bloc")
     @classmethod
-    def _check_tags(cls, value: dict[str, str]) -> dict[str, str]:
-        unknown = set(value) - set(TAG_NAMES)
-        if unknown:
-            raise ValueError(f"unknown tags {sorted(unknown)}; allowed: {TAG_NAMES}")
-        for tag in value.values():
-            tide_column("x", "x", tag, "x")  # same validation as any tide tag
+    def _check_tag(cls, value: str | None) -> str | None:
+        if value is not None and (not value or TIDE_SEPARATOR in value):
+            raise ValueError(f"{value!r} cannot be empty or contain {TIDE_SEPARATOR!r}")
         return value
 
     @model_validator(mode="after")
@@ -164,20 +159,21 @@ class Meter(SourcedModel):
 
     # --- tide naming --------------------------------------------------------------------------
 
-    @property
-    def bloc(self) -> str:
-        """Tide ``bloc`` tag: the scope entity if there is only one, else the meter id."""
-        return self.tags.get("bloc") or (self.scope[0] if len(self.scope) == 1 else self.id)
+    def tide_tags(self) -> tuple[str, str]:
+        """Return the effective tide tags ``(bloc, sub_bloc)`` of the columns.
 
-    @property
-    def sub_bloc(self) -> str:
-        """Tide ``sub_bloc`` tag: the measured end use (``"other"`` when unknown)."""
-        return self.tags.get("sub_bloc") or str(self.end_use or EndUse.OTHER)
+        Without an explicit value, ``bloc`` is the scope entity if there is only one, else the
+        meter id, and ``sub_bloc`` is the measured end use (``"other"`` when unknown).
+        """
+        bloc = self.bloc or (self.scope[0] if len(self.scope) == 1 else self.id)
+        sub_bloc = self.sub_bloc or str(self.end_use or EndUse.OTHER)
+        return bloc, sub_bloc
 
     def column_names(self) -> dict[str, str]:
         """Return the tide column name of each channel, by channel name."""
+        bloc, sub_bloc = self.tide_tags()
         return {
-            c.name: tide_column(f"{self.id}_{c.name}", c.unit, self.bloc, self.sub_bloc)
+            c.name: tide_column(f"{self.id}_{c.name}", c.unit, bloc, sub_bloc)
             for c in self.channels
         }
 

@@ -567,7 +567,7 @@ Règles :
 | `channels` | `list[Channel]` | Grandeurs mesurées (une colonne par grandeur) |
 | `data_source` | `DataSource \| None` | Où lire les données (nommé ainsi pour ne pas confondre avec la `source` de provenance) |
 | `original_data_source` | `DataSource \| None` | Source d'origine, conservée après `save(include_data=True)` |
-| `tags` | `dict[str, str]` | Surcharge des tags tide (`bloc`, `sub_bloc`) |
+| `bloc`, `sub_bloc` | `str \| None` | Surcharge des tags tide ; `None` = valeur dérivée (§6.4). `meter.tide_tags()` renvoie le couple effectif |
 | `data` | `pd.DataFrame \| None` | Données en mémoire, **non sérialisées en JSON** |
 
 ```python
@@ -640,7 +640,7 @@ Les colonnes suivent le format tide `name__unit__bloc__sub_bloc` :
 | `bloc` | id de l'entité du `scope` s'il n'y en a qu'une ; sinon `meter.id` |
 | `sub_bloc` | `end_use` (ex. `heating`), `other` si inconnu |
 
-`meter.tags` permet de surcharger `bloc` et `sub_bloc`. Exemple : `PDL_123_power__W__site-ecole-A__total`.
+`Meter(bloc=..., sub_bloc=...)` surcharge ces valeurs ; `meter.tide_tags()` renvoie le couple effectif. Exemple : `PDL_123_power__W__site-ecole-A__total`.
 
 `park.timeseries(...)` assemble un DataFrame unique à partir de plusieurs compteurs, directement utilisable
 par tide :

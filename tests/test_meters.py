@@ -57,22 +57,27 @@ def test_bloc_is_meter_id_for_several_entities_and_sub_bloc_defaults_to_other():
     assert meter.column_names()["energy"] == "m_energy__kWh__m__other"
 
 
-def test_tags_override_bloc_and_sub_bloc():
+def test_explicit_bloc_and_sub_bloc_override_derived_tags():
     meter = Meter(
         id="m",
         scope=[RNB_A],
         end_use="heating",
-        tags={"bloc": "chaufferie", "sub_bloc": "gas"},
+        bloc="chaufferie",
+        sub_bloc="gas",
         channels=[Channel(name="energy", unit="kWh")],
     )
     assert meter.column_names()["energy"] == "m_energy__kWh__chaufferie__gas"
+    assert meter.tide_tags() == ("chaufferie", "gas")
+    meter.bloc = None
+    assert meter.tide_tags() == (RNB_A, "gas")
 
 
 @pytest.mark.parametrize(
     "kwargs",
     [
-        {"tags": {"unit": "W"}},
-        {"tags": {"bloc": "a__b"}},
+        {"bloc": "a__b"},
+        {"sub_bloc": ""},
+        {"tags": {"bloc": "x"}},  # removed field
         {"channels": [Channel(name="e", unit="kWh"), Channel(name="e", unit="Wh")]},
         {"channels": []},
         {"id": "bad__id"},
