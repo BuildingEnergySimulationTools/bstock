@@ -33,7 +33,7 @@ class DescribedEntity(SourcedModel):
     extensive ones (counts, areas) never do.
     """
 
-    id: str
+    id: str = Field(frozen=True)
     dpe_ids: list[str] = Field(default_factory=list)
     envelope: Envelope = Field(default_factory=Envelope)
     heating: list[HeatingGenerator] = Field(default_factory=list)

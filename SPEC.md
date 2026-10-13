@@ -83,8 +83,10 @@ Toutes les entités (`Site`, `Building`, `Envelope`, systèmes, `Meter`) hérite
     (`"bldg-1f3a"`) ou choisi par l'utilisateur. Il ne change jamais, même si le `rnb_id` est corrigé plus
     tard : `scope`, `serves` et les tags tide restent valides ;
   - `Site.id` : choisi par l'utilisateur (code client, par exemple) ;
-  - systèmes, parois et Meters : choisis par l'utilisateur ou générés automatiquement (préfixe + 8
-    caractères hexadécimaux, ex. `"heating-1f3a9c0b"`).
+  - systèmes et Meters : choisis par l'utilisateur ou générés automatiquement (préfixe + 8 caractères
+    hexadécimaux, ex. `"heating-1f3a9c0b"`) ;
+  - parois d'enveloppe : même règle, mais l'unicité est vérifiée au sein de leur enveloppe seulement.
+- Les ids sont **immuables** une fois l'entité créée.
 - Les ids ne doivent pas contenir `__`, qui sert de séparateur aux tags tide. Cette règle est vérifiée à
   la création.
 - `park.get(id)` renvoie l'entité correspondante ; `park.get_by_rnb(rnb_id)` retrouve un bâtiment par son
@@ -132,10 +134,10 @@ Méthodes principales :
 | `add_site(site, parent=None)`, `add_building(building, site=None)` | Ajoute un objet déjà construit (contrôle de classe et d'unicité des ids) |
 | `add_system(system, owner)` | Ajoute un système à un bâtiment ou à un site (`owner` = objet ou id) |
 | `add_meter(meter)` | Ajoute un compteur ; les ids du `scope` doivent exister |
-| `get(id)`, `get_by_rnb(rnb_id)` | Recherche |
+| `get(id)`, `get_by_rnb(rnb_id)` | Recherche ; renvoie `None` si absent. `park[id]` lève `UnknownIdError`, `id in park` teste la présence |
 | `iter_sites()`, `iter_buildings()`, `iter_systems()` | Parcours de tout l'arbre |
 | `move(id, new_parent)` | Déplace un site ou un bâtiment (`new_parent` = site, ou `None` pour le premier niveau) |
-| `remove(id)` | Supprime une entité. Lève une erreur si elle est référencée (`scope` d'un Meter, `serves` d'un système), sauf avec `force=True`, qui retire aussi les références |
+| `remove(id, force=False)` | Supprime une entité (un site avec tout son contenu). Lève une erreur si elle est référencée (`scope` d'un Meter, `serves` d'un système), sauf avec `force=True`, qui retire aussi les références |
 
 > Changement par rapport au draw.io : `municipality`, `country`, `lat` et `lon` sont déplacés vers
 > Site et Building. Un parc peut couvrir plusieurs communes.

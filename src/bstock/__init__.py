@@ -34,6 +34,7 @@ from bstock.exceptions import (
     UnknownFieldError,
     UnknownIdError,
 )
+from bstock.park import BuildingPark
 from bstock.provenance import (
     DEFAULT_SOURCE_PRIORITY,
     SourcedField,
@@ -65,6 +66,7 @@ __all__ = [
     "BstockError",
     "BstockWarning",
     "Building",
+    "BuildingPark",
     "BuildingUsage",
     "ComponentKind",
     "CoolingGenerator",

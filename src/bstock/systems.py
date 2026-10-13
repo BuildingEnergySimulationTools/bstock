@@ -5,7 +5,7 @@ from __future__ import annotations
 import warnings
 from typing import Any, ClassVar
 
-from pydantic import field_validator, model_validator
+from pydantic import Field, field_validator, model_validator
 
 from bstock._ids import check_id, new_id
 from bstock.enums import EnergyType, GeneratorTechnology
@@ -77,7 +77,7 @@ class System(SourcedModel):
     kind: ClassVar[str] = "system"
     """Kind of system, used as id prefix and by ``building.systems(kind=...)``."""
 
-    id: str
+    id: str = Field(frozen=True)
     serves: list[str] | None = None
 
     name = sourced(str)

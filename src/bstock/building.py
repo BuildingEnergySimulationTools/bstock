@@ -55,6 +55,13 @@ class Building(DescribedEntity):
     def _check_bdnb_construction_id(cls, value: str | None) -> str | None:
         return check_external_id("bdnb_batiment_construction", value)
 
+    def __setattr__(self, name: str, value: Any) -> None:
+        if name == "rnb_id" and value != self.rnb_id:
+            park = self.park
+            if park is not None:
+                park._change_rnb(self, value)
+        super().__setattr__(name, value)
+
     @property
     def site(self) -> Any:
         """The site directly containing the building, or ``None``."""

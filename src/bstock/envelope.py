@@ -33,7 +33,7 @@ class EnvelopeComponent(SourcedModel):
     ψ in W/(m.K). Windows use :class:`Window`.
     """
 
-    id: str = Field(default_factory=lambda: new_id("component"))
+    id: str = Field(default_factory=lambda: new_id("component"), frozen=True)
     kind: ComponentKind
 
     area = sourced(float, unit="m²", ge=0, description="Area (length in m for a thermal bridge)")

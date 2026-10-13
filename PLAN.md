@@ -67,15 +67,15 @@ Règles (voir `CLAUDE.md`) :
 - [x] Tests : construction, héritage site → bâtiment sur les attributs du §3.6, formats d'identifiants
 
 ## Étape 7 — BuildingPark (§3.2, §3.4, §5)
-- [ ] Index des ids, unicité (y compris `rnb_id`), interdiction de `__`, génération des ids
-- [ ] `new_site`, `new_building`, `add_site`, `add_building`, `add_system`, `get`, `get_by_rnb`
-- [ ] `iter_sites`, `iter_buildings`, `iter_systems` ; accès dérivés `building.site`, `.park`,
+- [x] Index des ids, unicité (y compris `rnb_id`), interdiction de `__`, génération des ids
+- [x] `new_site`, `new_building`, `add_site`, `add_building`, `add_system`, `get`, `get_by_rnb`
+- [x] `iter_sites`, `iter_buildings`, `iter_systems` ; accès dérivés `building.site`, `.park`,
       `site.parent`, `iter_*` récursifs
-- [ ] `move` et `remove` (contrôle des références, `force=True`)
-- [ ] `site_cls` / `building_cls` utilisés par `new_*`, contrôle de classe dans `add_*`
-- [ ] `building.systems(kind, include_shared=True)` avec `serves` (validation : bâtiments du sous-arbre)
-- [ ] Priorité de sources portée par le parc et utilisée par toutes les entités rattachées
-- [ ] Tests : cas d'erreur (id dupliqué, id inconnu, mauvaise classe), sous-classe projet type
+- [x] `move` et `remove` (contrôle des références, `force=True`)
+- [x] `site_cls` / `building_cls` utilisés par `new_*`, contrôle de classe dans `add_*`
+- [x] `building.systems(kind, include_shared=True)` avec `serves` (validation : bâtiments du sous-arbre)
+- [x] Priorité de sources portée par le parc et utilisée par toutes les entités rattachées
+- [x] Tests : cas d'erreur (id dupliqué, id inconnu, mauvaise classe), sous-classe projet type
       `BayonneBuilding`, systèmes partagés, déplacement et suppression
 
 ## Étape 8 — Compteurs et sources de données (§6)
