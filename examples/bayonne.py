@@ -67,7 +67,7 @@ def read_inventory(path: Path, park: BuildingPark) -> None:
         )
         park.new_building(
             row.rnb,
-            site=site,
+            parent=site,
             source=CLIENT_SOURCE,
             code_patrimoine=row.code,
             surface_utile_client=row.surface_utile,

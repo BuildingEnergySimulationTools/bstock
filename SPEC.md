@@ -130,14 +130,14 @@ Méthodes principales :
 | Méthode | Rôle |
 |---|---|
 | `new_site(id, parent=None, source=None, **attrs)` | Crée un site (instance de `site_cls`) au premier niveau ou sous `parent` |
-| `new_building(rnb_id=None, id=None, site=None, source=None, **attrs)` | Crée un bâtiment (instance de `building_cls`) |
-| `add_site(site, parent=None)`, `add_building(building, site=None)` | Ajoute un objet déjà construit (contrôle de classe et d'unicité des ids) |
+| `new_building(rnb_id=None, id=None, parent=None, source=None, **attrs)` | Crée un bâtiment (instance de `building_cls`) |
+| `add_site(site, parent=None)`, `add_building(building, parent=None)` | Ajoute un objet déjà construit (contrôle de classe et d'unicité des ids) |
 | `add_system(system, owner)` | Ajoute un système à un bâtiment ou à un site (`owner` = objet ou id) |
 | `add_meter(meter)` | Ajoute un compteur ; les ids du `scope` doivent exister |
-| `get(id)`, `get_by_rnb(rnb_id)` | Recherche ; renvoie `None` si absent. `park[id]` lève `UnknownIdError`, `id in park` teste la présence |
-| `iter_sites()`, `iter_buildings()`, `iter_systems()` | Parcours de tout l'arbre |
-| `move(id, new_parent, force=False)` | Déplace un site ou un bâtiment (`new_parent` = site, ou `None` pour le premier niveau). Lève `EntityInUseError` si un système d'un site quitté dessert un bâtiment déplacé (`serves`), sauf avec `force=True`, qui retire ces bâtiments du `serves` |
-| `remove(id, force=False)` | Supprime une entité (un site avec tout son contenu). Lève une erreur si elle est référencée (`scope` d'un Meter, `serves` d'un système), sauf avec `force=True`, qui retire aussi les références |
+| `get(id)`, `get_by_rnb(rnb_id)` | Recherche (sites, bâtiments, systèmes et compteurs) ; renvoie `None` si absent. `park[id]` lève `UnknownIdError`, `id in park` teste la présence |
+| `iter_sites(recursive=True)`, `iter_buildings(recursive=True)`, `iter_systems()` | Parcours de tout l'arbre, ou du premier niveau seulement avec `recursive=False` |
+| `move(entity, new_parent, force=False)` | Déplace un site ou un bâtiment (objet ou id ; `new_parent` = site, ou `None` pour le premier niveau). Lève `EntityInUseError` si un système d'un site quitté dessert un bâtiment déplacé (`serves`), sauf avec `force=True`, qui retire ces bâtiments du `serves` |
+| `remove(entity, force=False)` | Supprime une entité, objet ou id (un site avec tout son contenu). Lève une erreur si elle est référencée (`scope` d'un Meter, `serves` d'un système), sauf avec `force=True`, qui retire aussi les références |
 
 > Changement par rapport au draw.io : `municipality`, `country`, `lat` et `lon` sont déplacés vers
 > Site et Building. Un parc peut couvrir plusieurs communes.
@@ -521,7 +521,7 @@ def read_patrimoine_xlsx(path, park):
     for row in df.itertuples():
         site = park.get(row.code_site) or park.new_site(id=row.code_site, name=row.nom_site,
                                                         source="bayonne_xlsx_2024")
-        park.new_building(rnb_id=row.rnb, site=site, source="bayonne_xlsx_2024",
+        park.new_building(rnb_id=row.rnb, parent=site, source="bayonne_xlsx_2024",
                           code_patrimoine=row.code, surface_utile_client=row.su)
 ```
 
@@ -530,7 +530,7 @@ Règles :
 - `park.new_site(...)` et `park.new_building(...)` instancient `park.site_cls` et `park.building_cls`. Les
   futurs connecteurs RNB, BDNB et DPE passeront aussi par ces méthodes : ils produiront donc des
   `BayonneBuilding` sans rien connaître de Bayonne.
-- `park.add_building(b, site=None)` et `park.add_site(s)` vérifient que l'objet est une instance de la
+- `park.add_building(b, parent=None)` et `park.add_site(s)` vérifient que l'objet est une instance de la
   classe configurée, ainsi que tous les sites et bâtiments qu'il contient. `site.add_site` et
   `site.add_building` font le même contrôle quand le site appartient à un parc, de même que la construction
   directe `BuildingPark(..., site_cls=..., building_cls=..., sites=[...])`. Dans ce dernier cas, les

@@ -30,8 +30,8 @@ def hourly(start="2024-01-01", periods=3, tz="UTC", **columns):
 def park():
     park = BuildingPark(name="p")
     site = park.new_site("site-A")
-    park.new_building(RNB_A, site=site)
-    park.new_building(RNB_B, site=site)
+    park.new_building(RNB_A, parent=site)
+    park.new_building(RNB_B, parent=site)
     park.add_system(HeatingGenerator(id="boiler"), owner=site)
     return park
 

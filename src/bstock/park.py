@@ -152,7 +152,7 @@ class BuildingPark(BaseModel):
     # --- lookup -------------------------------------------------------------------------------
 
     def get(self, entity_id: str) -> Entity | None:
-        """Return the site, building or system with id ``entity_id``, or ``None``."""
+        """Return the site, building, system or meter with id ``entity_id``, or ``None``."""
         return self._index.get(entity_id)
 
     def __getitem__(self, entity_id: str) -> Entity:
@@ -169,17 +169,19 @@ class BuildingPark(BaseModel):
         """Return the building whose RNB id is ``rnb_id``, or ``None``."""
         return self._rnb_index.get(rnb_id)
 
-    def iter_sites(self) -> Iterator[Site]:
-        """Iterate over every site of the park, depth first."""
+    def iter_sites(self, *, recursive: bool = True) -> Iterator[Site]:
+        """Iterate over the sites of the park: every site, depth first, or the top-level ones."""
         for site in self.sites:
             yield site
-            yield from site.iter_sites(recursive=True)
+            if recursive:
+                yield from site.iter_sites(recursive=True)
 
-    def iter_buildings(self) -> Iterator[Building]:
-        """Iterate over every building of the park."""
+    def iter_buildings(self, *, recursive: bool = True) -> Iterator[Building]:
+        """Iterate over the buildings of the park: all of them, or those without site."""
         yield from self.buildings
-        for site in self.sites:
-            yield from site.iter_buildings(recursive=True)
+        if recursive:
+            for site in self.sites:
+                yield from site.iter_buildings(recursive=True)
 
     def iter_systems(self, kind: SystemKind | str | None = None) -> Iterator[System]:
         """Iterate over every system of the park, optionally of one ``kind``."""
@@ -187,7 +189,11 @@ class BuildingPark(BaseModel):
             yield from entity.iter_systems(kind)
 
     def meters_for(self, entity: Site | Building | str) -> list[Meter]:
-        """Return the meters whose scope contains ``entity`` or one of its own systems."""
+        """Return the meters whose scope contains ``entity`` or one of its own systems.
+
+        Unlike :attr:`meters`, the list of every meter of the park, this is a query; it is also
+        available as ``entity.meters()``.
+        """
         target = self._resolve(entity, (Site, Building))
         ids = {target.id, *(s.id for s in target.iter_systems())}
         return [m for m in self.meters if ids & set(m.scope)]
@@ -222,7 +228,7 @@ class BuildingPark(BaseModel):
         self,
         rnb_id: str | None = None,
         id: str | None = None,
-        site: Site | str | None = None,
+        parent: Site | str | None = None,
         *,
         source: str | None = None,
         **attrs: Any,
@@ -235,7 +241,7 @@ class BuildingPark(BaseModel):
             RNB id; also the building id when ``id`` is omitted.
         id
             Explicit building id.
-        site
+        parent
             Site (object or id) receiving the building; ``None`` attaches it to the park.
         source
             Source of the sourced attributes given in ``attrs`` (``"manual"`` by default).
@@ -243,7 +249,7 @@ class BuildingPark(BaseModel):
             Building fields and sourced attributes.
         """
         building = self.building_cls(rnb_id=rnb_id, id=id, source=source, **attrs)
-        return self.add_building(building, site)
+        return self.add_building(building, parent)
 
     def add_site(self, site: Site, parent: Site | str | None = None) -> Site:
         """Attach an existing site at the top level or under ``parent`` and return it.
@@ -266,8 +272,8 @@ class BuildingPark(BaseModel):
             return site
         return self._resolve_site(parent).add_site(site)
 
-    def add_building(self, building: Building, site: Site | str | None = None) -> Building:
-        """Attach an existing building to the park or to ``site`` and return it.
+    def add_building(self, building: Building, parent: Site | str | None = None) -> Building:
+        """Attach an existing building at the top level or under ``parent`` and return it.
 
         Raises
         ------
@@ -276,15 +282,15 @@ class BuildingPark(BaseModel):
         DuplicateIdError
             If its id, RNB id or one of its system ids is already used in the park.
         UnknownIdError
-            If ``site`` is an unknown id.
+            If ``parent`` is an unknown id.
         """
         self._check_classes(building)
-        if site is None:
+        if parent is None:
             self._register(building)
             building._container = self
             self.buildings.append(building)
             return building
-        return self._resolve_site(site).add_building(building)
+        return self._resolve_site(parent).add_building(building)
 
     def add_system(self, system: System, owner: Site | Building | str) -> System:
         """Add ``system`` to ``owner`` (a site or a building, object or id) and return it.
@@ -399,7 +405,7 @@ class BuildingPark(BaseModel):
     # --- move / remove ------------------------------------------------------------------------
 
     def move(
-        self, entity_id: str, new_parent: Site | str | None, *, force: bool = False
+        self, entity: Site | Building | str, new_parent: Site | str | None, *, force: bool = False
     ) -> Site | Building:
         """Move a site or a building under ``new_parent`` (``None``: top level) and return it.
 
@@ -407,8 +413,8 @@ class BuildingPark(BaseModel):
 
         Parameters
         ----------
-        entity_id
-            Id of the site or building to move.
+        entity
+            Site or building to move (object or id).
         new_parent
             New parent site (object or id), or ``None`` for the top level.
         force
@@ -418,13 +424,13 @@ class BuildingPark(BaseModel):
         Raises
         ------
         UnknownIdError
-            If ``entity_id`` or ``new_parent`` is unknown.
+            If ``entity`` or ``new_parent`` is not in the park.
         ValueError
             If a site would be moved inside itself.
         EntityInUseError
             If a system of a site left behind serves a moved building and ``force`` is False.
         """
-        entity = self._resolve(entity_id, (Site, Building))
+        entity = self._resolve(entity, (Site, Building))
         target = None if new_parent is None else self._resolve_site(new_parent)
         if (
             target is not None
@@ -450,30 +456,30 @@ class BuildingPark(BaseModel):
             (target.sites if isinstance(entity, Site) else target.buildings).append(entity)
         return entity
 
-    def remove(self, entity_id: str, *, force: bool = False) -> Entity:
+    def remove(self, entity: Entity | str, *, force: bool = False) -> Entity:
         """Remove a site (with its content), a building or a system and return it.
 
         Parameters
         ----------
-        entity_id
-            Id of the entity to remove.
+        entity
+            Entity to remove (object or id).
         force
             Remove even if other entities reference it, deleting those references.
 
         Raises
         ------
         UnknownIdError
-            If ``entity_id`` is unknown.
+            If ``entity`` is not in the park.
         EntityInUseError
             If the entity is referenced (e.g. in the ``serves`` of a system) and ``force`` is False.
         """
-        entity = self[entity_id]
+        entity = self._resolve(entity, (Site, Building, System, Meter))
         removed_ids = set(self._subtree_ids(entity))
         references = self.references_to(removed_ids)
         outside = [ref for ref in references if ref[0] not in removed_ids]
         if outside and not force:
             raise EntityInUseError(
-                f"{entity_id!r} is referenced by {sorted({r[0] for r in outside})}"
+                f"{entity.id!r} is referenced by {sorted({r[0] for r in outside})}"
             )
         for _, drop in outside:
             drop()

@@ -159,7 +159,10 @@ class DescribedEntity(SourcedModel):
             raise ValueError(f"'serves' only applies to systems owned by a site, not {self.id!r}")
 
     def meters(self) -> list[Any]:
-        """Return the park meters whose scope contains this entity or one of its own systems."""
+        """Return the park meters whose scope contains this entity or one of its own systems.
+
+        A query, unlike ``park.meters`` (every meter of the park); see ``park.meters_for``.
+        """
         park = self.park
         return [] if park is None else park.meters_for(self)
 

@@ -27,9 +27,9 @@ def park():
     park = BuildingPark(name="Ville de Bayonne")
     client = park.new_site("site-ecole-A", name="Groupe scolaire A", usage="tertiary")
     park.new_site(GROUP, parent=client, bdnb_batiment_groupe_id=GROUP)
-    park.new_building(RNB_A, site=GROUP, construction_year=1972, source="bdnb")
-    park.new_building(RNB_B, site=GROUP)
-    park.new_building(RNB_C, site="site-ecole-A")
+    park.new_building(RNB_A, parent=GROUP, construction_year=1972, source="bdnb")
+    park.new_building(RNB_B, parent=GROUP)
+    park.new_building(RNB_C, parent="site-ecole-A")
     park.new_building(id="bldg-isolated")
     return park
 
@@ -52,6 +52,11 @@ def test_lookup(park):
 def test_iteration(park):
     assert [s.id for s in park.iter_sites()] == ["site-ecole-A", GROUP]
     assert [b.id for b in park.iter_buildings()] == ["bldg-isolated", RNB_C, RNB_A, RNB_B]
+
+
+def test_top_level_iteration(park):
+    assert [s.id for s in park.iter_sites(recursive=False)] == ["site-ecole-A"]
+    assert [b.id for b in park.iter_buildings(recursive=False)] == ["bldg-isolated"]
 
 
 def test_new_entities_are_attached(park):
@@ -143,7 +148,7 @@ def test_systems_are_indexed(park):
 def test_new_entities_use_project_classes():
     park = BuildingPark(name="Bayonne", site_cls=BayonneSite, building_cls=BayonneBuilding)
     site = park.new_site("s1", secteur="Nord", source="bayonne_xlsx")
-    building = park.new_building(RNB_A, site=site, code_patrimoine="BAT-0042")
+    building = park.new_building(RNB_A, parent=site, code_patrimoine="BAT-0042")
     assert type(site) is BayonneSite
     assert type(building) is BayonneBuilding
     assert building.code_patrimoine == "BAT-0042"
@@ -350,6 +355,26 @@ def test_references_inside_removed_subtree_do_not_block(park):
 def test_remove_unknown_id(park):
     with pytest.raises(UnknownIdError):
         park.remove("nope")
+
+
+def test_remove_and_move_accept_objects(park):
+    building = park[RNB_B]
+    assert park.move(building, None) is building
+    assert building in park.buildings
+    plant = park.add_system(HeatingGenerator(id="plant"), "site-ecole-A")
+    assert park.remove(plant) is plant
+    assert park.remove(building) is building
+    assert RNB_B not in park
+
+
+@pytest.mark.parametrize("method", ["remove", "move"])
+def test_objects_outside_the_park_are_rejected(park, method):
+    stranger = Building(id=RNB_A)  # same id as a park building, but another object
+    args = (stranger,) if method == "remove" else (stranger, None)
+    with pytest.raises(UnknownIdError):
+        getattr(park, method)(*args)
+    assert park[RNB_A] is not stranger
+    assert park[RNB_A].parent is park[GROUP]
 
 
 # --- construction from data -------------------------------------------------------------------
