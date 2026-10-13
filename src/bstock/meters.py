@@ -110,7 +110,7 @@ class Meter(SourcedModel):
 
     name = sourced(str)
     energy_type = sourced(EnergyType)
-    usage = sourced(EndUse, description="Measured end use")
+    end_use = sourced(EndUse, description="Measured end use")
     timestep = sourced(str, description="Nominal time step, as a pandas offset ('30min', '1h')")
 
     _data: pd.DataFrame | None = PrivateAttr(default=None)
@@ -166,7 +166,7 @@ class Meter(SourcedModel):
     @property
     def sub_bloc(self) -> str:
         """Tide ``sub_bloc`` tag: the measured end use (``"other"`` when unknown)."""
-        return self.tags.get("sub_bloc") or str(self.usage or EndUse.OTHER)
+        return self.tags.get("sub_bloc") or str(self.end_use or EndUse.OTHER)
 
     def column_names(self) -> dict[str, str]:
         """Return the tide column name of each channel, by channel name."""

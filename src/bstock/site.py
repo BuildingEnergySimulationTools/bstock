@@ -57,11 +57,6 @@ class Site(DescribedEntity):
             seen.add(child.id)
             child._container = self
 
-    @property
-    def parent(self) -> Site | None:
-        """The parent site, or ``None`` for a top-level site."""
-        return self.parent_site
-
     # --- navigation ---------------------------------------------------------------------------
 
     def iter_sites(self, *, recursive: bool = True) -> Iterator[Site]:

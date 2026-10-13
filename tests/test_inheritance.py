@@ -65,14 +65,14 @@ def test_value_inherited_from_parent(tree):
     _, group, building = tree
     group.set("year", 1972, source="bdnb")
     assert building.year == 1972
-    assert building.origin("year") == "bdnb-bg-1111"
+    assert building.provider_id("year") == "bdnb-bg-1111"
 
 
 def test_value_inherited_across_several_levels(tree):
     client, _, building = tree
     client.usage = "school"
     assert building.usage == "school"
-    assert building.origin("usage") == "client-site"
+    assert building.provider_id("usage") == "client-site"
 
 
 def test_nearest_level_wins_whatever_the_source(tree):
@@ -80,7 +80,7 @@ def test_nearest_level_wins_whatever_the_source(tree):
     group.set("year", 1972, source="audit")
     building.set("year", 1970, source="assumption")
     assert building.year == 1970
-    assert building.origin("year") == "A1B2C3D4E5F6"
+    assert building.provider_id("year") == "A1B2C3D4E5F6"
 
 
 def test_nearest_ancestor_with_value_wins(tree):
@@ -103,13 +103,13 @@ def test_extensive_value_is_not_inherited(tree):
     _, group, building = tree
     group.dwellings = 48
     assert building.dwellings is None
-    assert building.origin("dwellings") is None
+    assert building.provider_id("dwellings") is None
 
 
 def test_own_sources_exclude_inherited_ones(tree):
     _, group, building = tree
     group.set("year", 1972, source="bdnb")
-    assert building.sources("year") == []
+    assert building.candidates("year") == []
 
 
 def test_inherited_sources_list_every_level_nearest_first(tree):
@@ -117,7 +117,7 @@ def test_inherited_sources_list_every_level_nearest_first(tree):
     building.set("year", 1985, source="audit")
     group.set("year", 1972, source="bdnb")
     client.set("year", 1950, source="manual")
-    assert building.sources("year", inherited=True) == [
+    assert building.candidates("year", inherited=True) == [
         ("A1B2C3D4E5F6", SourcedValue(value=1985, source="audit")),
         ("bdnb-bg-1111", SourcedValue(value=1972, source="bdnb")),
         ("client-site", SourcedValue(value=1950, source="manual")),
@@ -127,20 +127,20 @@ def test_inherited_sources_list_every_level_nearest_first(tree):
 def test_inherited_sources_of_extensive_field_are_own_only(tree):
     _, group, building = tree
     group.dwellings = 48
-    assert building.sources("dwellings", inherited=True) == []
+    assert building.candidates("dwellings", inherited=True) == []
 
 
 def test_field_missing_on_parent_stops_inheritance(tree):
     _, group, building = tree
     assert "code" not in group.sourced_fields()
     assert building.code is None
-    assert building.origin("code") is None
+    assert building.provider_id("code") is None
 
 
 def test_entity_without_parent_inherits_nothing():
     orphan = Node(id="orphan")
     assert orphan.year is None
-    assert orphan.origin("year") is None
+    assert orphan.provider_id("year") is None
 
 
 def test_inheritance_uses_each_level_priority(tree):
@@ -156,14 +156,14 @@ def test_part_inherits_from_part_of_parent_owner(tree):
     _, group, building = tree
     group.part.set("u_value", 1.2, source="dpe")
     assert building.part.u_value == 1.2
-    assert building.part.origin("u_value") == "bdnb-bg-1111"
+    assert building.part.provider_id("u_value") == "bdnb-bg-1111"
     group.part.area = 300.0
     assert building.part.area is None
 
 
 def test_origin_of_unknown_field_is_rejected(tree):
     with pytest.raises(UnknownFieldError):
-        tree[2].origin("nope")
+        tree[2].provider_id("nope")
 
 
 def test_inheritance_cycle_is_detected():

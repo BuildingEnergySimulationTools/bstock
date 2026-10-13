@@ -3,12 +3,12 @@
 from __future__ import annotations
 
 from collections.abc import Iterator
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from pydantic import Field, field_validator
 
 from bstock._ids import check_external_id, check_id
-from bstock.enums import BuildingUsage
+from bstock.enums import BuildingUsage, SystemKind
 from bstock.envelope import Envelope
 from bstock.exceptions import DuplicateIdError, UnknownIdError
 from bstock.provenance import SourcedModel, sourced
@@ -21,6 +21,9 @@ from bstock.systems import (
     System,
     Ventilation,
 )
+
+if TYPE_CHECKING:
+    from bstock.site import Site
 
 __all__ = ["DescribedEntity"]
 
@@ -81,8 +84,8 @@ class DescribedEntity(SourcedModel):
     # --- hierarchy ----------------------------------------------------------------------------
 
     @property
-    def parent_site(self) -> Any:
-        """The site containing this entity, or ``None``."""
+    def parent(self) -> Site | None:
+        """The site directly containing this entity, or ``None`` (top level or outside a park)."""
         from bstock.site import Site  # circular import
 
         return self._container if isinstance(self._container, Site) else None
@@ -97,17 +100,17 @@ class DescribedEntity(SourcedModel):
 
     def inheritance_parent(self) -> SourcedModel | None:
         """Inherited values come from the parent site."""
-        return self.parent_site
+        return self.parent
 
     def _ancestor_sites(self) -> Iterator[Any]:
-        site = self.parent_site
+        site = self.parent
         while site is not None:
             yield site
-            site = site.parent_site
+            site = site.parent
 
     # --- systems ------------------------------------------------------------------------------
 
-    def iter_systems(self, kind: str | None = None) -> Iterator[System]:
+    def iter_systems(self, kind: SystemKind | str | None = None) -> Iterator[System]:
         """Iterate over the systems owned by this entity, optionally of one ``kind``."""
         kinds = SYSTEM_CLASSES if kind is None else [_check_kind(kind)]
         for name in kinds:
@@ -167,7 +170,9 @@ class DescribedEntity(SourcedModel):
             getattr(park, method)(entity)
 
 
-def _check_kind(kind: str) -> str:
-    if kind not in SYSTEM_CLASSES:
-        raise ValueError(f"unknown system kind {kind!r}; expected one of {list(SYSTEM_CLASSES)}")
-    return kind
+def _check_kind(kind: SystemKind | str) -> SystemKind:
+    try:
+        return SystemKind(kind)
+    except ValueError:
+        expected = [str(k) for k in SystemKind]
+        raise ValueError(f"unknown system kind {kind!r}; expected one of {expected}") from None

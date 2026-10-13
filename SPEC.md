@@ -163,7 +163,7 @@ Les deux se combinent : `Site « Groupe scolaire A » > Site « bdnb-bg-… » >
 | `heating`, `cooling`, `dhw`, `ventilation`, `pv` | `list[...]` | Systèmes partagés (§3.8) |
 | *attributs descriptifs* | | Les attributs communs du §3.6 |
 
-Accès dérivés (non sérialisés) : `site.parent` (site parent ou `None`), `site.park`,
+Accès dérivés (non sérialisés) : `site.parent` (site parent ou `None`, comme `building.parent`), `site.park`,
 `site.iter_buildings(recursive=True)`, `site.iter_sites(recursive=True)`.
 
 Gestion des enfants au niveau du site : `site.add_site(s)`, `site.add_building(b)`, `site.detach(id)`. Site
@@ -211,7 +211,7 @@ un sous-site, reprend la valeur de son site parent quand il n'a pas la sienne (�
 | `heated_area` | sourcé `float` | m² | **non** | Surface chauffée |
 
 Accès dérivés du bâtiment (non sérialisés) :
-- `building.site` : le site parent direct ou `None` ;
+- `building.parent` : le site parent direct ou `None` ;
 - `building.park` : le parc ;
 - `building.systems(kind="heating", include_shared=True)` : systèmes propres, plus systèmes des sites
   ancêtres qui le desservent ;
@@ -314,7 +314,7 @@ technologie ou d'un ratio : un ratio > 1,1 pour une technologie à combustion, �
 sous-station, ou un ratio < 1 pour une PAC, un groupe froid ou un chauffe-eau thermodynamique. Les PAC
 hybrides et le solaire thermique ne sont pas contrôlés.
 
-Chaque classe de système a un `kind` (`heating`, `cooling`, `dhw`, `ventilation`, `pv`) qui sert de préfixe
+Chaque classe de système a un `kind` (`SystemKind` : `heating`, `cooling`, `dhw`, `ventilation`, `pv`) qui sert de préfixe
 aux ids générés et de filtre dans `building.systems(kind=...)`.
 
 `DHWGenerator` ajoute `storage_volume` (sourcé `float`, L) : volume de stockage, `None` = production
@@ -355,6 +355,7 @@ Elles sont sérialisées par cette valeur, et les API acceptent indifféremment 
 | `ComponentKind` | `WALL`, `ROOF`, `FLOOR`, `WINDOW`, `DOOR`, `THERMAL_BRIDGE` |
 | `Orientation` | `N`, `NE`, `E`, `SE`, `S`, `SW`, `W`, `NW`, `HORIZONTAL` (le DPE n'utilise que N, E, S, O, horizontal) |
 | `Adjacency` | `EXTERIOR`, `UNHEATED_SPACE`, `GROUND`, `ADJACENT_BUILDING` |
+| `SystemKind` | `HEATING`, `COOLING`, `DHW`, `VENTILATION`, `PV` (nom de la liste correspondante sur Site et Building) |
 | `EndUse` (Meters) | `HEATING`, `COOLING`, `DHW`, `VENTILATION`, `LIGHTING`, `APPLIANCES`, `PV_PRODUCTION`, `TOTAL`, `OTHER` |
 
 Dans la BDNB, l'énergie est souvent intégrée au libellé du générateur (« chaudiere gaz condensation »). Le
@@ -391,7 +392,7 @@ b.year_construction = None             # retire le candidat "manual" (équivaut 
 b.set("year_construction", 1970, source="bdnb", date=date(2024, 10, 1))
 b.set("year_construction", 1972, source="dpe", ref="2364E0123456X")
 
-b.sources("year_construction")
+b.candidates("year_construction")
 # [SourcedValue(1972, source="dpe", ref="2364E0123456X"),
 #  SourcedValue(1970, source="bdnb", date=2024-10-01)]
 
@@ -446,9 +447,9 @@ en remontant la hiérarchie :
 ```python
 site.set("year_construction", 1972, source="bdnb")   # posé sur le groupe BDNB
 b.year_construction                           # -> 1972 (hérité)
-b.origin("year_construction")                 # -> "bdnb-bg-1111-1HRT-8SVH" (id de l'entité qui fournit la valeur)
-b.sources("year_construction")                # -> [] (candidats propres seulement)
-b.sources("year_construction", inherited=True)
+b.provider_id("year_construction")                 # -> "bdnb-bg-1111-1HRT-8SVH" (id de l'entité qui fournit la valeur)
+b.candidates("year_construction")                # -> [] (candidats propres seulement)
+b.candidates("year_construction", inherited=True)
 # [("bdnb-bg-1111-1HRT-8SVH", SourcedValue(1972, source="bdnb"))]
 b.set("year_construction", 1985, source="audit")   # valeur propre : masque l'héritage
 ```
@@ -484,7 +485,7 @@ b.set("year_construction", 1985, source="audit")   # valeur propre : masque l'h�
   exactement comme un champ du socle.
 - L'héritage des valeurs repose sur deux méthodes surchargées par les entités :
   `inheritance_parent()` renvoie l'objet dont on hérite (le site parent pour un site ou un bâtiment,
-  l'enveloppe du site parent pour une enveloppe), et `entity_id()` renvoie l'id affiché par `origin()` (une
+  l'enveloppe du site parent pour une enveloppe), et `entity_id()` renvoie l'id affiché par `provider_id()` (une
   enveloppe renvoie l'id de son propriétaire). L'héritage s'arrête au premier ancêtre qui ne déclare pas
   l'attribut.
 
@@ -554,7 +555,7 @@ Règles :
 | `name` | sourcé `str` | |
 | `scope` | `list[str]` | Ids des entités concernées : sites, bâtiments ou systèmes. Peut être vide (compteur pas encore rattaché, ou après `remove(..., force=True)`). Dans un parc, les ids doivent exister : vérifié par `add_meter` et à chaque affectation de `meter.scope` (pas pour une modification en place) |
 | `energy_type` | sourcé `EnergyType` | Pour un compteur d'énergie |
-| `usage` | sourcé `EndUse` | Usage mesuré |
+| `end_use` | sourcé `EndUse` | Usage mesuré |
 | `timestep` | sourcé `str` | Pas de temps nominal (`"10min"`, `"1h"`, `"1D"`…) |
 | `channels` | `list[Channel]` | Grandeurs mesurées (une colonne par grandeur) |
 | `data_source` | `DataSource \| None` | Où lire les données (nommé ainsi pour ne pas confondre avec la `source` de provenance) |
@@ -573,12 +574,12 @@ Exemples :
 
 ```python
 park.add_meter(Meter(id="PDL_123", scope=["site-ecole-A"], energy_type="electricity",
-                     usage="total", timestep="30min",
+                     end_use="total", timestep="30min",
                      channels=[Channel(name="power", unit="W", column="valeur")],
                      data_source=CsvSource(path="data/enedis_PDL_123.csv", index_col="horodate")))
 
 park.add_meter(Meter(id="SUB_chauff", scope=["heating-chaufferie-A"],
-                     energy_type="natural_gas", usage="heating", timestep="1D",
+                     energy_type="natural_gas", end_use="heating", timestep="1D",
                      channels=[Channel(name="energy", unit="kWh")]))
 ```
 
@@ -630,7 +631,7 @@ Les colonnes suivent le format tide `name__unit__bloc__sub_bloc` :
 | `name` | `{meter.id}_{channel.name}` (ex. `PDL_123_power`) |
 | `unit` | `channel.unit` |
 | `bloc` | id de l'entité du `scope` s'il n'y en a qu'une ; sinon `meter.id` |
-| `sub_bloc` | `usage` (ex. `heating`), `other` si inconnu |
+| `sub_bloc` | `end_use` (ex. `heating`), `other` si inconnu |
 
 `meter.tags` permet de surcharger `bloc` et `sub_bloc`. Exemple : `PDL_123_power__W__site-ecole-A__total`.
 
@@ -638,7 +639,7 @@ Les colonnes suivent le format tide `name__unit__bloc__sub_bloc` :
 par tide :
 
 ```python
-df = park.timeseries(usage="heating", buildings=[...], load=True)  # filtres optionnels
+df = park.timeseries(end_use="heating", buildings=[...], load=True)  # filtres optionnels
 from tide.plumbing import Plumber
 Plumber(df).show()
 ```
@@ -646,7 +647,7 @@ Plumber(df).show()
 - Les index sont convertis dans un fuseau unique (`tz="UTC"` par défaut, paramétrable), puis unis
   (outer join), sans rééchantillonnage : c'est le rôle de tide.
 - `load=True` appelle `load()` sur les compteurs dont `data` est vide.
-- Filtres : `usage`, `energy_type`, `meters` (ids), `buildings` / `sites` (ids ou objets). Un filtre sur
+- Filtres : `end_use`, `energy_type`, `meters` (ids), `buildings` / `sites` (ids ou objets). Un filtre sur
   des bâtiments retient les compteurs dont le `scope` contient ces bâtiments ou leurs systèmes propres.
 - Les noms de colonnes commencent par l'id du compteur : ils sont donc uniques dans le parc.
 - Un compteur sélectionné sans données en mémoire (et sans `load=True`) est ignoré avec un
@@ -761,9 +762,9 @@ b.envelope.u_bat = 0.9                         # source "manual"
 park.add_system(HeatingGenerator(id="heating-chaufferie-A", technology="boiler_condensing",
                                   energy_type="natural_gas", nominal_power=450.0,
                                   seasonal_performance_ratio=0.95, source="audit"),
-                 owner=b.site)
+                 owner=b.parent)
 
-park.add_meter(Meter(id="PDL_123", scope=[b.site.id], usage="total", timestep="30min",
+park.add_meter(Meter(id="PDL_123", scope=[b.parent.id], end_use="total", timestep="30min",
                      energy_type="electricity",
                      channels=[Channel(name="power", unit="W", column="valeur")],
                      data_source=CsvSource(path="data/enedis_PDL_123.csv", index_col="horodate")))
@@ -773,7 +774,7 @@ park.save("out/bayonne/", include_data=True)
 
 # plus tard, ailleurs
 park2 = BuildingPark.load("out/bayonne/", site_cls=BayonneSite, building_cls=BayonneBuilding)
-park2.get("A1B2C3D4E5F6").sources("heated_area")
+park2.get("A1B2C3D4E5F6").candidates("heated_area")
 ```
 
 ---

@@ -22,6 +22,7 @@ __all__ = [
     "Inertia",
     "InsulationLevel",
     "Orientation",
+    "SystemKind",
 ]
 
 
@@ -159,6 +160,16 @@ class Adjacency(StrEnum):
     UNHEATED_SPACE = auto()
     GROUND = auto()
     ADJACENT_BUILDING = auto()
+
+
+class SystemKind(StrEnum):
+    """Kind of technical system; also the name of the matching list on sites and buildings."""
+
+    HEATING = auto()
+    COOLING = auto()
+    DHW = auto()
+    VENTILATION = auto()
+    PV = auto()
 
 
 class EndUse(StrEnum):

@@ -417,14 +417,14 @@ class SourcedModel(BaseModel):
             self.values.pop(name, None)
 
     @overload
-    def sources(self, name: str, *, inherited: Literal[False] = False) -> list[SourcedValue]: ...
+    def candidates(self, name: str, *, inherited: Literal[False] = False) -> list[SourcedValue]: ...
 
     @overload
-    def sources(
+    def candidates(
         self, name: str, *, inherited: Literal[True]
     ) -> list[tuple[str | None, SourcedValue]]: ...
 
-    def sources(
+    def candidates(
         self, name: str, *, inherited: bool = False
     ) -> list[SourcedValue] | list[tuple[str | None, SourcedValue]]:
         """Return the candidates of ``name``, in insertion order.
@@ -469,7 +469,7 @@ class SourcedModel(BaseModel):
             return None
         return provider.active_source_priority().select(name, provider.values[name])
 
-    def origin(self, name: str) -> str | None:
+    def provider_id(self, name: str) -> str | None:
         """Return the id of the entity providing the effective value of ``name``, or ``None``.
 
         Raises

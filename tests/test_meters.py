@@ -47,7 +47,7 @@ def test_tide_column():
 
 def test_column_names_follow_convention():
     meter = Meter(
-        id="PDL_123", scope=["site-A"], usage="total", channels=[Channel(name="power", unit="W")]
+        id="PDL_123", scope=["site-A"], end_use="total", channels=[Channel(name="power", unit="W")]
     )
     assert meter.column_names() == {"power": "PDL_123_power__W__site-A__total"}
 
@@ -61,7 +61,7 @@ def test_tags_override_bloc_and_sub_bloc():
     meter = Meter(
         id="m",
         scope=[RNB_A],
-        usage="heating",
+        end_use="heating",
         tags={"bloc": "chaufferie", "sub_bloc": "gas"},
         channels=[Channel(name="energy", unit="kWh")],
     )
@@ -100,7 +100,7 @@ def test_timestep_is_validated():
 
 
 def test_data_setter_renames_channel_columns():
-    meter = Meter(id="m", scope=["s"], usage="total", channels=[Channel(name="power", unit="W")])
+    meter = Meter(id="m", scope=["s"], end_use="total", channels=[Channel(name="power", unit="W")])
     meter.data = hourly(power=[1.0, 2.0, 3.0])
     assert list(meter.data.columns) == ["m_power__W__s__total"]
     meter.data = meter.data  # already in tide format
@@ -284,9 +284,13 @@ def test_unknown_source_type_is_kept():
 # --- park -------------------------------------------------------------------------------------
 
 
-def make_meter(meter_id, scope, usage="total", channel="energy", unit="kWh", **kwargs):
+def make_meter(meter_id, scope, end_use="total", channel="energy", unit="kWh", **kwargs):
     return Meter(
-        id=meter_id, scope=scope, usage=usage, channels=[Channel(name=channel, unit=unit)], **kwargs
+        id=meter_id,
+        scope=scope,
+        end_use=end_use,
+        channels=[Channel(name=channel, unit=unit)],
+        **kwargs,
     )
 
 
@@ -321,7 +325,7 @@ def test_meter_uses_park_priority(park):
 
 def test_entity_meters(park):
     site_meter = park.add_meter(make_meter("site-meter", ["site-A"]))
-    boiler_meter = park.add_meter(make_meter("boiler-meter", ["boiler"], usage="heating"))
+    boiler_meter = park.add_meter(make_meter("boiler-meter", ["boiler"], end_use="heating"))
     a_meter = park.add_meter(make_meter("a-meter", [RNB_A]))
     assert park["site-A"].meters() == [site_meter, boiler_meter]  # boiler is a site system
     assert park[RNB_A].meters() == [a_meter]
@@ -345,7 +349,7 @@ def test_removing_measured_entity_needs_force(park):
 
 def test_timeseries_assembles_meters(park):
     elec = park.add_meter(make_meter("elec", ["site-A"], channel="power", unit="W"))
-    gas = park.add_meter(make_meter("gas", ["boiler"], usage="heating"))
+    gas = park.add_meter(make_meter("gas", ["boiler"], end_use="heating"))
     elec.data = hourly(power=[1.0, 2.0, 3.0])
     gas.data = hourly(start="2024-01-01 02:00", tz="Europe/Paris", energy=[10.0, 20.0, 30.0])
     df = park.timeseries()
@@ -356,11 +360,13 @@ def test_timeseries_assembles_meters(park):
 
 
 def test_timeseries_filters(park):
-    for meter_id, scope, usage in [("a", [RNB_A], "heating"), ("b", [RNB_B], "total")]:
-        meter = park.add_meter(make_meter(meter_id, scope, usage=usage, energy_type="electricity"))
+    for meter_id, scope, end_use in [("a", [RNB_A], "heating"), ("b", [RNB_B], "total")]:
+        meter = park.add_meter(
+            make_meter(meter_id, scope, end_use=end_use, energy_type="electricity")
+        )
         meter.data = hourly(energy=[1, 2, 3])
-    assert len(park.timeseries(usage="heating").columns) == 1
-    assert len(park.timeseries(usage=[EndUse.HEATING, "total"]).columns) == 2
+    assert len(park.timeseries(end_use="heating").columns) == 1
+    assert len(park.timeseries(end_use=[EndUse.HEATING, "total"]).columns) == 2
     assert len(park.timeseries(buildings=[RNB_B]).columns) == 1
     assert len(park.timeseries(meters=["a"]).columns) == 1
     assert len(park.timeseries(energy_type="natural_gas").columns) == 0

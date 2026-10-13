@@ -4,7 +4,8 @@ import warnings
 import pytest
 from pydantic import ValidationError
 
-from bstock.enums import EnergyType, GeneratorTechnology
+from bstock.building import Building
+from bstock.enums import EnergyType, GeneratorTechnology, SystemKind
 from bstock.exceptions import PerformanceRatioWarning
 from bstock.systems import (
     SYSTEM_CLASSES,
@@ -31,6 +32,30 @@ def test_generated_id_uses_kind_prefix(cls):
     system = cls()
     assert system.id.startswith(f"{cls.kind}-")
     assert cls().id != system.id
+
+
+@pytest.mark.parametrize(
+    ("cls", "kind"),
+    [
+        (HeatingGenerator, "heating"),
+        (CoolingGenerator, "cooling"),
+        (DHWGenerator, "dhw"),
+        (Ventilation, "ventilation"),
+        (SolarPV, "pv"),
+    ],
+)
+def test_kind_is_a_system_kind(cls, kind):
+    assert cls.kind is SystemKind(kind)
+    assert cls().id.startswith(f"{kind}-")
+
+
+@pytest.mark.parametrize("kind", [SystemKind.HEATING, "heating"])
+def test_systems_filter_accepts_member_or_string(kind):
+    building = Building()
+    boiler = building.add_system(HeatingGenerator())
+    building.add_system(SolarPV())
+    assert building.systems(kind) == [boiler]
+    assert list(building.iter_systems(kind)) == [boiler]
 
 
 def test_given_id_is_kept():

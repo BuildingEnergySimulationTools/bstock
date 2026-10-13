@@ -57,8 +57,8 @@ def test_iteration(park):
 def test_new_entities_are_attached(park):
     a = park[RNB_A]
     assert a.park is park
-    assert a.site is park[GROUP]
-    assert park["bldg-isolated"].site is None
+    assert a.parent is park[GROUP]
+    assert park["bldg-isolated"].parent is None
     assert park["bldg-isolated"].park is park
 
 
@@ -68,7 +68,7 @@ def test_new_building_source_applies_to_attributes(park):
 
 def test_inheritance_inside_park(park):
     assert park[RNB_A].usage == "tertiary"
-    assert park[RNB_A].origin("usage") == "site-ecole-A"
+    assert park[RNB_A].provider_id("usage") == "site-ecole-A"
 
 
 def test_park_priority_is_used_by_all_entities(park):
@@ -259,11 +259,11 @@ def test_move_building_changes_inheritance(park):
     b = park[RNB_B]
     assert b.year_construction == 1980
     park.move(RNB_B, None)
-    assert b.site is None
+    assert b.parent is None
     assert b in park.buildings
     assert b.year_construction is None
     park.move(RNB_B, GROUP)
-    assert b.site is park[GROUP]
+    assert b.parent is park[GROUP]
     assert b.year_construction == 1980
 
 
@@ -272,7 +272,7 @@ def test_move_site_keeps_its_content(park):
     group = park[GROUP]
     assert group.parent is None
     assert group in park.sites
-    assert park[RNB_A].site is group
+    assert park[RNB_A].parent is group
     assert park[RNB_A].usage is None  # no longer under the client site
 
 
@@ -284,7 +284,7 @@ def test_move_out_of_serving_site_needs_force(park, moved, new_parent):
     plant = park.add_system(HeatingGenerator(id="plant", serves=[RNB_A, RNB_C]), "site-ecole-A")
     with pytest.raises(EntityInUseError, match="plant"):
         park.move(moved, new_parent)
-    assert park[RNB_A].site is park[GROUP]
+    assert park[RNB_A].parent is park[GROUP]
     assert plant.serves == [RNB_A, RNB_C]
     park.move(moved, new_parent, force=True)
     assert plant.serves == [RNB_C]
@@ -363,7 +363,7 @@ def test_park_built_from_nested_data_is_indexed():
             "buildings": [{"id": "b2"}],
         }
     )
-    assert park[RNB_A].site is park["s"]
+    assert park[RNB_A].parent is park["s"]
     assert park["b2"].park is park
 
 

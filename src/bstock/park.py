@@ -13,7 +13,7 @@ from pydantic.json_schema import SkipJsonSchema
 
 from bstock.building import Building
 from bstock.description import DescribedEntity
-from bstock.enums import EndUse, EnergyType
+from bstock.enums import EndUse, EnergyType, SystemKind
 from bstock.exceptions import (
     DuplicateIdError,
     EntityInUseError,
@@ -181,7 +181,7 @@ class BuildingPark(BaseModel):
         for site in self.sites:
             yield from site.iter_buildings(recursive=True)
 
-    def iter_systems(self, kind: str | None = None) -> Iterator[System]:
+    def iter_systems(self, kind: SystemKind | str | None = None) -> Iterator[System]:
         """Iterate over every system of the park, optionally of one ``kind``."""
         for entity in [*self.iter_sites(), *self.iter_buildings()]:
             yield from entity.iter_systems(kind)
@@ -328,7 +328,7 @@ class BuildingPark(BaseModel):
     def timeseries(
         self,
         *,
-        usage: EndUse | str | Iterable[EndUse | str] | None = None,
+        end_use: EndUse | str | Iterable[EndUse | str] | None = None,
         energy_type: EnergyType | str | Iterable[EnergyType | str] | None = None,
         meters: Iterable[Meter | str] | None = None,
         buildings: Iterable[Building | str] | None = None,
@@ -340,7 +340,7 @@ class BuildingPark(BaseModel):
 
         Parameters
         ----------
-        usage, energy_type
+        end_use, energy_type
             Keep the meters with one of these end uses / energy types.
         meters
             Keep these meters (objects or ids).
@@ -358,7 +358,7 @@ class BuildingPark(BaseModel):
         pandas.DataFrame
             Outer join of the meter data, in tide column format, without resampling.
         """
-        selected = self._select_meters(usage, energy_type, meters, buildings, sites)
+        selected = self._select_meters(end_use, energy_type, meters, buildings, sites)
         frames: list[pd.DataFrame] = []
         for meter in selected:
             if meter.data is None and load:
@@ -374,7 +374,7 @@ class BuildingPark(BaseModel):
 
     def _select_meters(
         self,
-        usage: Any,
+        end_use: Any,
         energy_type: Any,
         meters: Iterable[Meter | str] | None,
         buildings: Iterable[Building | str] | None,
@@ -384,9 +384,9 @@ class BuildingPark(BaseModel):
         if meters is not None:
             wanted = {m if isinstance(m, str) else m.id for m in meters}
             selected = [m for m in selected if m.id in wanted]
-        if usage is not None:
-            usages = _as_set(usage, EndUse)
-            selected = [m for m in selected if m.usage in usages]
+        if end_use is not None:
+            end_uses = _as_set(end_use, EndUse)
+            selected = [m for m in selected if m.end_use in end_uses]
         if energy_type is not None:
             energies = _as_set(energy_type, EnergyType)
             selected = [m for m in selected if m.energy_type in energies]

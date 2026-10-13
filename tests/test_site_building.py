@@ -122,10 +122,10 @@ def test_out_of_range_values_are_rejected(name, value):
 
 def test_navigation(tree):
     client, group, a, _b, c = tree
-    assert a.site is group
+    assert a.parent is group
     assert group.parent is client
     assert client.parent is None
-    assert c.site is client
+    assert c.parent is client
     assert [s.id for s in client.iter_sites()] == [GROUP]
     assert [x.id for x in client.iter_buildings()] == [RNB_C, RNB_A, RNB_B]
     assert [x.id for x in client.iter_buildings(recursive=False)] == [RNB_C]
@@ -135,9 +135,9 @@ def test_building_inherits_through_nested_sites(tree):
     _client, group, a, _, c = tree
     group.set("year_construction", 1972, source="bdnb", ref=GROUP)
     assert a.usage is BuildingUsage.TERTIARY
-    assert a.origin("usage") == "site-ecole-A"
+    assert a.provider_id("usage") == "site-ecole-A"
     assert a.year_construction == 1972
-    assert a.origin("year_construction") == GROUP
+    assert a.provider_id("year_construction") == GROUP
     assert c.year_construction is None  # not under the BDNB group
 
 
@@ -159,7 +159,7 @@ def test_building_envelope_inherits_from_site_envelope(tree):
     group.envelope.set("u_bat", 1.1, source="dpe", ref="2611E0031228S")
     group.envelope.inertia = Inertia.HEAVY
     assert a.envelope.u_bat == 1.1
-    assert a.envelope.origin("u_bat") == GROUP
+    assert a.envelope.provider_id("u_bat") == GROUP
     assert a.envelope.inertia is Inertia.HEAVY
 
 
@@ -167,7 +167,7 @@ def test_detached_building_stops_inheriting(tree):
     _client, group, a, _, _ = tree
     removed = group.detach(RNB_A)
     assert removed is a
-    assert a.site is None
+    assert a.parent is None
     assert a.usage is None
     with pytest.raises(UnknownIdError):
         group.detach(RNB_A)

@@ -19,6 +19,7 @@ from bstock.enums import (
     Inertia,
     InsulationLevel,
     Orientation,
+    SystemKind,
 )
 from bstock.envelope import COMPUTED_SOURCE, Envelope, EnvelopeComponent, Window
 from bstock.exceptions import (
@@ -112,6 +113,7 @@ __all__ = [
     "SourcedModel",
     "SourcedValue",
     "System",
+    "SystemKind",
     "TimeSeriesError",
     "UnknownAttributeWarning",
     "UnknownFieldError",

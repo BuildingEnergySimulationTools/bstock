@@ -8,7 +8,7 @@ from typing import Any, ClassVar
 from pydantic import Field, field_validator, model_validator
 
 from bstock._ids import check_id, new_id
-from bstock.enums import EnergyType, GeneratorTechnology
+from bstock.enums import EnergyType, GeneratorTechnology, SystemKind
 from bstock.exceptions import PerformanceRatioWarning
 from bstock.provenance import SourcedModel, SourcedValue, sourced
 
@@ -76,7 +76,8 @@ class System(SourcedModel):
     """
 
     kind: ClassVar[str] = "system"
-    """Kind of system, used as id prefix and by ``building.systems(kind=...)``."""
+    """Kind of system (a :class:`SystemKind` on concrete classes), used as id prefix and by
+    ``building.systems(kind=...)``."""
 
     id: str = Field(frozen=True)
     serves: list[str] | None = None
@@ -164,19 +165,19 @@ class Generator(System):
 class HeatingGenerator(Generator):
     """Space heating generator."""
 
-    kind: ClassVar[str] = "heating"
+    kind: ClassVar[str] = SystemKind.HEATING
 
 
 class CoolingGenerator(Generator):
     """Space cooling generator."""
 
-    kind: ClassVar[str] = "cooling"
+    kind: ClassVar[str] = SystemKind.COOLING
 
 
 class DHWGenerator(Generator):
     """Domestic hot water generator."""
 
-    kind: ClassVar[str] = "dhw"
+    kind: ClassVar[str] = SystemKind.DHW
 
     storage_volume = sourced(
         float, unit="L", ge=0, description="Storage volume; None for instantaneous or unknown"
@@ -186,7 +187,7 @@ class DHWGenerator(Generator):
 class Ventilation(System):
     """Ventilation system."""
 
-    kind: ClassVar[str] = "ventilation"
+    kind: ClassVar[str] = SystemKind.VENTILATION
 
     air_change_rate = sourced(float, unit="1/h", ge=0, description="Air changes per hour")
     heat_recovery_efficiency = sourced(
@@ -197,7 +198,7 @@ class Ventilation(System):
 class SolarPV(System):
     """Photovoltaic installation."""
 
-    kind: ClassVar[str] = "pv"
+    kind: ClassVar[str] = SystemKind.PV
 
     peak_power = sourced(float, unit="kWp", ge=0)
     area = sourced(float, unit="m²", ge=0)
@@ -206,7 +207,7 @@ class SolarPV(System):
 
 
 #: Concrete system classes by kind.
-SYSTEM_CLASSES: dict[str, type[System]] = {
-    cls.kind: cls
+SYSTEM_CLASSES: dict[SystemKind, type[System]] = {
+    SystemKind(cls.kind): cls
     for cls in (HeatingGenerator, CoolingGenerator, DHWGenerator, Ventilation, SolarPV)
 }

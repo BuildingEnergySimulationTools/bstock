@@ -191,7 +191,7 @@ def test_envelope_inherits_from_parent_owner_envelope():
     site.envelope.loss_area = 900.0
     assert building.envelope.u_bat == 1.2
     assert building.envelope.inertia is Inertia.HEAVY
-    assert building.envelope.origin("u_bat") == "site"
+    assert building.envelope.provider_id("u_bat") == "site"
     assert building.envelope.loss_area is None  # extensive
 
 

@@ -43,12 +43,12 @@ group.set("year_construction", 1972, source="bdnb")
 b = park.new_building("A1B2C3D4E5F6", site=group, asset_code="BAT-0042", source="client")
 b.set("year_construction", 1974, source="audit")
 b.year_construction                    # 1974: own value, audit
-b.sources("year_construction", inherited=True)
+b.candidates("year_construction", inherited=True)
 # [('A1B2C3D4E5F6', SourcedValue(value=1974, source='audit', ...)),
 #  ('bdnb-bg-1111-1HRT-8SVH', SourcedValue(value=1972, source='bdnb', ...))]
 
 park.add_meter(Meter(
-    id="PDL_123", scope=["school-A"], usage="total",
+    id="PDL_123", scope=["school-A"], end_use="total",
     channels=[Channel(name="power", unit="W", column="valeur")],
     data_source=CsvSource(path="enedis.csv", index_col="horodate", sep=";", tz="Europe/Paris"),
 ))

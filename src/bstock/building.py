@@ -8,6 +8,7 @@ from pydantic import field_validator, model_validator
 
 from bstock._ids import check_external_id, new_id
 from bstock.description import DescribedEntity
+from bstock.enums import SystemKind
 from bstock.systems import System
 
 __all__ = ["Building"]
@@ -62,12 +63,9 @@ class Building(DescribedEntity):
                 park._change_rnb(self, value)
         super().__setattr__(name, value)
 
-    @property
-    def site(self) -> Any:
-        """The site directly containing the building, or ``None``."""
-        return self.parent_site
-
-    def systems(self, kind: str | None = None, *, include_shared: bool = True) -> list[System]:
+    def systems(
+        self, kind: SystemKind | str | None = None, *, include_shared: bool = True
+    ) -> list[System]:
         """Return the systems serving this building.
 
         Parameters

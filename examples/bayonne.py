@@ -112,9 +112,9 @@ def main(output: Path) -> BuildingPark:
     a.set("year_construction", 1974, source="audit", date=date(2025, 3, 12), comment="plans")
     a.set("heated_area", 1250.0, source="audit")
     print(f"A built in {a.year_construction} ({a.effective('year_construction').source}),")
-    for origin, candidate in a.sources("year_construction", inherited=True):
-        print(f"  {origin}: {candidate.value} from {candidate.source}")
-    print(f"A usage {a.usage} inherited from {a.origin('usage')}")
+    for entity_id, candidate in a.candidates("year_construction", inherited=True):
+        print(f"  {entity_id}: {candidate.value} from {candidate.source}")
+    print(f"A usage {a.usage} inherited from {a.provider_id('usage')}")
 
     # Detailed envelope from an audit, then the computed U_bat beats the DPE value.
     for component in (
@@ -145,7 +145,7 @@ def main(output: Path) -> BuildingPark:
         Meter(
             id="PDL_123",
             scope=["site-ecole-A"],
-            usage="total",
+            end_use="total",
             energy_type="electricity",
             timestep="30min",
             channels=[Channel(name="power", unit="W", column="valeur")],

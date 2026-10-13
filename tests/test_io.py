@@ -63,7 +63,7 @@ def park():
         Meter(
             id="PDL_123",
             scope=["site-ecole-A"],
-            usage="total",
+            end_use="total",
             channels=[Channel(name="power", unit="W")],
         )
     )
@@ -99,7 +99,7 @@ def test_json_round_trip_with_project_classes(park):
     assert loaded.building_cls is BayonneBuilding
     assert a.code_patrimoine == "BAT-0042"
     assert a.year_construction == 1972
-    assert a.origin("year_construction") == GROUP
+    assert a.provider_id("year_construction") == GROUP
     assert a.usage == "tertiary"
     assert a.envelope.u_bat == 1.1
     assert type(a.envelope.components[1]) is Window
@@ -124,7 +124,7 @@ def test_loading_with_base_classes_keeps_project_attributes(park):
     with pytest.warns(UnknownAttributeWarning), pytest.warns(ClassMismatchWarning):
         plain = BuildingPark.from_json(text)
     assert type(plain[RNB_A]) is Building
-    assert plain[RNB_A].sources("code_patrimoine")[0].value == "BAT-0042"
+    assert plain[RNB_A].candidates("code_patrimoine")[0].value == "BAT-0042"
     # saving again writes them back unchanged, and project classes read them normally
     with pytest.warns(ClassMismatchWarning):
         reloaded = BuildingPark.from_json(

@@ -55,7 +55,7 @@ def test_reserved_name_is_rejected():
     with pytest.raises(TypeError, match="reserved"):
 
         class Bad(SourcedModel):
-            sources = sourced(int)
+            candidates = sourced(int)
 
 
 # --- set / get / unset ------------------------------------------------------------------------
@@ -64,7 +64,7 @@ def test_reserved_name_is_rejected():
 def test_unset_attribute_is_none():
     assert Thing().area is None
     assert Thing().effective("area") is None
-    assert Thing().sources("area") == []
+    assert Thing().candidates("area") == []
 
 
 def test_direct_assignment_uses_manual_source():
@@ -80,7 +80,7 @@ def test_assigning_none_removes_manual_candidate():
     thing.area = 12.5
     thing.area = None
     assert thing.area == 10.0
-    assert [c.source for c in thing.sources("area")] == ["bdnb"]
+    assert [c.source for c in thing.candidates("area")] == ["bdnb"]
 
 
 def test_set_keeps_provenance():
@@ -109,14 +109,14 @@ def test_one_candidate_per_source():
     thing = Thing()
     thing.set("area", 10.0, source="bdnb")
     thing.set("area", 11.0, source="bdnb")
-    assert [c.value for c in thing.sources("area")] == [11.0]
+    assert [c.value for c in thing.candidates("area")] == [11.0]
 
 
 def test_set_none_unsets_that_source():
     thing = Thing()
     thing.set("area", 10.0, source="bdnb")
     assert thing.set("area", None, source="bdnb") is None
-    assert thing.sources("area") == []
+    assert thing.candidates("area") == []
 
 
 def test_unset_all_sources():
@@ -144,7 +144,7 @@ def test_invalid_values_are_rejected(name, value):
         Thing().set(name, value, source="bdnb")
 
 
-@pytest.mark.parametrize("method", ["set", "unset", "sources", "effective"])
+@pytest.mark.parametrize("method", ["set", "unset", "candidates", "effective"])
 def test_unknown_attribute_name_is_rejected(method):
     thing = Thing()
     args = ("nope", 1) if method == "set" else ("nope",)
@@ -169,12 +169,12 @@ def test_constructor_kwargs_default_to_manual_source():
 
 def test_constructor_source_applies_to_all_kwargs():
     thing = Thing(area=10.0, year=1972, source="bdnb")
-    assert {c.source for name in ("area", "year") for c in thing.sources(name)} == {"bdnb"}
+    assert {c.source for name in ("area", "year") for c in thing.candidates(name)} == {"bdnb"}
 
 
 def test_constructor_ignores_none_values():
     thing = Thing(area=None, year=1972)
-    assert thing.sources("area") == []
+    assert thing.candidates("area") == []
 
 
 def test_constructor_accepts_sourced_value_instances():
@@ -218,7 +218,7 @@ def test_unknown_loaded_attribute_is_kept_with_warning():
     data = {"values": {"code": [{"value": "BAT-0042", "source": "bayonne_xlsx"}]}}
     with pytest.warns(UnknownAttributeWarning):
         thing = Thing.model_validate(data)
-    assert thing.sources("code")[0].value == "BAT-0042"
+    assert thing.candidates("code")[0].value == "BAT-0042"
     assert json.loads(thing.model_dump_json(exclude_none=True)) == {"id": "thing", **data}
 
 
