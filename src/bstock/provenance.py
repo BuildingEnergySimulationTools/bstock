@@ -238,7 +238,7 @@ class SourcedModel(BaseModel):
     Constructor keyword arguments named after sourced attributes become candidates of the source
     given by ``source`` (``"manual"`` by default); ``None`` values are ignored::
 
-        Building(rnb_id="A1B2C3D4E5F6", year_construction=1970, source="bdnb")
+        Building(rnb_id="A1B2C3D4E5F6", construction_year=1970, source="bdnb")
     """
 
     model_config = ConfigDict(

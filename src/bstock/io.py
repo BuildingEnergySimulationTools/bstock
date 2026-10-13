@@ -166,7 +166,7 @@ def load(
 ) -> BuildingPark:
     """Load a park saved by :func:`save`; data sources resolve relative paths in ``directory``.
 
-    Metered data is not read: call ``meter.load()`` or ``park.timeseries(load=True)``.
+    Metered data is not read: call ``meter.load_data()`` or ``park.timeseries(load_data=True)``.
     """
     directory = Path(directory)
     park = from_json(

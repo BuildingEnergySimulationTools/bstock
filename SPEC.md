@@ -27,7 +27,7 @@ parc de bâtiments, sa provenance et ses données mesurées.
   héritage dans le code du projet.
 - **Traçabilité.** Chaque valeur descriptive sait d'où elle vient. Plusieurs sources peuvent coexister, et
   une règle de priorité choisit la valeur effective.
-- **Simple à l'usage.** `building.year_construction` renvoie directement une valeur ; la provenance est
+- **Simple à l'usage.** `building.construction_year` renvoie directement une valeur ; la provenance est
   consultable à part.
 
 ### Hors périmètre
@@ -202,10 +202,10 @@ un sous-site, reprend la valeur de son site parent quand il n'a pas la sienne (�
 | `lat`, `lon` | sourcé `float` | ° (WGS84) | oui | Point représentatif |
 | `usage` | sourcé `BuildingUsage` | | oui | Usage principal (§3.9) |
 | `sub_usages` | sourcé `list[str]` | | oui | Remplace `sub_usage_category_1..3` |
-| `year_construction` | sourcé `int` | | oui | |
-| `nb_levels` | sourcé `int` | | oui | Nombre de niveaux, RDC = 1 (fusion de `floor_number` et `nb_level`) |
+| `construction_year` | sourcé `int` | | oui | |
+| `level_count` | sourcé `int` | | oui | Nombre de niveaux, RDC = 1 (fusion de `floor_number` et `nb_level`) |
 | `height` | sourcé `float` | m | oui | |
-| `nb_dwellings` | sourcé `int` | | **non** | Nombre de logements |
+| `dwelling_count` | sourcé `int` | | **non** | Nombre de logements |
 | `footprint_area` | sourcé `float` | m² | **non** | Emprise au sol |
 | `floor_area` | sourcé `float` | m² | **non** | Surface de plancher (`floor_surface` du draw.io) |
 | `heated_area` | sourcé `float` | m² | **non** | Surface chauffée |
@@ -271,7 +271,7 @@ env.compute_heat_loss_coefficient()  # Σ H des parois
 env.compute_loss_area()              # Σ A des parois hors ponts thermiques
 env.compute_u_bat()                  # heat_loss_coefficient / loss_area (valeurs effectives)
 env.compute_window_shgc()  # moyenne des shgc pondérée par la surface des vitrages
-env.components_by(kind="window", orientation="s")   # filtrage
+env.find_components(kind="window", orientation="s")   # filtrage
 env.add_component(c), env.remove_component(id)    # gestion des parois (ids uniques dans l'enveloppe)
 ```
 
@@ -385,19 +385,19 @@ La **valeur effective** est choisie parmi les candidats selon la priorité des s
 ### 4.2 API
 
 ```python
-b.year_construction                    # -> 1972 (valeur effective) ou None
-b.year_construction = 1968             # équivaut à b.set(..., source="manual")
-b.year_construction = None             # retire le candidat "manual" (équivaut à unset(source="manual"))
+b.construction_year                    # -> 1972 (valeur effective) ou None
+b.construction_year = 1968             # équivaut à b.set(..., source="manual")
+b.construction_year = None             # retire le candidat "manual" (équivaut à unset(source="manual"))
 
-b.set("year_construction", 1970, source="bdnb", date=date(2024, 10, 1))
-b.set("year_construction", 1972, source="dpe", ref="2364E0123456X")
+b.set("construction_year", 1970, source="bdnb", date=date(2024, 10, 1))
+b.set("construction_year", 1972, source="dpe", ref="2364E0123456X")
 
-b.candidates("year_construction")
+b.candidates("construction_year")
 # [SourcedValue(1972, source="dpe", ref="2364E0123456X"),
 #  SourcedValue(1970, source="bdnb", date=2024-10-01)]
 
-b.effective("year_construction")       # -> SourcedValue retenue (avec sa source)
-b.unset("year_construction", source="bdnb")   # retire le candidat d'une source
+b.effective("construction_year")       # -> SourcedValue retenue (avec sa source)
+b.unset("construction_year", source="bdnb")   # retire le candidat d'une source
 ```
 
 Règles :
@@ -409,7 +409,7 @@ Règles :
 - À la construction, les kwargs sont enregistrés sous la source `"manual"`, sauf si l'appel précise
   `source=` (une valeur `None` est ignorée) :
   ```python
-  park.new_building(rnb_id="...", source="bdnb", year_construction=1970, height=12.5)
+  park.new_building(rnb_id="...", source="bdnb", construction_year=1970, height=12.5)
   ```
 
 ### 4.3 Résolution (SourcePriority)
@@ -445,16 +445,16 @@ en remontant la hiérarchie :
    réputée plus précise.
 
 ```python
-site.set("year_construction", 1972, source="bdnb")   # posé sur le groupe BDNB
-b.year_construction                           # -> 1972 (hérité)
-b.provider_id("year_construction")                 # -> "bdnb-bg-1111-1HRT-8SVH" (id de l'entité qui fournit la valeur)
-b.candidates("year_construction")                # -> [] (candidats propres seulement)
-b.candidates("year_construction", inherited=True)
+site.set("construction_year", 1972, source="bdnb")   # posé sur le groupe BDNB
+b.construction_year                           # -> 1972 (hérité)
+b.provider_id("construction_year")                 # -> "bdnb-bg-1111-1HRT-8SVH" (id de l'entité qui fournit la valeur)
+b.candidates("construction_year")                # -> [] (candidats propres seulement)
+b.candidates("construction_year", inherited=True)
 # [("bdnb-bg-1111-1HRT-8SVH", SourcedValue(1972, source="bdnb"))]
-b.set("year_construction", 1985, source="audit")   # valeur propre : masque l'héritage
+b.set("construction_year", 1985, source="audit")   # valeur propre : masque l'héritage
 ```
 
-- Les grandeurs extensives (`nb_dwellings`, surfaces, `heat_loss_coefficient`…) ne sont **jamais**
+- Les grandeurs extensives (`dwelling_count`, surfaces, `heat_loss_coefficient`…) ne sont **jamais**
   héritées. Une valeur posée sur un site vaut pour le site entier. Les agrégations (somme des bâtiments
   comparée à la valeur du site) sont prévues en v3.
 - Un champ ajouté par un projet choisit son comportement : `sourced(str, inherit=True)`. Par défaut, il n'est
@@ -470,7 +470,7 @@ b.set("year_construction", 1985, source="audit")   # valeur propre : masque l'h�
   class Building(SourcedModel):
       rnb_id: str | None = None                                  # champ Pydantic classique
       heated_area = sourced(float, unit="m²", ge=0, description="Surface chauffée")
-      year_construction = sourced(int, inherit=True)
+      construction_year = sourced(int, inherit=True)
   ```
   `sourced(...)` renvoie un descripteur `SourcedField[T]`. Sur une instance, il renvoie la valeur effective
   (`T | None`), et les IDE et vérificateurs de types connaissent donc son type. Sur la classe, il renvoie
@@ -610,7 +610,7 @@ class ParquetSource(DataSource): type = "parquet"; path
 ### 6.3 Chargement et données en mémoire
 
 ```python
-m.load()                 # data_source.load() -> sélection et renommage des colonnes -> m.data
+m.load_data()            # data_source.load() -> sélection et renommage des colonnes -> m.data
 m.data                   # DataFrame au format décrit ci-dessous
 m.data = df_nettoye      # affectation directe (validée) ; colonnes nommées par channel.name
                          # ou déjà au format tide
@@ -639,18 +639,18 @@ Les colonnes suivent le format tide `name__unit__bloc__sub_bloc` :
 par tide :
 
 ```python
-df = park.timeseries(end_use="heating", buildings=[...], load=True)  # filtres optionnels
+df = park.timeseries(end_use="heating", buildings=[...], load_data=True)  # filtres optionnels
 from tide.plumbing import Plumber
 Plumber(df).show()
 ```
 
 - Les index sont convertis dans un fuseau unique (`tz="UTC"` par défaut, paramétrable), puis unis
   (outer join), sans rééchantillonnage : c'est le rôle de tide.
-- `load=True` appelle `load()` sur les compteurs dont `data` est vide.
+- `load_data=True` appelle `load_data()` sur les compteurs dont `data` est vide.
 - Filtres : `end_use`, `energy_type`, `meters` (ids), `buildings` / `sites` (ids ou objets). Un filtre sur
   des bâtiments retient les compteurs dont le `scope` contient ces bâtiments ou leurs systèmes propres.
 - Les noms de colonnes commencent par l'id du compteur : ils sont donc uniques dans le parc.
-- Un compteur sélectionné sans données en mémoire (et sans `load=True`) est ignoré avec un
+- Un compteur sélectionné sans données en mémoire (et sans `load_data=True`) est ignoré avec un
   `NoDataWarning`.
 - `park.meters_for(entité)` et `entité.meters()` renvoient les compteurs dont le `scope` contient l'entité
   ou un de ses systèmes propres.
@@ -673,7 +673,7 @@ BuildingPark.load("bayonne/", site_cls=..., building_cls=...)
 BuildingPark.json_schema(site_cls=..., building_cls=...) -> dict
 ```
 
-- `load` ne lit pas les séries : `meter.load()` ou `park.timeseries(load=True)` les chargent à la demande.
+- `load` ne lit pas les séries : `meter.load_data()` ou `park.timeseries(load_data=True)` les chargent à la demande.
 - Dans un fichier de parc, les chemins relatifs des sources de données sont relatifs au dossier du parc.
   À la sauvegarde, les chemins relatifs au répertoire courant sont donc rendus absolus. Un dossier de parc
   sauvegardé avec `include_data=True` peut être déplacé.
@@ -718,7 +718,7 @@ traçabilité. Le parc sauvegardé est alors **autonome**.
       "bdnb_batiment_groupe_id": "bdnb-bg-1111-1HRT-8SVH",
       "dpe_ids": ["2364E0123456X"],
       "values": {
-        "year_construction": [
+        "construction_year": [
           {"value": 1972, "source": "dpe", "ref": "2364E0123456X"},
           {"value": 1970, "source": "bdnb", "date": "2024-10-01", "ref": "bdnb-bg-1111-1HRT-8SVH"}
         ],
@@ -769,7 +769,7 @@ park.add_meter(Meter(id="PDL_123", scope=[b.parent.id], end_use="total", timeste
                      channels=[Channel(name="power", unit="W", column="valeur")],
                      data_source=CsvSource(path="data/enedis_PDL_123.csv", index_col="horodate")))
 
-df = park.timeseries(load=True)
+df = park.timeseries(load_data=True)
 park.save("out/bayonne/", include_data=True)
 
 # plus tard, ailleurs

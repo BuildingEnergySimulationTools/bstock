@@ -163,7 +163,10 @@ class Adjacency(StrEnum):
 
 
 class SystemKind(StrEnum):
-    """Kind of technical system; also the name of the matching list on sites and buildings."""
+    """Kind of technical system; also the name of the matching list on sites and buildings.
+
+    ``DHW`` is domestic hot water and ``PV`` photovoltaics, the usual abbreviations of the field.
+    """
 
     HEATING = auto()
     COOLING = auto()

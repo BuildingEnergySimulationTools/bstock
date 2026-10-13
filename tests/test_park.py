@@ -27,7 +27,7 @@ def park():
     park = BuildingPark(name="Ville de Bayonne")
     client = park.new_site("site-ecole-A", name="Groupe scolaire A", usage="tertiary")
     park.new_site(GROUP, parent=client, bdnb_batiment_groupe_id=GROUP)
-    park.new_building(RNB_A, site=GROUP, year_construction=1972, source="bdnb")
+    park.new_building(RNB_A, site=GROUP, construction_year=1972, source="bdnb")
     park.new_building(RNB_B, site=GROUP)
     park.new_building(RNB_C, site="site-ecole-A")
     park.new_building(id="bldg-isolated")
@@ -63,7 +63,7 @@ def test_new_entities_are_attached(park):
 
 
 def test_new_building_source_applies_to_attributes(park):
-    assert park[RNB_A].effective("year_construction").source == "bdnb"
+    assert park[RNB_A].effective("construction_year").source == "bdnb"
 
 
 def test_inheritance_inside_park(park):
@@ -255,16 +255,16 @@ def test_add_system_to_unknown_owner(park):
 
 
 def test_move_building_changes_inheritance(park):
-    park[GROUP].set("year_construction", 1980, source="bdnb")
+    park[GROUP].set("construction_year", 1980, source="bdnb")
     b = park[RNB_B]
-    assert b.year_construction == 1980
+    assert b.construction_year == 1980
     park.move(RNB_B, None)
     assert b.parent is None
     assert b in park.buildings
-    assert b.year_construction is None
+    assert b.construction_year is None
     park.move(RNB_B, GROUP)
     assert b.parent is park[GROUP]
-    assert b.year_construction == 1980
+    assert b.construction_year == 1980
 
 
 def test_move_site_keeps_its_content(park):

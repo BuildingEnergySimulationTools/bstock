@@ -333,7 +333,7 @@ class BuildingPark(BaseModel):
         meters: Iterable[Meter | str] | None = None,
         buildings: Iterable[Building | str] | None = None,
         sites: Iterable[Site | str] | None = None,
-        load: bool = False,
+        load_data: bool = False,
         tz: str = "UTC",
     ) -> pd.DataFrame:
         """Assemble the data of several meters in one DataFrame, ready for ``tide.Plumber``.
@@ -347,8 +347,8 @@ class BuildingPark(BaseModel):
         buildings, sites
             Keep the meters whose scope contains one of these entities or one of their own
             systems.
-        load
-            Call :meth:`Meter.load` on the selected meters that have no data in memory. Without
+        load_data
+            Call :meth:`Meter.load_data` on the selected meters that have no data in memory. Without
             it, such meters are skipped with a :class:`NoDataWarning`.
         tz
             Time zone of the result.
@@ -361,8 +361,8 @@ class BuildingPark(BaseModel):
         selected = self._select_meters(end_use, energy_type, meters, buildings, sites)
         frames: list[pd.DataFrame] = []
         for meter in selected:
-            if meter.data is None and load:
-                meter.load()
+            if meter.data is None and load_data:
+                meter.load_data()
             if meter.data is None:
                 warnings.warn(f"meter {meter.id!r} has no data", NoDataWarning, stacklevel=2)
                 continue

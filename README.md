@@ -38,12 +38,12 @@ class MyBuilding(Building):            # client attributes, with provenance too
 park = BuildingPark(name="My park", building_cls=MyBuilding)
 school = park.new_site("school-A", name="School A")
 group = park.new_site("bdnb-bg-1111-1HRT-8SVH", parent=school)
-group.set("year_construction", 1972, source="bdnb")
+group.set("construction_year", 1972, source="bdnb")
 
 b = park.new_building("A1B2C3D4E5F6", site=group, asset_code="BAT-0042", source="client")
-b.set("year_construction", 1974, source="audit")
-b.year_construction                    # 1974: own value, audit
-b.candidates("year_construction", inherited=True)
+b.set("construction_year", 1974, source="audit")
+b.construction_year                    # 1974: own value, audit
+b.candidates("construction_year", inherited=True)
 # [('A1B2C3D4E5F6', SourcedValue(value=1974, source='audit', ...)),
 #  ('bdnb-bg-1111-1HRT-8SVH', SourcedValue(value=1972, source='bdnb', ...))]
 
@@ -52,7 +52,7 @@ park.add_meter(Meter(
     channels=[Channel(name="power", unit="W", column="valeur")],
     data_source=CsvSource(path="enedis.csv", index_col="horodate", sep=";", tz="Europe/Paris"),
 ))
-df = park.timeseries(load=True)        # columns: PDL_123_power__W__school-A__total
+df = park.timeseries(load_data=True)        # columns: PDL_123_power__W__school-A__total
 
 park.save("out/my_park", include_data=True)
 park = BuildingPark.load("out/my_park", building_cls=MyBuilding)

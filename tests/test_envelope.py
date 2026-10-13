@@ -58,9 +58,12 @@ def test_window_kind_requires_window_class():
 
 
 def test_component_heat_loss_prefers_given_value():
-    assert wall(area=10.0, u_value=0.5).heat_loss() == 5.0
-    assert wall(area=10.0, u_value=0.5, heat_loss_coefficient=7.0).heat_loss() == 7.0
-    assert wall(area=10.0).heat_loss() is None
+    assert wall(area=10.0, u_value=0.5).resolved_heat_loss_coefficient() == 5.0
+    assert (
+        wall(area=10.0, u_value=0.5, heat_loss_coefficient=7.0).resolved_heat_loss_coefficient()
+        == 7.0
+    )
+    assert wall(area=10.0).resolved_heat_loss_coefficient() is None
 
 
 def test_units_are_declared():
@@ -92,11 +95,14 @@ def test_duplicate_component_ids_rejected_at_construction():
         Envelope(components=[wall(id="w"), wall(id="w")])
 
 
-def test_components_by(detailed):
-    assert [c.id for c in detailed.components_by(kind="window")] == ["win-s", "win-n"]
-    assert [c.id for c in detailed.components_by(orientation=Orientation.S)] == ["wall-s", "win-s"]
-    assert [c.id for c in detailed.components_by(kind="wall", orientation="n")] == ["wall-n"]
-    assert len(detailed.components_by()) == 6
+def test_find_components(detailed):
+    assert [c.id for c in detailed.find_components(kind="window")] == ["win-s", "win-n"]
+    assert [c.id for c in detailed.find_components(orientation=Orientation.S)] == [
+        "wall-s",
+        "win-s",
+    ]
+    assert [c.id for c in detailed.find_components(kind="wall", orientation="n")] == ["wall-n"]
+    assert len(detailed.find_components()) == 6
 
 
 # --- computations -----------------------------------------------------------------------------
@@ -210,4 +216,4 @@ def test_json_round_trip_restores_component_classes(detailed):
     assert loaded == detailed
     assert [type(c) for c in loaded.components] == [type(c) for c in detailed.components]
     assert all(c._container is loaded for c in loaded.components)
-    assert loaded.components_by(kind="window")[0].shgc == 0.6
+    assert loaded.find_components(kind="window")[0].shgc == 0.6

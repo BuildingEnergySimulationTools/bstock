@@ -156,7 +156,7 @@ def test_csv_source_with_offsets(tmp_path):
         channels=[Channel(name="power", unit="W", column="valeur")],
         data_source=CsvSource(path=str(csv), index_col="horodate", sep=";", decimal=","),
     )
-    data = meter.load()
+    data = meter.load_data()
     assert data.iloc[:, 0].tolist() == [1.5, 2.5]
     assert data.index.tz is not None
 
@@ -197,7 +197,7 @@ def test_parquet_source(tmp_path):
     meter = Meter(
         channels=[Channel(name="power", unit="W")], data_source=ParquetSource(path=str(path))
     )
-    assert meter.load().shape == (3, 1)
+    assert meter.load_data().shape == (3, 1)
 
 
 def test_single_column_feeds_single_channel(tmp_path):
@@ -206,7 +206,7 @@ def test_single_column_feeds_single_channel(tmp_path):
     meter = Meter(
         channels=[Channel(name="power", unit="W")], data_source=ParquetSource(path=str(path))
     )
-    assert meter.load().iloc[:, 0].tolist() == [1.0, 2.0, 3.0]
+    assert meter.load_data().iloc[:, 0].tolist() == [1.0, 2.0, 3.0]
 
 
 def test_missing_source_column(tmp_path):
@@ -217,7 +217,7 @@ def test_missing_source_column(tmp_path):
         data_source=ParquetSource(path=str(path)),
     )
     with pytest.raises(DataSourceError, match="not found"):
-        meter.load()
+        meter.load_data()
 
 
 def test_missing_file_raises_data_source_error(tmp_path):
@@ -227,7 +227,7 @@ def test_missing_file_raises_data_source_error(tmp_path):
 
 def test_load_without_source():
     with pytest.raises(DataSourceError, match="no data source"):
-        Meter(channels=[Channel(name="power", unit="W")]).load()
+        Meter(channels=[Channel(name="power", unit="W")]).load_data()
 
 
 def test_relative_path_resolved_against_base_dir(tmp_path):
@@ -263,7 +263,7 @@ def test_custom_source_is_registered_and_round_trips():
     }
     loaded = Meter.model_validate(data)
     assert isinstance(loaded.data_source, ApiSource)
-    assert loaded.load().iloc[:, 0].tolist() == [5.0, 6.0, 7.0]
+    assert loaded.load_data().iloc[:, 0].tolist() == [5.0, 6.0, 7.0]
 
 
 def test_unknown_source_type_is_kept():
@@ -278,7 +278,7 @@ def test_unknown_source_type_is_kept():
         "sftp.example.org"
     )
     with pytest.raises(DataSourceError, match="client_sftp"):
-        meter.load()
+        meter.load_data()
 
 
 # --- park -------------------------------------------------------------------------------------
@@ -385,7 +385,7 @@ def test_timeseries_load(park, tmp_path):
     park.add_meter(
         make_meter("m", ["site-A"], data_source=ParquetSource(path=str(tmp_path / "m.parquet")))
     )
-    assert park.timeseries(load=True).shape == (3, 1)
+    assert park.timeseries(load_data=True).shape == (3, 1)
 
 
 def test_meters_with_same_tags_get_distinct_columns(park):

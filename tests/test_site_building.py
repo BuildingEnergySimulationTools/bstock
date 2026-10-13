@@ -84,8 +84,8 @@ def test_id_with_tide_separator_is_rejected():
 def test_common_attributes_on_site_and_building():
     assert set(Site.sourced_fields()) == set(Building.sourced_fields())
     assert Building.heated_area.unit == "m²"
-    assert Building.year_construction.inherit is True
-    assert Building.nb_dwellings.inherit is False
+    assert Building.construction_year.inherit is True
+    assert Building.dwelling_count.inherit is False
 
 
 @pytest.mark.parametrize(
@@ -93,12 +93,12 @@ def test_common_attributes_on_site_and_building():
     [
         ("address", True),
         ("usage", True),
-        ("year_construction", True),
-        ("nb_levels", True),
+        ("construction_year", True),
+        ("level_count", True),
         ("height", True),
         ("lat", True),
         ("name", False),
-        ("nb_dwellings", False),
+        ("dwelling_count", False),
         ("footprint_area", False),
         ("floor_area", False),
         ("heated_area", False),
@@ -110,7 +110,7 @@ def test_inheritance_flags_follow_spec(name, inherited):
 
 @pytest.mark.parametrize(
     ("name", "value"),
-    [("lat", 91.0), ("lon", -181.0), ("nb_levels", 0), ("year_construction", 50)],
+    [("lat", 91.0), ("lon", -181.0), ("level_count", 0), ("construction_year", 50)],
 )
 def test_out_of_range_values_are_rejected(name, value):
     with pytest.raises(ValidationError):
@@ -133,19 +133,19 @@ def test_navigation(tree):
 
 def test_building_inherits_through_nested_sites(tree):
     _client, group, a, _, c = tree
-    group.set("year_construction", 1972, source="bdnb", ref=GROUP)
+    group.set("construction_year", 1972, source="bdnb", ref=GROUP)
     assert a.usage is BuildingUsage.TERTIARY
     assert a.provider_id("usage") == "site-ecole-A"
-    assert a.year_construction == 1972
-    assert a.provider_id("year_construction") == GROUP
-    assert c.year_construction is None  # not under the BDNB group
+    assert a.construction_year == 1972
+    assert a.provider_id("construction_year") == GROUP
+    assert c.construction_year is None  # not under the BDNB group
 
 
 def test_extensive_values_stay_on_site(tree):
     _, group, a, _, _ = tree
-    group.nb_dwellings = 48
+    group.dwelling_count = 48
     group.heated_area = 3200.0
-    assert a.nb_dwellings is None
+    assert a.dwelling_count is None
     assert a.heated_area is None
 
 
@@ -235,14 +235,14 @@ def test_duplicate_system_ids_rejected_at_construction():
 
 def test_json_round_trip_rebuilds_tree(tree):
     client, group, _a, _, _ = tree
-    group.set("year_construction", 1972, source="bdnb")
+    group.set("construction_year", 1972, source="bdnb")
     group.envelope.set("u_bat", 1.1, source="dpe")
     group.add_system(HeatingGenerator(id="heating-group", serves=[RNB_A], technology="chiller"))
     data = json.loads(client.model_dump_json(exclude_none=True))
     loaded = Site.model_validate(data)
     assert loaded == client
     loaded_a = next(x for x in loaded.iter_buildings() if x.id == RNB_A)
-    assert loaded_a.year_construction == 1972
+    assert loaded_a.construction_year == 1972
     assert loaded_a.envelope.u_bat == 1.1
     assert [s.id for s in loaded_a.systems("heating")] == ["heating-group"]
     assert loaded_a.usage is BuildingUsage.TERTIARY

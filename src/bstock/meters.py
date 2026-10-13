@@ -82,7 +82,7 @@ class Meter(SourcedModel):
 
     The data is a DataFrame with a sorted, time-zone aware ``DatetimeIndex`` and one column per
     channel, named after the tide convention ``name__unit__bloc__sub_bloc`` (SPEC §6.4). It is kept
-    in memory only: the JSON keeps ``data_source``, from which :meth:`load` reads it.
+    in memory only: the JSON keeps ``data_source``, from which :meth:`load_data` reads it.
 
     Parameters
     ----------
@@ -199,7 +199,7 @@ class Meter(SourcedModel):
             )
         self._data = renamed[expected]
 
-    def load(self) -> pd.DataFrame:
+    def load_data(self) -> pd.DataFrame:
         """Read the data from ``data_source``, keep it in :attr:`data` and return it.
 
         Columns already in tide format (as saved by the park) are taken as is. Otherwise each

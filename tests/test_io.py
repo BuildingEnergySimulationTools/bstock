@@ -45,7 +45,7 @@ def park():
     )
     client = park.new_site("site-ecole-A", secteur="Nord", usage="tertiary", source="bayonne_xlsx")
     group = park.new_site(GROUP, parent=client, bdnb_batiment_groupe_id=GROUP)
-    group.set("year_construction", 1972, source="bdnb", ref=GROUP, raw="1972")
+    group.set("construction_year", 1972, source="bdnb", ref=GROUP, raw="1972")
     group.envelope.set("u_bat", 1.1, source="dpe", ref="2611E0031228S")
     a = park.new_building(RNB_A, site=group, code_patrimoine="BAT-0042", source="bayonne_xlsx")
     a.set("heated_area", 1250.0, source="audit", comment="plans")
@@ -80,10 +80,10 @@ def test_json_contains_metadata_and_candidates_only(park):
     assert data["site_cls"] == class_path(BayonneSite)
     assert data["building_cls"] == class_path(BayonneBuilding)
     group = data["sites"][0]["sites"][0]
-    assert group["values"]["year_construction"] == [
+    assert group["values"]["construction_year"] == [
         {"value": 1972, "source": "bdnb", "ref": GROUP, "raw": "1972"}
     ]
-    assert "year_construction" not in group["buildings"][0]["values"]  # inherited, not copied
+    assert "construction_year" not in group["buildings"][0]["values"]  # inherited, not copied
     assert "data" not in data["meters"][0]
 
 
@@ -98,8 +98,8 @@ def test_json_round_trip_with_project_classes(park):
     assert type(loaded["site-ecole-A"]) is BayonneSite
     assert loaded.building_cls is BayonneBuilding
     assert a.code_patrimoine == "BAT-0042"
-    assert a.year_construction == 1972
-    assert a.provider_id("year_construction") == GROUP
+    assert a.construction_year == 1972
+    assert a.provider_id("construction_year") == GROUP
     assert a.usage == "tertiary"
     assert a.envelope.u_bat == 1.1
     assert type(a.envelope.components[1]) is Window
@@ -182,7 +182,7 @@ def test_save_with_data_makes_park_autonomous(park, tmp_path):
     loaded = BuildingPark.load(
         tmp_path / "bayonne", site_cls=BayonneSite, building_cls=BayonneBuilding
     )
-    df = loaded.timeseries(load=True, tz="Europe/Paris")
+    df = loaded.timeseries(load_data=True, tz="Europe/Paris")
     pd.testing.assert_frame_equal(df, expected, check_freq=False)
     assert isinstance(loaded["PDL_123"].original_data_source, CsvSource)
 
@@ -208,7 +208,7 @@ def test_moved_park_directory_still_loads_data(park, tmp_path):
     loaded = BuildingPark.load(
         tmp_path / "moved", site_cls=BayonneSite, building_cls=BayonneBuilding
     )
-    assert loaded["PDL_123"].load().shape == (3, 1)
+    assert loaded["PDL_123"].load_data().shape == (3, 1)
 
 
 def test_multi_channel_meter_round_trip(tmp_path):
@@ -224,7 +224,7 @@ def test_multi_channel_meter_round_trip(tmp_path):
     meter.data = hourly(power=[1, 2, 3], energy=[4, 5, 6])
     park.save(tmp_path, include_data=True)
     loaded = BuildingPark.load(tmp_path)
-    assert list(loaded["m"].load().columns) == list(meter.data.columns)
+    assert list(loaded["m"].load_data().columns) == list(meter.data.columns)
 
 
 # --- schema -----------------------------------------------------------------------------------
@@ -234,7 +234,7 @@ def test_json_schema_lists_sourced_attributes_with_units():
     schema = BuildingPark.json_schema(site_cls=BayonneSite, building_cls=BayonneBuilding)
     sourced_attributes = schema["x-bstock-sourced-attributes"]
     assert sourced_attributes["BayonneBuilding"]["surface_utile_client"]["unit"] == "m²"
-    assert sourced_attributes["BayonneBuilding"]["year_construction"]["inherit"] is True
+    assert sourced_attributes["BayonneBuilding"]["construction_year"]["inherit"] is True
     assert sourced_attributes["Envelope"]["inertia"]["schema"]["enum"] == [i.value for i in Inertia]
     assert sourced_attributes["HeatingGenerator"]["nominal_power"]["unit"] == "kW"
     assert "sites" in schema["properties"]

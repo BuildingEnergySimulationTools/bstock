@@ -59,7 +59,7 @@ class EnvelopeComponent(SourcedModel):
             raise ValueError("use the Window class for windows")
         return kind
 
-    def heat_loss(self) -> float | None:
+    def resolved_heat_loss_coefficient(self) -> float | None:
         """Return the heat loss coefficient in W/K: the given one, else U·A, else ``None``."""
         if self.heat_loss_coefficient is not None:
             return self.heat_loss_coefficient
@@ -158,7 +158,7 @@ class Envelope(SourcedModel):
                 return self.components.pop(index)
         raise UnknownIdError(component_id)
 
-    def components_by(
+    def find_components(
         self,
         kind: ComponentKind | str | None = None,
         orientation: Orientation | str | None = None,
@@ -192,10 +192,10 @@ class Envelope(SourcedModel):
             If there is no component, or a component heat loss cannot be determined.
         """
         components = self._require_components()
-        missing = [c.id for c in components if c.heat_loss() is None]
+        missing = [c.id for c in components if c.resolved_heat_loss_coefficient() is None]
         if missing:
             raise IncompleteDataError(f"heat loss unknown for components {missing}")
-        total = sum(c.heat_loss() or 0.0 for c in components)
+        total = sum(c.resolved_heat_loss_coefficient() or 0.0 for c in components)
         return self._set_computed("heat_loss_coefficient", total, len(components))
 
     def compute_loss_area(self) -> SourcedValue:

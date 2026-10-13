@@ -104,15 +104,15 @@ def main(output: Path) -> BuildingPark:
     group = park.new_site("bdnb-bg-1111-1HRT-8SVH", parent="site-ecole-A")
     for rnb in ("A1B2C3D4E5F6", "B1B2C3D4E5F6"):
         park.move(rnb, group)
-    group.set("year_construction", 1972, source="bdnb", ref=group.id)
+    group.set("construction_year", 1972, source="bdnb", ref=group.id)
     group.set("usage", "tertiary", source="bdnb")
     group.envelope.set("u_bat", 1.4, source="dpe", ref="2611E0031228S")
 
     a = park["A1B2C3D4E5F6"]
-    a.set("year_construction", 1974, source="audit", date=date(2025, 3, 12), comment="plans")
+    a.set("construction_year", 1974, source="audit", date=date(2025, 3, 12), comment="plans")
     a.set("heated_area", 1250.0, source="audit")
-    print(f"A built in {a.year_construction} ({a.effective('year_construction').source}),")
-    for entity_id, candidate in a.candidates("year_construction", inherited=True):
+    print(f"A built in {a.construction_year} ({a.effective('construction_year').source}),")
+    for entity_id, candidate in a.candidates("construction_year", inherited=True):
         print(f"  {entity_id}: {candidate.value} from {candidate.source}")
     print(f"A usage {a.usage} inherited from {a.provider_id('usage')}")
 
@@ -155,7 +155,7 @@ def main(output: Path) -> BuildingPark:
         )
     )
 
-    frame = park.timeseries(load=True)
+    frame = park.timeseries(load_data=True)
     print(f"Time series ready for tide: {list(frame.columns)}, {len(frame)} rows")
 
     park.save(output / "park", include_data=True)
@@ -164,7 +164,7 @@ def main(output: Path) -> BuildingPark:
         output / "park", site_cls=BayonneSite, building_cls=BayonneBuilding
     )
     assert reloaded == park
-    assert reloaded.timeseries(load=True).equals(frame)
+    assert reloaded.timeseries(load_data=True).equals(frame)
     print(f"Reloaded {sum(1 for _ in reloaded.iter_buildings())} buildings from {output / 'park'}")
     return reloaded
 
