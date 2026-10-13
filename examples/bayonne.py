@@ -1,4 +1,4 @@
-"""End-to-end example of bstock (SPEC §8), with made-up data for a fictitious Bayonne park.
+"""End-to-end example of bstock (SPEC §10), with made-up data for a fictitious Bayonne park.
 
 It shows the typical project workflow:
 

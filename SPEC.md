@@ -1,7 +1,8 @@
 # bstock — Spécification
 
-> Statut : **v1.0**, implémentée par bstock 0.2.0 (périmètre v1 du §10). Issue de l'interview de
-> conception du 2026-10-13 et ajustée pendant l'implémentation. Points ouverts : §11.
+> Statut : **v1.0**, implémentée par bstock 0.2.0 (périmètre v1 du §12). **v2 spécifiée** (§3.6
+> emprise, §8 connecteurs, §9 exports, annexe A), en cours d'implémentation : voir `PLAN.md`. Issue des
+> interviews de conception du 2026-10-13 et ajustée pendant l'implémentation. Points ouverts : §13.
 
 ---
 
@@ -207,9 +208,24 @@ un sous-site, reprend la valeur de son site parent quand il n'a pas la sienne (�
 | `level_count` | sourcé `int` | | oui | Nombre de niveaux, RDC = 1 (fusion de `floor_number` et `nb_level`) |
 | `height` | sourcé `float` | m | oui | |
 | `dwelling_count` | sourcé `int` | | **non** | Nombre de logements |
-| `footprint_area` | sourcé `float` | m² | **non** | Emprise au sol |
-| `floor_area` | sourcé `float` | m² | **non** | Surface de plancher (`floor_surface` du draw.io) |
-| `heated_area` | sourcé `float` | m² | **non** | Surface chauffée |
+| `footprint` | sourcé `dict` (géométrie GeoJSON) | ° (WGS84) | **non** | Emprise au sol : `Polygon` ou `MultiPolygon` |
+| `footprint_area` | sourcé `float` | m² | **non** | Surface de l'emprise au sol |
+| `floor_area` | sourcé `float` | m² | **non** | Surface de plancher (`floor_surface` du draw.io) ; jamais alimentée par le DPE |
+| `heated_area` | sourcé `float` | m² | **non** | Surface chauffée. Le connecteur DPE y range la surface de référence du DPE (habitable ou utile) et la nomme dans `comment` (§8.5) |
+
+**Emprise au sol.** `footprint` est un objet géométrie GeoJSON (RFC 7946) : un dict `{"type": "Polygon",
+"coordinates": [...]}` ou `MultiPolygon`, coordonnées `[lon, lat]` en WGS84 (EPSG:4326). Il est stocké
+tel quel dans le JSON du parc, sans dépendance géographique. La validation est légère : type, anneaux
+fermés d'au moins 4 positions, coordonnées dans les bornes WGS84 ; une géométrie invalide lève
+`ValidationError`. Les géométries reçues dans un autre système (Lambert-93 de la BDNB) sont reprojetées
+par le connecteur, ce qui demande l'extra `[geo]` (§8.1).
+
+`compute_footprint_area()` (Site et Building) ajoute un candidat `footprint_area` de source `"computed"`,
+calculé depuis la valeur effective de `footprint`, sans dépendance : projection équirectangulaire locale
+autour du centre de la géométrie, puis formule du lacet (trous soustraits, polygones d'un `MultiPolygon`
+additionnés). L'écart avec une projection à aires égales est inférieur à 0,1 % à l'échelle d'un
+bâtiment. Sans emprise, il lève `IncompleteDataError`. Comme pour l'enveloppe (§3.7), c'est un instantané
+et la priorité des sources arbitre avec la valeur de la BDNB.
 
 Accès dérivés du bâtiment (non sérialisés) :
 - `building.parent` : le site parent direct ou `None` ;
@@ -312,8 +328,9 @@ technologies. Les deux ratios sont optionnels et indépendants.
 
 Validation (avertissement `PerformanceRatioWarning`, pas d'erreur), relancée à chaque modification de la
 technologie ou d'un ratio : un ratio > 1,1 pour une technologie à combustion, à effet Joule ou une
-sous-station, ou un ratio < 1 pour une PAC, un groupe froid ou un chauffe-eau thermodynamique. Les PAC
-hybrides et le solaire thermique ne sont pas contrôlés.
+sous-station, ou un ratio < 1 pour une PAC, un groupe froid ou un chauffe-eau thermodynamique. Les
+technologies génériques suivent leur famille : `BOILER` et `WATER_HEATER` comme la combustion,
+`HEAT_PUMP` comme une PAC. Les PAC hybrides et le solaire thermique ne sont pas contrôlés.
 
 Chaque classe de système a un `kind` (`SystemKind` : `heating`, `cooling`, `dhw`, `ventilation`, `pv`) qui sert de préfixe
 aux ids générés et de filtre dans `building.systems(kind=...)`.
@@ -348,7 +365,7 @@ Elles sont sérialisées par cette valeur, et les API acceptent indifféremment 
 |---|---|
 | `BuildingUsage` | `RESIDENTIAL_INDIVIDUAL`, `RESIDENTIAL_COLLECTIVE`, `TERTIARY`, `SECONDARY`, `PRIMARY`, `OUTBUILDING`, `UNDETERMINED` (les 7 valeurs de `usage_principal_bdnb_open`) |
 | `EnergyType` | `ELECTRICITY`, `NATURAL_GAS`, `FUEL_OIL`, `LPG` (GPL, propane, butane), `WOOD`, `WOOD_LOGS`, `WOOD_PELLETS`, `WOOD_CHIPS`, `COAL`, `DISTRICT_HEATING`, `DISTRICT_COOLING`, `SOLAR`, `OTHER_FOSSIL`, `OTHER` |
-| `GeneratorTechnology` | `BOILER_STANDARD`, `BOILER_LOW_TEMPERATURE`, `BOILER_CONDENSING`, `ELECTRIC_BOILER`, `ELECTRIC_RESISTANCE` (effet Joule), `ELECTRIC_STORAGE_HEATER`, `HEAT_PUMP_AIR_AIR`, `HEAT_PUMP_AIR_WATER`, `HEAT_PUMP_WATER_WATER`, `HEAT_PUMP_GROUND`, `HEAT_PUMP_GAS`, `HEAT_PUMP_HYBRID`, `STOVE_INSERT`, `GAS_RADIATOR`, `WARM_AIR_GENERATOR`, `DISTRICT_SUBSTATION`, `SOLAR_THERMAL`, `ELECTRIC_WATER_TANK`, `INSTANT_WATER_HEATER`, `THERMODYNAMIC_WATER_HEATER`, `CHILLER`, `OTHER` |
+| `GeneratorTechnology` | `BOILER` (type inconnu), `BOILER_STANDARD`, `BOILER_LOW_TEMPERATURE`, `BOILER_CONDENSING`, `ELECTRIC_BOILER`, `ELECTRIC_RESISTANCE` (effet Joule), `ELECTRIC_STORAGE_HEATER`, `HEAT_PUMP` (type inconnu), `HEAT_PUMP_AIR_AIR`, `HEAT_PUMP_AIR_WATER`, `HEAT_PUMP_WATER_WATER`, `HEAT_PUMP_GROUND`, `HEAT_PUMP_GAS`, `HEAT_PUMP_HYBRID`, `STOVE_INSERT`, `GAS_RADIATOR`, `WARM_AIR_GENERATOR`, `DISTRICT_SUBSTATION`, `SOLAR_THERMAL`, `WATER_HEATER` (chauffe-eau non thermodynamique, type inconnu), `ELECTRIC_WATER_TANK`, `INSTANT_WATER_HEATER`, `THERMODYNAMIC_WATER_HEATER`, `CHILLER`, `OTHER` |
 | `Inertia` | `LIGHT`, `MEDIUM`, `HEAVY`, `VERY_HEAVY` (classes du DPE) |
 | `InsulationLevel` | `INSUFFICIENT`, `AVERAGE`, `GOOD`, `VERY_GOOD` (les 4 valeurs du DPE) |
 | `GlazingType` | `SINGLE`, `DOUBLE`, `TRIPLE`, `SECONDARY_GLAZING` (survitrage), `GLASS_BRICK`, `POLYCARBONATE` |
@@ -536,7 +553,7 @@ def read_patrimoine_xlsx(path, park):
 Règles :
 - `park.new_site(id, parent=None, ...)` crée un site de premier niveau ou un sous-site.
 - `park.new_site(...)` et `park.new_building(...)` instancient `park.site_cls` et `park.building_cls`. Les
-  futurs connecteurs RNB, BDNB et DPE passeront aussi par ces méthodes : ils produiront donc des
+  connecteurs RNB, BDNB et DPE (§8) passent aussi par ces méthodes : ils produisent donc des
   `BayonneBuilding` sans rien connaître de Bayonne.
 - `park.add_building(b, parent=None)` et `park.add_site(s)` vérifient que l'objet est une instance de la
   classe configurée, ainsi que tous les sites et bâtiments qu'il contient. `site.add_site` et
@@ -750,7 +767,195 @@ Seuls les candidats sont sérialisés, pas la valeur effective : elle est recalc
 
 ---
 
-## 8. Exemple de bout en bout (v1)
+## 8. Connecteurs (v2)
+
+Les connecteurs créent et enrichissent les entités du parc à partir des API publiques RNB, BDNB et DPE
+(ADEME). Ils ne font qu'appeler l'API publique du modèle : `park.new_building`, `park.new_site`,
+`park.move`, `set(..., source=...)`, `add_system`. Ils produisent donc les classes projet du parc
+(§5) sans les connaître. Les contrats d'API et les tables de correspondance sont en annexe A.
+
+### 8.1 Organisation
+
+```
+src/bstock/connectors/
+  __init__.py      # ImportReport ; les sous-modules s'importent explicitement
+  _http.py         # session requests, timeout, nouvel essai, pagination
+  _mappings.py     # tables de correspondance de l'annexe A (fonctions pures)
+  data/            # dpe_generators.csv (annexe A.5)
+  rnb.py           # RnbClient, add_buildings, enrich, suggest_matches
+  bdnb.py          # BdnbClient, enrich
+  dpe.py           # DpeClient, enrich
+```
+
+Chaque connecteur a trois couches :
+- un **client** (`RnbClient`, `BdnbClient`, `DpeClient`) qui ne fait que récupérer les réponses brutes
+  (dicts JSON). URL de base, session `requests` et clé d'API éventuelle sont configurables ;
+- des **correspondances** pures, internes : réponse brute → candidats `SourcedValue` (avec `raw` et
+  `ref`) ;
+- des **fonctions de haut niveau** qui modifient le parc. Elles acceptent un `client=` (sinon un client
+  par défaut est créé), ce qui permet de les tester hors réseau avec un faux client.
+
+```python
+from bstock.connectors import bdnb, dpe, rnb
+
+report = rnb.add_buildings(park, ["8K3CTZKZ9R27", "A1B2C3D4E5F6"], parent="site-ecole-A")
+report = bdnb.enrich(park)                 # tous les bâtiments qui ont un rnb_id
+report = dpe.enrich(park, buildings=["A1B2C3D4E5F6"])
+```
+
+Dépendances : `requests` (extra `[connectors]`), importé dans les fonctions qui en ont besoin.
+shapely, geopandas et pyproj (extra `[geo]`) servent à reprojeter les géométries BDNB et aux exports
+géographiques (§9). Un extra manquant lève `MissingDependencyError` avec la commande d'installation.
+
+### 8.2 Règles communes
+
+- **Sources** : `"rnb"`, `"bdnb"` et `"dpe"`, déjà présentes dans la priorité par défaut (§4.3). `date` =
+  date de l'information (millésime BDNB, date d'établissement du DPE ; aucune pour le RNB, dont la réponse ne date pas l'information), `ref` =
+  identifiant dans la source (`rnb_id`, `batiment_groupe_id` ou `batiment_construction_id`, n° de DPE),
+  `raw` = libellé d'origine quand la valeur a été traduite.
+- **Idempotence** : relancer un connecteur remplace les candidats de sa source (un candidat par source,
+  §4.2). Les systèmes et les parois qu'il crée ont un id déterministe, `<kind>-<owner_id>-<source>-<n>`
+  pour un système (ex. `heating-bdnb-bg-1111-1HRT-8SVH-bdnb-1`) et `<source>-<kind>` pour une paroi par
+  poste (ex. `dpe-wall`) : ils sont mis à jour au lieu d'être dupliqués. Ceux qu'une nouvelle réponse ne
+  produit plus sont retirés, sauf s'ils sont référencés (`scope` d'un Meter) : ils sont alors conservés
+  et signalés dans le rapport.
+- **Libellé inconnu** des tables de correspondance : la valeur prend `OTHER` quand l'enum l'a, sinon elle
+  n'est pas posée ; un `UnmappedValueWarning` cite le libellé, et `raw` le conserve.
+- **Rapport** : les fonctions de haut niveau renvoient un `ImportReport` (ids créés, enrichis, non
+  trouvés, ambigus, et un message par id), avec `report.to_dataframe()`. Les cas attendus (bâtiment
+  absent de la source, DPE d'appartement ignoré) y figurent au lieu d'émettre des avertissements.
+- **Erreurs** : une erreur HTTP persistante ou une réponse inattendue lève `ConnectorError`. Les erreurs
+  429 et 5xx sont réessayées avec attente avant d'abandonner.
+- **Pas de cache** dans bstock : on sauvegarde le parc enrichi, ou on passe au client sa propre session
+  (`requests-cache`, par exemple).
+- Le format JSON du parc ne change pas (`schema_version` reste 1).
+
+### 8.3 RNB
+
+- `rnb.add_buildings(park, rnb_ids, parent=None, *, client=None) -> ImportReport` : crée via
+  `park.new_building` les bâtiments absents du parc et enrichit ceux qui existent déjà (recherche par
+  `get_by_rnb`).
+- `rnb.enrich(park, buildings=None, *, client=None) -> ImportReport` : bâtiments du parc qui ont un
+  `rnb_id` (tous si `buildings` est `None`).
+- Une requête par bâtiment : l'API n'offre pas de lecture groupée par liste d'ids.
+- Correspondances : point → `lat` / `lon`, forme → `footprint` (si c'est un `Polygon` ou un
+  `MultiPolygon`), première adresse → `address`, `municipality`, `insee_code`, identifiant externe BDNB →
+  `bdnb_batiment_construction_id` s'il n'est pas déjà renseigné (ces liens datent de 2023 : la BDNB, qui
+  référence elle-même le `rnb_id`, fait foi).
+- Un `rnb_id` est normalisé (majuscules, sans tirets) avant comparaison.
+- Signalés dans le rapport, sans rien modifier ni supprimer dans le parc : id inconnu du RNB, bâtiment
+  démoli (`status`), id désactivé après une fusion ou une scission (`is_active: false` ; le rapport
+  donne le ou les ids successeurs lus dans l'historique du bâtiment).
+
+**Bâtiments sans `rnb_id`.** `rnb.suggest_matches(park, buildings=None, *, by="point", radius=...,
+assign=None, client=None) -> pd.DataFrame` propose des bâtiments RNB candidats, cherchés autour du point
+(`lat` / `lon`, rayon ≤ 1000 m) ou à partir de l'adresse (`by="address"`). Le DataFrame a une ligne par
+couple (bâtiment, candidat) : id du bâtiment, `rnb_id` candidat, distance (m, 0 si le point est dans
+l'emprise) ou score de géocodage de l'adresse, adresse RNB. L'utilisateur valide puis pose
+`building.rnb_id`. Aucune affectation automatique, sauf `assign="unique"` : le `rnb_id` est posé quand il
+n'y a qu'un candidat (dans le rayon, ou à l'adresse). Un `rnb_id` déjà utilisé dans le parc est signalé
+mais jamais affecté.
+
+La recherche par adresse s'appuie sur l'API RNB, qui géocode elle-même l'adresse avec la BAN et ne garde
+que la meilleure adresse : il n'y a pas de géocodage séparé dans bstock. Une adresse sans numéro ou mal
+reconnue ne donne aucun candidat.
+
+### 8.4 BDNB
+
+`bdnb.enrich(park, buildings=None, *, group_sites=True, client=None) -> ImportReport` part du `rnb_id` des
+bâtiments.
+
+- **Quotas** : sans clé, l'API sert 10 lignes par appel et 10 000 appels par mois. Le client regroupe
+  donc les requêtes par lots d'ids (`in.(...)`) et accepte une clé d'API (`BdnbClient(api_key=...)`),
+  qui relève ces limites. Il faut compter quatre appels pour dix bâtiments, plus un appel par groupe pour
+  compter ses constructions.
+- Valeurs de la **construction** (`batiment_construction`) → bâtiment : `bdnb_batiment_construction_id`,
+  `height` (`hauteur`), `footprint_area` (`s_geom_cstr`), `footprint` (`geom_cstr`). Les géométries
+  BDNB sont en Lambert-93 : elles sont reprojetées en WGS84 avec l'extra `[geo]`. Sans cet extra, elles
+  sont ignorées avec un avertissement, et le reste de l'enrichissement se fait normalement.
+- Valeurs du **groupe** (`batiment_groupe_complet`) : `usage`, `construction_year`, `dwelling_count`,
+  `level_count`, `height` (hauteur moyenne), `footprint_area` et `footprint` du groupe, générateurs de
+  chauffage, d'ECS et de froid (principal et appoint, seuls exposés par l'offre ouverte). Les énergies
+  d'ECS et de froid viennent de `batiment_groupe_dpe_representatif_logement`. Le numéro du DPE
+  représentatif est ajouté aux `dpe_ids` de l'entité qui reçoit les valeurs du groupe.
+- **Provenance** : `ref` = `batiment_construction_id` ou `batiment_groupe_id`. L'API ne date pas ses
+  réponses : `date` est vide, sauf pour les générateurs, qui reçoivent la date du DPE représentatif dont
+  ils sont issus.
+- Plusieurs constructions BDNB pour un même `rnb_id` (cas non observé, mais possible) : bâtiment signalé
+  comme ambigu dans le rapport et non enrichi.
+- **Règle des groupes** : on compte les constructions du groupe **dans la BDNB**, pas dans le parc.
+  - Groupe d'une seule construction : les valeurs du groupe sont posées sur le bâtiment, qui reçoit
+    `bdnb_batiment_groupe_id`.
+  - Groupe de plusieurs constructions : un sous-site `id = batiment_groupe_id`, avec
+    `bdnb_batiment_groupe_id`, est créé sous le parent commun des bâtiments du groupe (ou réutilisé
+    s'il existe), et ces bâtiments y sont déplacés (`park.move`). Les valeurs du groupe sont posées sur
+    le sous-site : les grandeurs intensives sont héritées par les bâtiments, les extensives restent au
+    niveau du groupe (§4.4). C'est le cas même si un seul bâtiment du groupe est dans le parc, car les
+    valeurs extensives du groupe ne valent pas pour ce seul bâtiment.
+  - Bâtiments d'un même groupe rangés sous des parents différents : pas de restructuration ; les valeurs
+    intensives du groupe sont posées sur chaque bâtiment, les extensives ne le sont pas, et le rapport
+    le signale.
+  - `group_sites=False` désactive la création des sous-sites : on applique alors la règle précédente.
+
+### 8.5 DPE
+
+`dpe.enrich(park, buildings=None, *, client=None) -> ImportReport` cherche les DPE par `rnb_id` (colonne
+`id_rnb`, renseignée sur environ la moitié des DPE) et par les `dpe_ids` déjà connus (posés par
+l'utilisateur ou par le connecteur BDNB), dans trois jeux de l'ADEME : logements existants (depuis
+juillet 2021), logements neufs et tertiaire. Le XML des DPE n'est pas couvert.
+
+- **Échelle** : seuls les DPE qui portent sur un bâtiment entier alimentent les attributs :
+  `type_batiment` `immeuble` ou `maison` (logement), `methode_dpe` sans « dans un bâtiment de logement »
+  (tertiaire). Les DPE d'appartement et les DPE tertiaires d'un local situé dans un immeuble de
+  logements sont seulement ajoutés à `dpe_ids`. Un DPE d'appartement généré à partir d'un DPE immeuble
+  (`numero_dpe_immeuble_associe`) mène à ce DPE immeuble, qui est alors utilisé.
+- **Plusieurs DPE** : un DPE remplacé par un autre (`numero_dpe_remplace`) est écarté ; parmi les
+  autres, le plus récent l'emporte (un seul candidat `"dpe"` par attribut) ; `date` =
+  `date_etablissement_dpe`, `ref` = numéro du DPE. Tous les numéros trouvés sont ajoutés à `dpe_ids`.
+- Les valeurs vont sur l'entité qui porte le DPE : le bâtiment trouvé par `rnb_id` ou `dpe_ids`, ou le
+  site dont les `dpe_ids` contiennent le numéro (DPE immeuble posé sur un groupe).
+- **Description** : `construction_year` (`annee_construction` ; la période seule ne donne pas de
+  valeur), `dwelling_count` (`nombre_appartement` pour un immeuble, 1 pour une maison), `level_count`
+  (`nombre_niveau_immeuble`), `usage` (maison → `RESIDENTIAL_INDIVIDUAL`, immeuble →
+  `RESIDENTIAL_COLLECTIVE`, tertiaire → `TERTIARY`).
+- **Surfaces** : la surface de référence du DPE (`surface_habitable_immeuble` ou `_logement` pour un
+  logement, `surface_utile` pour le tertiaire) va dans `heated_area`, et `comment` la nomme.
+  `floor_area` n'est jamais alimentée par le DPE.
+- **Enveloppe** (DPE logement) : `u_bat`, `inertia`, et une paroi par poste (`dpe-wall`, `dpe-roof`,
+  `dpe-floor`, `dpe-window`, `dpe-door`, `dpe-thermal_bridge`) avec `heat_loss_coefficient` (W/K) et la
+  qualité d'isolation. Les fenêtres et les portes reçoivent la qualité des menuiseries ; la toiture, la
+  moins bonne des trois qualités de plancher haut renseignées (comble perdu, comble aménagé, toit
+  terrasse). Le DPE tertiaire ne décrit pas l'enveloppe. L'open data ne donne pas le Q4Pa.
+- **Systèmes** (DPE logement) : jusqu'à quatre générateurs de chauffage (deux installations de deux
+  générateurs) et deux d'ECS, avec `technology`, `energy_type` et, pour l'ECS, `storage_volume` (L) et
+  le COP en `nominal_performance_ratio`. L'open data ne donne aucun rendement de chauffage. Ids
+  déterministes (§8.2).
+
+---
+
+## 9. Exports (v2)
+
+```python
+park.to_dataframe(kind="building", provenance=False) -> pd.DataFrame        # ou kind="site"
+park.to_geodataframe(kind="building", geometry="footprint")                 # extra [geo]
+park.to_geopackage("parc.gpkg", geometry="footprint")                       # couches sites et buildings
+park.to_geoparquet("batiments.parquet", kind="building", geometry="footprint")
+```
+
+- Une ligne par entité, indexée par `id`. Colonnes : `rnb_id`, identifiants BDNB, `dpe_ids`,
+  `parent_id`, puis la **valeur effective** de chaque attribut sourcé, héritage compris, y compris les
+  attributs ajoutés par une sous-classe projet. Les enums sont rendues par leur valeur (chaîne),
+  `footprint` est exclu de `to_dataframe`.
+- `provenance=True` ajoute pour chaque attribut `<attr>_source` (source de la valeur retenue) et
+  `<attr>_provider` (id de l'entité qui la fournit, différent de la ligne si elle est héritée).
+- `to_geodataframe` utilise `footprint` (`geometry="footprint"`) ou le point `lat` / `lon`
+  (`geometry="point"`), en EPSG:4326. Une entité sans géométrie est conservée avec une géométrie vide.
+- GeoPackage et GeoParquet sont écrits avec geopandas. Pour le GeoPackage, qui n'accepte pas les listes
+  ni les dicts, ces valeurs sont écrites en chaîne JSON.
+
+---
+
+## 10. Exemple de bout en bout (v1)
 
 Version exécutable, avec des données fictives : `examples/bayonne.py` (vérifiée par les tests).
 
@@ -787,7 +992,7 @@ park2.get("A1B2C3D4E5F6").candidates("heated_area")
 
 ---
 
-## 9. Organisation du package
+## 11. Organisation du package
 
 ```
 src/bstock/
@@ -803,31 +1008,36 @@ src/bstock/
   meters.py            # Meter, Channel, conventions tide
   sources.py           # DataSource, CsvSource, ParquetSource, registre
   io.py                # to_json/from_json, save/load, JSON Schema
+  export.py            # to_dataframe, to_geodataframe, GeoPackage, GeoParquet (§9)
+  _geometry.py         # validation GeoJSON, aire de l'emprise (sans dépendance)
+  connectors/          # RNB, BDNB, DPE (§8.1)
   exceptions.py        # BstockError, BstockWarning et leurs sous-classes
   _ids.py              # génération et contrôle des identifiants
 tests/                 # un fichier par module, plus test_examples.py
+tests/data/            # réponses d'API enregistrées (rnb/, bdnb/, dpe/) pour les tests hors réseau
 examples/bayonne.py    # exemple de bout en bout
+scripts/               # outils de maintenance (régénération de dpe_generators.csv)
 ```
 
 - Python ≥ 3.11.
 - Dépendances : `pydantic>=2`, `pandas`, `pyarrow` (Parquet). Extras : `[plot]` (plotly, seule lib de
-  graphiques), `[dev]` (pytest, ruff). tide n'est **pas** une dépendance : bstock
+  graphiques), `[connectors]` (requests), `[geo]` (shapely, geopandas, pyproj), `[dev]` (pytest, ruff). tide n'est **pas** une dépendance : bstock
   respecte seulement sa convention de nommage.
 - Outillage et conventions : voir `CLAUDE.md`. Plan de réalisation : `PLAN.md`.
 
 ---
 
-## 10. Feuille de route
+## 12. Feuille de route
 
 | Version | Contenu |
 |---|---|
 | **v1** | Modèle (Park, Site, Building, Envelope, systèmes, Meter), provenance multi-sources, extension par héritage, sources CSV/Parquet, `timeseries()` au format tide, save/load JSON + Parquet, JSON Schema |
-| v2 | Connecteurs API RNB, BDNB, DPE (création et enrichissement via `new_building` / `set(source=...)` ; un groupe BDNB à plusieurs bâtiments RNB devient un sous-site, un groupe à un seul bâtiment est porté par le bâtiment) ; exports `to_dataframe()`, `to_geodataframe()`, GeoPackage, GeoParquet ; emprise au sol (`footprint`) |
+| v2 | Connecteurs API RNB, BDNB, DPE (§8) avec suggestions d'appariement RNB ; exports `to_dataframe()`, `to_geodataframe()`, GeoPackage, GeoParquet (§9) ; emprise au sol `footprint` et `compute_footprint_area()` (§3.6) |
 | v3 | Filtrage (`park.buildings.filter(...)`), agrégations par site ou par parc (grandeurs extensives), rapport de complétude et de provenance |
 
 ---
 
-## 11. Questions ouvertes
+## 13. Questions ouvertes
 
 1. Bâtiment client qui couvre **plusieurs ID RNB** : il se modélise comme un site contenant ces bâtiments.
    À valider à l'usage.
@@ -899,16 +1109,144 @@ Attention aux caractères : les libellés bois du DPE utilisent un tiret demi-ca
 | `deperditions_murs`, `_planchers_hauts`, `_planchers_bas`, `_baies_vitrees`, `_portes`, `_ponts_thermiques` | un `EnvelopeComponent` par poste, avec `heat_loss_coefficient` |
 | `ubat_w_par_m2_k` | `Envelope.u_bat` |
 
-À noter : dans l'API ADEME, la colonne s'appelle `qualite_isolation_plancher bas` (avec une espace).
+À noter : la clé de l'API est `qualite_isolation_plancher_bas` ; l'espace n'existe que dans le nom
+d'origine (`x-originalName`). Les connecteurs utilisent toujours les clés de l'API.
 
-### A.5 GeneratorTechnology (principes)
+### A.5 GeneratorTechnology
 
-- **BDNB** (`type_generateur_chauffage`, `_ecs`, `_climatisation`) : libellé = technologie + énergie, par
-  exemple `chaudiere gaz condensation` → `BOILER_CONDENSING` + `NATURAL_GAS`, `pac air/eau` →
-  `HEAT_PUMP_AIR_WATER`, `generateurs a effet joule` → `ELECTRIC_RESISTANCE`, `reseau de chaleur` →
-  `DISTRICT_SUBSTATION` + `DISTRICT_HEATING`, `ecs thermodynamique electrique(pac ou ballon)` →
-  `THERMODYNAMIC_WATER_HEATER`.
-- **DPE** : 171 types de chauffage et 134 types d'ECS. On s'appuie sur la colonne `categorie_open_data`
-  des tables d'enums, puis sur le libellé, qui contient aussi la période d'installation (« Chaudière gaz à
-  condensation après 2015 »).
-- La table de correspondance complète sera écrite avec les connecteurs (v2).
+Les sources donnent souvent un type sans détail (« chaudière gaz indéterminée », « PAC autre que
+air/air ») : il est traduit par une technologie générique (`BOILER`, `HEAT_PUMP`, `WATER_HEATER`), qui
+garde la famille de l'équipement. `raw` conserve toujours le libellé d'origine.
+
+**BDNB** (`type_generateur_chauffage[_appoint]`, `type_generateur_ecs[_appoint]`,
+`type_generateur_climatisation`). Le libellé porte la technologie et souvent l'énergie ; la colonne
+`type_energie_*` correspondante, quand elle existe, l'emporte sur l'énergie lue dans le libellé.
+
+| Libellé BDNB | `technology` | `energy_type` |
+|---|---|---|
+| `chaudiere <énergie> standard` | `BOILER_STANDARD` | selon `<énergie>` |
+| `chaudiere <énergie> basse temperature` | `BOILER_LOW_TEMPERATURE` | selon `<énergie>` |
+| `chaudiere <énergie> condensation` | `BOILER_CONDENSING` | selon `<énergie>` |
+| `chaudiere <énergie> indetermine`, `chaudiere bois` | `BOILER` | selon `<énergie>` |
+| `chaudiere electrique` | `ELECTRIC_BOILER` | `ELECTRICITY` |
+| `pac air/air`, `pac air/eau`, `pac eau/eau`, `pac geothermique`, `pac gaz` | `HEAT_PUMP_AIR_AIR`, `_AIR_WATER`, `_WATER_WATER`, `_GROUND`, `_GAS` | électricité (gaz naturel pour `pac gaz`) |
+| `pac indetermine` | `HEAT_PUMP` | `ELECTRICITY` |
+| `poele ou insert <énergie>`, `poele bouilleur bois` | `STOVE_INSERT` | selon `<énergie>` |
+| `radiateurs gaz` | `GAS_RADIATOR` | `NATURAL_GAS` |
+| `generateur air chaud combustion` | `WARM_AIR_GENERATOR` | – |
+| `generateurs a effet joule` | `ELECTRIC_RESISTANCE` | `ELECTRICITY` |
+| `reseau de chaleur` / `reseau de froid` | `DISTRICT_SUBSTATION` | `DISTRICT_HEATING` / `DISTRICT_COOLING` |
+| `chauffage solaire`, `ecs solaire` | `SOLAR_THERMAL` | `SOLAR` |
+| `ballon accumulation electrique` | `ELECTRIC_WATER_TANK` | `ELECTRICITY` |
+| `chauffe eau electrique instantane` | `INSTANT_WATER_HEATER` | `ELECTRICITY` |
+| `ecs thermodynamique electrique(pac ou ballon)` | `THERMODYNAMIC_WATER_HEATER` | `ELECTRICITY` |
+| `chauffe-eau <énergie> independant` | `WATER_HEATER` | selon `<énergie>` |
+| `chauffage bois indetermine`, `ecs bois indetermine` | `OTHER` | `WOOD` |
+| `chauffage autre indetermine`, `ecs autre indetermine`, `production mixte indetermine` | `OTHER` | – |
+
+`<énergie>` : `gaz` → `NATURAL_GAS`, `fioul` → `FUEL_OIL`, `gpl/butane/propane` → `LPG`, `bois` →
+`WOOD`, `charbon` → `COAL`, `energie indetermine` ou `independant indetermine` → pas de valeur.
+
+**DPE** (`type_generateur_*` de l'open data, 171 libellés de chauffage et 134 d'ECS, avec la période
+d'installation : « Chaudière gaz à condensation après 2015 »). La correspondance est une **table de
+données livrée avec bstock** (`connectors/data/dpe_generators.csv` : libellé → `technology`,
+`energy_type`), relue ligne par ligne. Elle est générée une fois, par un script fourni dans le dépôt, à
+partir des tables d'enums de l'Observatoire DPE (feuilles `type_generateur_ch` et `type_generateur_ecs`
+de `modele_donnee/enum_tables.xlsx`, gitlab.com/observatoire-dpe/observatoire-dpe, Licence Ouverte 2.0 :
+source et date citées dans l'en-tête du fichier), en s'aidant de leur colonne `categorie_open_data`.
+La comparaison des libellés est exacte, sans normalisation. Un libellé absent de la table, par exemple
+ajouté plus tard par l'ADEME, donne `OTHER` et un `UnmappedValueWarning` jusqu'à la mise à jour de la
+table. L'énergie vient de la colonne `type_energie_generateur_*` (table A.3).
+
+### A.6 Contrats des API (vérifiés le 2026-10-13)
+
+Réponses réelles enregistrées dans `tests/data/` lors de l'écriture de chaque connecteur.
+
+**RNB** : `https://rnb-api.beta.gouv.fr/api/alpha/` (schéma OpenAPI : `schema/`), lecture sans
+authentification, limite de 20 requêtes par seconde (429 au-delà). Toujours terminer les chemins par `/`.
+
+| Endpoint | Usage | Remarques |
+|---|---|---|
+| `buildings/{rnb_id}/` | Un bâtiment | 404 si inconnu. Champs : `rnb_id`, `status` (`constructed`, `notUsable`, `demolished`), `point`, `shape`, `addresses`, `ext_ids`, `is_active`, `validated_by` |
+| `buildings/?insee_code=` ou `?bbox=lon_min,lat_min,lon_max,lat_max` | Liste | Un filtre obligatoire ; pas de filtre par liste d'ids. Bâtiments démolis exclus sauf `status=constructed,notUsable,demolished` ; ids inactifs exclus |
+| `buildings/closest/?point=lat,lon&radius=` | Suggestions par point | **lat,lon** (l'inverse des géométries) ; un ordre inversé renvoie une liste vide sans erreur. `radius` obligatoire, ≤ 1000 m. Résultats triés par `distance` (m), sans `is_active` |
+| `buildings/address/?q=&min_score=` | Suggestions par adresse | Géocodage BAN interne, meilleure adresse seulement : `status` (`ok`, `geocoding_score_is_too_low`, `geocoding_no_result`), `cle_interop_ban`, `score_ban`, `results` (`null` en cas d'échec) |
+| `buildings/{rnb_id}/history/` | Successeurs d'un id inactif | Non documenté. Versions de la plus récente à la plus ancienne ; `event.type` ∈ `creation`, `update`, `merge`, `split`, `deactivation` ; `event.details.merge_child` ou `split_children` |
+
+- Pagination par curseur : `{"next", "previous", "results"}`, paramètre `limit` (20 par défaut, 100 au
+  plus). On suit `next`.
+- Géométries GeoJSON en WGS84, coordonnées `[lon, lat]`. `point` est un `Point` ; `shape` est le plus
+  souvent un `MultiPolygon` mais peut être un `Point`.
+- `addresses[]` : `id` (clé d'interopérabilité BAN, ex. `64102_0885_00004`), `street_number` (chaîne),
+  `street_rep`, `street`, `city_name`, `city_zipcode`, `city_insee_code`. La liste peut être vide.
+- `ext_ids[]` : `{id, source, source_version, created_at}` ; `source = "bdnb"` donne un
+  `bdnb-bc-XXXX-XXXX-XXXX` (version `2023_01`).
+- Un id inactif (fusion, scission, désactivation) répond 200 avec `is_active: false`, sans successeur
+  dans la réponse. Les ids sont acceptés en minuscules ou avec tirets ; la réponse les donne en
+  majuscules sur 12 caractères.
+- Messages d'erreur en français, au format Django REST Framework (`detail`, `non_field_errors`).
+
+**BDNB** : `https://api.bdnb.io/v1/bdnb/donnees/<table>` (PostgREST derrière une passerelle Gravitee),
+métadonnées sous `metadonnees/<table>` (`colonne`, `jeu_de_donnees`). Seul le dernier millésime est servi
+(2026-02.a au 2026-10-13).
+
+| Offre | Clé (`X-Gravitee-Api-Key`) | Lignes par appel | Appels | Débit |
+|---|---|---|---|---|
+| Open | aucune | 10 | 10 000 / mois / IP | 120 / min |
+| Open+ | gratuite jusqu'à 100 000 appels / an | 1 000 | 1 M / mois | 1 200 / min |
+| Expert | payante | 10 000 | 10 M / mois | 1 200 / min |
+
+| Table | Usage | Colonnes utiles |
+|---|---|---|
+| `batiment_construction` | `rnb_id` → construction et groupe ; constructions d'un groupe | `batiment_construction_id`, `batiment_groupe_id`, `rnb_id` (souvent vide), `s_geom_cstr` (m², entier), `hauteur` (m), `geom_cstr` (MultiPolygon, EPSG:2154) |
+| `batiment_groupe_complet` | Valeurs du groupe | `usage_principal_bdnb_open`, `annee_construction`, `nb_log`, `nb_niveau` (RDC = 1), `hauteur_mean` (m), `s_geom_groupe` (m²), `geom_groupe` (EPSG:2154), `type_generateur_chauffage[_appoint]`, `type_energie_chauffage[_appoint]`, `type_generateur_ecs[_appoint]`, `type_generateur_climatisation`, `type_installation_chauffage` / `_ecs` (`individuel`, `collectif`), `identifiant_dpe`, `type_dpe`, `date_reception_dpe` |
+| `batiment_groupe_dpe_representatif_logement` | Énergies d'ECS et de froid, date du DPE représentatif | `type_energie_ecs[_appoint]`, `type_energie_climatisation`, `date_etablissement_dpe`, `nb_generateur_chauffage`, `nb_generateur_ecs` |
+
+- Filtres PostgREST : `col=eq.x`, `col=in.(a,b)`, `select=a,b`, `order=`, `limit` / `offset` (plafonnés
+  sans erreur à la taille de l'offre). `Prefer: count=exact` donne le total dans `Content-Range` : c'est
+  ainsi qu'on compte les constructions d'un groupe en un appel. Les agrégats sont refusés.
+- Géométries en GeoJSON avec un membre `crs` (EPSG:2154), même avec `Accept: application/geo+json` :
+  reprojection côté client.
+- Quotas dans les en-têtes `X-Quota-Remaining` et `X-Rate-Limit-Remaining` ; 429 au-delà. Une requête
+  sur une colonne non indexée peut dépasser le délai de 10 s (erreur Postgres 57014) : filtrer sur les
+  ids.
+- Erreurs PostgREST `{code, details, hint, message}`. La route `batiment_groupe_complet/rnb` citée dans
+  la documentation n'existe pas.
+- Les deux colonnes d'usage peuvent diverger (`usage_principal_bdnb_open` contre `usage_niveau_1_txt`
+  des fichiers fonciers) : bstock utilise la première.
+
+**DPE (ADEME)** : `https://data.ademe.fr/data-fair/api/v1/datasets/<jeu>/lines`, jeux `dpe03existant`
+(logements existants depuis juillet 2021), `dpe02neuf` et `dpe01tertiaire`. Accès libre ; les DPE
+désactivés sont déjà filtrés.
+
+- Paramètres : `select=`, `size` (≤ 10 000), `sort=`, `count=false` (économise le budget), filtres par
+  colonne `<col>_eq`, `_in` (valeurs séparées par des virgules), `_gte`, `_lte`, `_exists`, et `qs`
+  (syntaxe Lucene). Au-delà de 10 000 lignes, on suit `next` (paramètre `after`).
+- Limite : un budget de temps de traitement cumulé, sans en-tête de quota ; un dépassement renvoie un
+  message en français (« Le temps de traitement cumulé de vos requêtes dépasse le budget alloué… »). Le
+  client espace ses appels et réessaie avec attente.
+- Les colonnes vides sont **absentes** des lignes. Les dates sont au format ISO `YYYY-MM-DD` (contrairement
+  au `dateFormat` du schéma). `Non affecté` sert de valeur vide.
+- Colonnes communes : `numero_dpe` (5e caractère : `E` existant, `N` neuf, `T` tertiaire),
+  `numero_dpe_remplace`, `numero_dpe_immeuble_associe`, `id_rnb`, `date_etablissement_dpe`,
+  `identifiant_ban`, `code_insee_ban`, `annee_construction`, `periode_construction`.
+- Échelle : `type_batiment` ∈ `appartement`, `maison`, `immeuble` (logement) ; `methode_dpe` (tertiaire,
+  « … dans un bâtiment de logement » pour un local dans un immeuble de logements).
+- Logement : `surface_habitable_logement`, `surface_habitable_immeuble`, `nombre_appartement`,
+  `nombre_niveau_immeuble`, `ubat_w_par_m2_k`, `classe_inertie_batiment`, `qualite_isolation_murs`,
+  `_menuiseries`, `_plancher_bas`, `_plancher_haut_comble_perdu`, `_plancher_haut_comble_amenage`,
+  `_plancher_haut_toit_terrasse`, `deperditions_murs`, `_planchers_hauts`, `_planchers_bas`,
+  `_baies_vitrees`, `_portes`, `_ponts_thermiques` (W/K : unité non déclarée par le schéma, déduite des
+  valeurs et de la documentation de l'Observatoire DPE).
+- Générateurs de chauffage : `type_generateur_n{1,2}_installation_n{1,2}`,
+  `type_energie_generateur_n{1,2}_installation_n{1,2}`, `usage_generateur_…` (`chauffage`, `ecs`,
+  `chauffage + ecs`). ECS : `type_generateur_n{1,2}_ecs_n1`, `type_energie_generateur_n{1,2}_ecs_n1`,
+  `volume_stockage_generateur_n{1,2}_ecs_n1` (L, 0 pour une chaudière mixte), `cop_generateur_n{1,2}_ecs_n1`.
+  Pas de colonne de nombre de générateurs : on compte les emplacements renseignés. Dans `dpe02neuf`, ces
+  colonnes sont presque toujours vides.
+- Tertiaire : `surface_utile`, `surface_shon`, `secteur_activite` (32 valeurs, codes ERP),
+  `type_energie_principale_chauffage` ; pas de colonnes d'enveloppe ni de systèmes.
+- Les libellés de générateurs de l'API sont identiques, caractère pour caractère, aux libellés des tables
+  d'enums de l'Observatoire DPE (`modele_donnee/enum_tables.xlsx`, feuilles `type_generateur_ch` : 171
+  lignes, `type_generateur_ecs` : 134 lignes), qui portent la colonne `categorie_open_data`, absente de
+  l'API. Ne pas normaliser les apostrophes avant de comparer : les libellés mélangent `'` et `’`.
