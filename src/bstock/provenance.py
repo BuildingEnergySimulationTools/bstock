@@ -18,7 +18,7 @@ from __future__ import annotations
 import datetime
 import warnings
 from collections.abc import Iterable
-from typing import Annotated, Any, ClassVar, Generic, Self, TypeVar, overload
+from typing import Annotated, Any, ClassVar, Generic, Literal, Self, TypeVar, overload
 
 from pydantic import BaseModel, ConfigDict, Field, PrivateAttr, TypeAdapter, model_validator
 
@@ -412,10 +412,27 @@ class SourcedModel(BaseModel):
         else:
             self.values.pop(name, None)
 
-    def sources(self, name: str) -> list[SourcedValue]:
-        """Return the own candidates of ``name``, in insertion order.
+    @overload
+    def sources(self, name: str, *, inherited: Literal[False] = False) -> list[SourcedValue]: ...
 
-        Names unknown to the class but present in loaded data are accepted.
+    @overload
+    def sources(
+        self, name: str, *, inherited: Literal[True]
+    ) -> list[tuple[str | None, SourcedValue]]: ...
+
+    def sources(
+        self, name: str, *, inherited: bool = False
+    ) -> list[SourcedValue] | list[tuple[str | None, SourcedValue]]:
+        """Return the candidates of ``name``, in insertion order.
+
+        Parameters
+        ----------
+        name
+            Attribute name. Names unknown to the class but present in loaded data are accepted.
+        inherited
+            If False (default), return the own candidates only. If True, return
+            ``(entity_id, candidate)`` pairs for this entity and, for an inherited attribute, for
+            every ancestor up the inheritance chain, nearest first.
 
         Raises
         ------
@@ -424,18 +441,74 @@ class SourcedModel(BaseModel):
         """
         if name not in self.values:
             self._field(name)
-        return list(self.values.get(name, []))
+        if not inherited:
+            return list(self.values.get(name, []))
+        return [
+            (node.entity_id(), candidate)
+            for node in self._inheritance_chain(name)
+            for candidate in node.values.get(name, [])
+        ]
 
     def effective(self, name: str) -> SourcedValue | None:
-        """Return the candidate retained for ``name`` by the source priority, or ``None``.
+        """Return the candidate retained for ``name``, or ``None``.
+
+        The source priority chooses among the own candidates. For an inherited attribute without
+        own candidate, the nearest ancestor having one provides the value (SPEC §4.4).
 
         Raises
         ------
         UnknownFieldError
             If ``name`` is not a sourced attribute.
         """
+        provider = self._provider(name)
+        if provider is None:
+            return None
+        return provider.active_source_priority().select(name, provider.values[name])
+
+    def origin(self, name: str) -> str | None:
+        """Return the id of the entity providing the effective value of ``name``, or ``None``.
+
+        Raises
+        ------
+        UnknownFieldError
+            If ``name`` is not a sourced attribute.
+        """
+        provider = self._provider(name)
+        return None if provider is None else provider.entity_id()
+
+    def entity_id(self) -> str | None:
+        """Return the id identifying this object, or the one of its owner if it has none."""
+        own_id = getattr(self, "id", None)
+        if isinstance(own_id, str):
+            return own_id
+        owner = self._container
+        return owner.entity_id() if isinstance(owner, SourcedModel) else None
+
+    def inheritance_parent(self) -> SourcedModel | None:
+        """Return the object this one inherits values from, or ``None``.
+
+        The base implementation inherits from nothing. Sites, buildings and envelopes override it.
+        """
+        return None
+
+    def _inheritance_chain(self, name: str) -> list[SourcedModel]:
+        """Return self, then the ancestors that also declare ``name``, if it is inherited."""
+        field = self._field(name) if name not in self.values else self.__sourced_fields__.get(name)
+        chain: list[SourcedModel] = [self]
+        if field is None or not field.inherit:
+            return chain
+        node = self.inheritance_parent()
+        while node is not None and name in node.__sourced_fields__:
+            if any(node is seen for seen in chain):
+                raise RuntimeError(f"inheritance cycle detected on {name!r}")
+            chain.append(node)
+            node = node.inheritance_parent()
+        return chain
+
+    def _provider(self, name: str) -> SourcedModel | None:
+        """Return the nearest entity of the inheritance chain having candidates for ``name``."""
         self._field(name)
-        return self.active_source_priority().select(name, self.values.get(name, []))
+        return next((node for node in self._inheritance_chain(name) if node.values.get(name)), None)
 
 
 def _source_of(candidate: SourcedValue | dict[str, Any]) -> Any:

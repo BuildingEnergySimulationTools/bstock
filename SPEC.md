@@ -462,6 +462,11 @@ b.set("year_construction", 1985, source="audit")   # valeur propre : masque l'h�
   constructeur en candidats dans un validateur `mode="before"`.
 - Le mécanisme est **hérité** : un champ `sourced(...)` ajouté dans une sous-classe projet est traité
   exactement comme un champ du socle.
+- L'héritage des valeurs repose sur deux méthodes surchargées par les entités :
+  `inheritance_parent()` renvoie l'objet dont on hérite (le site parent pour un site ou un bâtiment,
+  l'enveloppe du site parent pour une enveloppe), et `entity_id()` renvoie l'id affiché par `origin()` (une
+  enveloppe renvoie l'id de son propriétaire). L'héritage s'arrête au premier ancêtre qui ne déclare pas
+  l'attribut.
 
 ---
 

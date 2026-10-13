@@ -41,10 +41,10 @@ Règles (voir `CLAUDE.md`) :
       validation en erreur, champs ajoutés dans une sous-classe
 
 ## Étape 3 — Héritage des valeurs (§4.4)
-- [ ] Lien parent (non sérialisé) sur `SourcedModel` et résolution en remontant la chaîne
-- [ ] `origin(attr)` et `sources(attr, inherited=True)`
-- [ ] Champs `inherit=False` jamais hérités
-- [ ] Tests : niveau le plus proche prioritaire, sites imbriqués sur plusieurs niveaux, extensif non
+- [x] Lien parent (non sérialisé) sur `SourcedModel` et résolution en remontant la chaîne
+- [x] `origin(attr)` et `sources(attr, inherited=True)`
+- [x] Champs `inherit=False` jamais hérités
+- [x] Tests : niveau le plus proche prioritaire, sites imbriqués sur plusieurs niveaux, extensif non
       hérité, entité sans parent
 
 ## Étape 4 — Enveloppe (§3.7)
