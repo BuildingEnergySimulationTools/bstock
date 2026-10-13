@@ -164,6 +164,11 @@ Les deux se combinent : `Site « Groupe scolaire A » > Site « bdnb-bg-… » >
 Accès dérivés (non sérialisés) : `site.parent` (site parent ou `None`), `site.park`,
 `site.iter_buildings(recursive=True)`, `site.iter_sites(recursive=True)`.
 
+Gestion des enfants au niveau du site : `site.add_site(s)`, `site.add_building(b)`, `site.detach(id)`. Site
+et Building ont aussi `add_system(system)` (rangé dans la liste de son `kind`), `remove_system(id)` et
+`iter_systems(kind=None)`. Quand l'entité appartient à un parc, ces méthodes mettent à jour l'index des ids
+du parc.
+
 ### 3.6 Building
 
 | Attribut | Type | Unité | Description |

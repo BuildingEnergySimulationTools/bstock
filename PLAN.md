@@ -61,10 +61,10 @@ Règles (voir `CLAUDE.md`) :
 - [x] Tests : construction, avertissements (chaudière > 1,1 ; PAC < 1), unités déclarées
 
 ## Étape 6 — Site et Building (§3.5, §3.6)
-- [ ] Attributs descriptifs communs (`description.py`) avec le drapeau d'héritage de chaque champ
-- [ ] `Site` (sous-sites, bâtiments, systèmes partagés) et `Building` (identifiants, systèmes propres)
-- [ ] Validation légère des formats RNB, BDNB et DPE (avertissement)
-- [ ] Tests : construction, héritage site → bâtiment sur les attributs du §3.6, formats d'identifiants
+- [x] Attributs descriptifs communs (`description.py`) avec le drapeau d'héritage de chaque champ
+- [x] `Site` (sous-sites, bâtiments, systèmes partagés) et `Building` (identifiants, systèmes propres)
+- [x] Validation légère des formats RNB, BDNB et DPE (avertissement)
+- [x] Tests : construction, héritage site → bâtiment sur les attributs du §3.6, formats d'identifiants
 
 ## Étape 7 — BuildingPark (§3.2, §3.4, §5)
 - [ ] Index des ids, unicité (y compris `rnb_id`), interdiction de `__`, génération des ids

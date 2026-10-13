@@ -5,6 +5,8 @@ See ``SPEC.md`` for the design reference.
 
 from importlib.metadata import PackageNotFoundError, version
 
+from bstock.building import Building
+from bstock.description import DescribedEntity
 from bstock.enums import (
     Adjacency,
     BuildingUsage,
@@ -24,6 +26,7 @@ from bstock.exceptions import (
     BstockWarning,
     DuplicateIdError,
     EntityInUseError,
+    IdentifierFormatWarning,
     IncompleteDataError,
     InvalidIdError,
     PerformanceRatioWarning,
@@ -39,6 +42,7 @@ from bstock.provenance import (
     SourcePriority,
     sourced,
 )
+from bstock.site import Site
 from bstock.systems import (
     CoolingGenerator,
     DHWGenerator,
@@ -60,10 +64,12 @@ __all__ = [
     "Adjacency",
     "BstockError",
     "BstockWarning",
+    "Building",
     "BuildingUsage",
     "ComponentKind",
     "CoolingGenerator",
     "DHWGenerator",
+    "DescribedEntity",
     "DuplicateIdError",
     "EndUse",
     "EnergyType",
@@ -75,12 +81,14 @@ __all__ = [
     "GeneratorTechnology",
     "GlazingType",
     "HeatingGenerator",
+    "IdentifierFormatWarning",
     "IncompleteDataError",
     "Inertia",
     "InsulationLevel",
     "InvalidIdError",
     "Orientation",
     "PerformanceRatioWarning",
+    "Site",
     "SolarPV",
     "SourcePriority",
     "SourcedField",

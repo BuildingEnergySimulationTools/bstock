@@ -39,3 +39,7 @@ class UnknownAttributeWarning(BstockWarning):
 
 class PerformanceRatioWarning(BstockWarning):
     """A generator performance ratio looks inconsistent with its technology."""
+
+
+class IdentifierFormatWarning(BstockWarning):
+    """An external identifier (RNB, BDNB, DPE) does not have the expected format."""
