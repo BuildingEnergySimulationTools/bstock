@@ -1,6 +1,6 @@
 # bstock — Spécification
 
-> Statut : **v1.0**, implémentée par bstock 0.1.0 (périmètre v1 du §10). Issue de l'interview de
+> Statut : **v1.0**, implémentée par bstock 0.2.0 (périmètre v1 du §10). Issue de l'interview de
 > conception du 2026-10-13 et ajustée pendant l'implémentation. Points ouverts : §11.
 
 ---
@@ -706,7 +706,7 @@ traçabilité. Le parc sauvegardé est alors **autonome**.
 
 ```json
 {
-  "bstock_version": "0.1.0",
+  "bstock_version": "0.2.0",
   "schema_version": 1,
   "site_cls": "projet_bayonne.model.BayonneSite",
   "building_cls": "projet_bayonne.model.BayonneBuilding",
