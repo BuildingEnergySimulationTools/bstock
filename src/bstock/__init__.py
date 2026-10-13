@@ -24,16 +24,20 @@ from bstock.envelope import COMPUTED_SOURCE, Envelope, EnvelopeComponent, Window
 from bstock.exceptions import (
     BstockError,
     BstockWarning,
+    DataSourceError,
     DuplicateIdError,
     EntityInUseError,
     IdentifierFormatWarning,
     IncompleteDataError,
     InvalidIdError,
+    NoDataWarning,
     PerformanceRatioWarning,
+    TimeSeriesError,
     UnknownAttributeWarning,
     UnknownFieldError,
     UnknownIdError,
 )
+from bstock.meters import Channel, Meter, tide_column
 from bstock.park import BuildingPark
 from bstock.provenance import (
     DEFAULT_SOURCE_PRIORITY,
@@ -44,6 +48,7 @@ from bstock.provenance import (
     sourced,
 )
 from bstock.site import Site
+from bstock.sources import CsvSource, DataSource, ParquetSource, UnknownSource
 from bstock.systems import (
     CoolingGenerator,
     DHWGenerator,
@@ -68,9 +73,13 @@ __all__ = [
     "Building",
     "BuildingPark",
     "BuildingUsage",
+    "Channel",
     "ComponentKind",
     "CoolingGenerator",
+    "CsvSource",
     "DHWGenerator",
+    "DataSource",
+    "DataSourceError",
     "DescribedEntity",
     "DuplicateIdError",
     "EndUse",
@@ -88,7 +97,10 @@ __all__ = [
     "Inertia",
     "InsulationLevel",
     "InvalidIdError",
+    "Meter",
+    "NoDataWarning",
     "Orientation",
+    "ParquetSource",
     "PerformanceRatioWarning",
     "Site",
     "SolarPV",
@@ -97,11 +109,14 @@ __all__ = [
     "SourcedModel",
     "SourcedValue",
     "System",
+    "TimeSeriesError",
     "UnknownAttributeWarning",
     "UnknownFieldError",
     "UnknownIdError",
+    "UnknownSource",
     "Ventilation",
     "Window",
     "__version__",
     "sourced",
+    "tide_column",
 ]

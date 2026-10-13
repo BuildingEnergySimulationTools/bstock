@@ -2,21 +2,30 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterator
+import warnings
+from collections.abc import Iterable, Iterator
 from typing import Any
 
+import pandas as pd
 from pydantic import BaseModel, ConfigDict, Field, PrivateAttr
 
 from bstock.building import Building
 from bstock.description import DescribedEntity
-from bstock.exceptions import DuplicateIdError, EntityInUseError, UnknownIdError
+from bstock.enums import EndUse, EnergyType
+from bstock.exceptions import (
+    DuplicateIdError,
+    EntityInUseError,
+    NoDataWarning,
+    UnknownIdError,
+)
+from bstock.meters import Meter
 from bstock.provenance import SourcedModel, SourcePriority
 from bstock.site import Site
 from bstock.systems import System
 
 __all__ = ["BuildingPark"]
 
-Entity = Site | Building | System
+Entity = Site | Building | System | Meter
 
 
 class BuildingPark(BaseModel):
@@ -42,6 +51,7 @@ class BuildingPark(BaseModel):
     source_priority: SourcePriority = Field(default_factory=SourcePriority)
     sites: list[Site] = Field(default_factory=list)
     buildings: list[Building] = Field(default_factory=list)
+    meters: list[Meter] = Field(default_factory=list)
 
     _site_cls: type[Site] = PrivateAttr(default=Site)
     _building_cls: type[Building] = PrivateAttr(default=Building)
@@ -71,6 +81,10 @@ class BuildingPark(BaseModel):
         for entity in [*self.sites, *self.buildings]:
             self._register(entity)
             entity._container = self
+        for meter in self.meters:
+            self._check_scope(meter)
+            self._register(meter)
+            meter._container = self
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, BaseModel):
@@ -125,6 +139,12 @@ class BuildingPark(BaseModel):
         """Iterate over every system of the park, optionally of one ``kind``."""
         for entity in [*self.iter_sites(), *self.iter_buildings()]:
             yield from entity.iter_systems(kind)
+
+    def meters_for(self, entity: Site | Building | str) -> list[Meter]:
+        """Return the meters whose scope contains ``entity`` or one of its own systems."""
+        target = self._resolve(entity, (Site, Building))
+        ids = {target.id, *(s.id for s in target.iter_systems())}
+        return [m for m in self.meters if ids & set(m.scope)]
 
     # --- creation -----------------------------------------------------------------------------
 
@@ -241,6 +261,102 @@ class BuildingPark(BaseModel):
                 raise UnknownIdError(f"buildings {unknown} are not in site {entity.id!r}")
         return entity.add_system(system)
 
+    def add_meter(self, meter: Meter) -> Meter:
+        """Add ``meter`` to the park and return it.
+
+        Raises
+        ------
+        UnknownIdError
+            If an id of ``meter.scope`` is not a site, building or system of the park.
+        DuplicateIdError
+            If the meter id is already used in the park.
+        """
+        self._check_scope(meter)
+        self._register(meter)
+        meter._container = self
+        self.meters.append(meter)
+        return meter
+
+    def _check_scope(self, meter: Meter) -> None:
+        unknown = [
+            i for i in meter.scope if not isinstance(self._index.get(i), Site | Building | System)
+        ]
+        if unknown:
+            raise UnknownIdError(f"meter {meter.id!r}: unknown scope ids {unknown}")
+
+    # --- time series --------------------------------------------------------------------------
+
+    def timeseries(
+        self,
+        *,
+        usage: EndUse | str | Iterable[EndUse | str] | None = None,
+        energy_type: EnergyType | str | Iterable[EnergyType | str] | None = None,
+        meters: Iterable[Meter | str] | None = None,
+        buildings: Iterable[Building | str] | None = None,
+        sites: Iterable[Site | str] | None = None,
+        load: bool = False,
+        tz: str = "UTC",
+    ) -> pd.DataFrame:
+        """Assemble the data of several meters in one DataFrame, ready for ``tide.Plumber``.
+
+        Parameters
+        ----------
+        usage, energy_type
+            Keep the meters with one of these end uses / energy types.
+        meters
+            Keep these meters (objects or ids).
+        buildings, sites
+            Keep the meters whose scope contains one of these entities or one of their own
+            systems.
+        load
+            Call :meth:`Meter.load` on the selected meters that have no data in memory. Without
+            it, such meters are skipped with a :class:`NoDataWarning`.
+        tz
+            Time zone of the result.
+
+        Returns
+        -------
+        pandas.DataFrame
+            Outer join of the meter data, in tide column format, without resampling.
+        """
+        selected = self._select_meters(usage, energy_type, meters, buildings, sites)
+        frames: list[pd.DataFrame] = []
+        for meter in selected:
+            if meter.data is None and load:
+                meter.load()
+            if meter.data is None:
+                warnings.warn(f"meter {meter.id!r} has no data", NoDataWarning, stacklevel=2)
+                continue
+            frames.append(meter.data.tz_convert(tz))
+        if not frames:
+            return pd.DataFrame(index=pd.DatetimeIndex([], tz=tz))
+        # column names start with the meter id, so they are unique across meters
+        return pd.concat(frames, axis=1, join="outer").sort_index()
+
+    def _select_meters(
+        self,
+        usage: Any,
+        energy_type: Any,
+        meters: Iterable[Meter | str] | None,
+        buildings: Iterable[Building | str] | None,
+        sites: Iterable[Site | str] | None,
+    ) -> list[Meter]:
+        selected = list(self.meters)
+        if meters is not None:
+            wanted = {m if isinstance(m, str) else m.id for m in meters}
+            selected = [m for m in selected if m.id in wanted]
+        if usage is not None:
+            usages = _as_set(usage, EndUse)
+            selected = [m for m in selected if m.usage in usages]
+        if energy_type is not None:
+            energies = _as_set(energy_type, EnergyType)
+            selected = [m for m in selected if m.energy_type in energies]
+        if buildings is not None or sites is not None:
+            entities = [*(buildings or []), *(sites or [])]
+            keep = {m.id for entity in entities for m in self.meters_for(entity)}
+            selected = [m for m in selected if m.id in keep]
+        return selected
+
     # --- move / remove ------------------------------------------------------------------------
 
     def move(self, entity_id: str, new_parent: Site | str | None) -> Site | Building:
@@ -303,6 +419,11 @@ class BuildingPark(BaseModel):
             owner = entity._container
             assert isinstance(owner, DescribedEntity)
             return owner.remove_system(entity.id)
+        if isinstance(entity, Meter):
+            self.meters.remove(entity)
+            self._unregister(entity)
+            entity._container = None
+            return entity
         self._take_out(entity)
         self._unregister(entity)
         entity._container = None
@@ -313,7 +434,10 @@ class BuildingPark(BaseModel):
         references: list[tuple[str, Any]] = []
         for system in self.iter_systems():
             if system.serves and ids & set(system.serves):
-                references.append((system.id, _dropper(system, ids)))
+                references.append((system.id, _dropper(system, "serves", ids)))
+        for meter in self.meters:
+            if ids & set(meter.scope):
+                references.append((meter.id, _dropper(meter, "scope", ids)))
         return references
 
     # --- index maintenance (also called by the entities) --------------------------------------
@@ -390,8 +514,13 @@ def _walk(entity: Entity) -> Iterator[Entity]:
             yield from _walk(child)
 
 
-def _dropper(system: System, ids: set[str]) -> Any:
+def _dropper(entity: System | Meter, field: str, ids: set[str]) -> Any:
     def drop() -> None:
-        system.serves = [i for i in system.serves or [] if i not in ids]
+        setattr(entity, field, [i for i in getattr(entity, field) or [] if i not in ids])
 
     return drop
+
+
+def _as_set(value: Any, enum: type) -> set[Any]:
+    values = [value] if isinstance(value, str) else list(value)
+    return {enum(v) for v in values}

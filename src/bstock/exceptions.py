@@ -29,6 +29,14 @@ class IncompleteDataError(BstockError, ValueError):
     """A computation lacks some of the values it needs."""
 
 
+class TimeSeriesError(BstockError, ValueError):
+    """Metered data does not respect the time series format (SPEC §6.3)."""
+
+
+class DataSourceError(BstockError):
+    """A data source cannot be loaded."""
+
+
 class BstockWarning(UserWarning):
     """Base class for all bstock warnings."""
 
@@ -43,3 +51,7 @@ class PerformanceRatioWarning(BstockWarning):
 
 class IdentifierFormatWarning(BstockWarning):
     """An external identifier (RNB, BDNB, DPE) does not have the expected format."""
+
+
+class NoDataWarning(BstockWarning):
+    """A meter selected for a time series has no data in memory and was skipped."""

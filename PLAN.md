@@ -79,14 +79,14 @@ Règles (voir `CLAUDE.md`) :
       `BayonneBuilding`, systèmes partagés, déplacement et suppression
 
 ## Étape 8 — Compteurs et sources de données (§6)
-- [ ] `Channel`, `Meter` (scope validé par le parc), `park.add_meter`, `building.meters()`
-- [ ] `DataSource` avec registre par `type` ; `CsvSource` (`tz`, `tz_ambiguous`…), `ParquetSource` ;
+- [x] `Channel`, `Meter` (scope validé par le parc), `park.add_meter`, `building.meters()`
+- [x] `DataSource` avec registre par `type` ; `CsvSource` (`tz`, `tz_ambiguous`…), `ParquetSource` ;
       conservation d'une source de type inconnu
-- [ ] `meter.load()` et le setter de `meter.data` : DatetimeIndex trié, fuseau obligatoire, colonnes
+- [x] `meter.load()` et le setter de `meter.data` : DatetimeIndex trié, fuseau obligatoire, colonnes
       renommées au format tide
-- [ ] Génération des noms `name__unit__bloc__sub_bloc` et surcharge par `meter.tags`
-- [ ] `park.timeseries(...)` : filtres, conversion de fuseau, outer join, erreur si doublon de colonne
-- [ ] Tests : index sans fuseau refusé ou localisé, changement d'heure, noms tide, assemblage multi-compteurs
+- [x] Génération des noms `name__unit__bloc__sub_bloc` et surcharge par `meter.tags`
+- [x] `park.timeseries(...)` : filtres, conversion de fuseau, outer join, erreur si doublon de colonne
+- [x] Tests : index sans fuseau refusé ou localisé, changement d'heure, noms tide, assemblage multi-compteurs
 
 ## Étape 9 — Persistance (§7)
 - [ ] `to_json` / `from_json` : arbre complet, candidats seulement, métadonnées de version et de classes

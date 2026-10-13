@@ -544,7 +544,7 @@ Règles :
 |---|---|---|
 | `id` | `str` | Identifiant unique (ex. numéro de PDL) |
 | `name` | sourcé `str` | |
-| `scope` | `list[str]` | Ids des entités concernées : site, bâtiment ou système |
+| `scope` | `list[str]` | Ids des entités concernées : sites, bâtiments ou systèmes. Peut être vide (compteur pas encore rattaché, ou après `remove(..., force=True)`) |
 | `energy_type` | sourcé `EnergyType` | Pour un compteur d'énergie |
 | `usage` | sourcé `EndUse` | Usage mesuré |
 | `timestep` | sourcé `str` | Pas de temps nominal (`"10min"`, `"1h"`, `"1D"`…) |
@@ -579,13 +579,20 @@ park.add_meter(Meter(id="SUB_chauff", scope=["heating-chaufferie-A"],
 ```python
 class DataSource(BaseModel):          # base abstraite, discriminée par `type`
     type: str
-    def load(self) -> pd.DataFrame: ...
+    tz: str | None                    # localise un index sans fuseau
+    tz_ambiguous, tz_nonexistent      # comme pandas.DatetimeIndex.tz_localize
+    def read(self) -> pd.DataFrame: ...   # à implémenter par chaque source
+    def load(self) -> pd.DataFrame: ...   # read() + contrôle et localisation de l'index
 
 class CsvSource(DataSource):     type = "csv";     path; index_col; sep; decimal; tz; tz_ambiguous; ...
 class ParquetSource(DataSource): type = "parquet"; path
 ```
 
-- Un projet crée sa propre source en sous-classant `DataSource`, par exemple pour une API client.
+- Un CSV dont les horodatages ont des décalages UTC différents (changement d'heure) est converti en UTC.
+- Un chemin relatif est résolu par rapport au dossier du parc quand le parc a été chargé depuis un dossier
+  (§7).
+- Un projet crée sa propre source en sous-classant `DataSource` et en implémentant `read()`, par exemple
+  pour une API client.
   L'enregistrement est automatique dès que la classe est importée (registre par `type`, pour le chargement
   JSON).
 - Si le JSON référence une source dont le `type` n'est pas enregistré, la description est conservée telle
@@ -615,7 +622,7 @@ Les colonnes suivent le format tide `name__unit__bloc__sub_bloc` :
 | `name` | `{meter.id}_{channel.name}` (ex. `PDL_123_power`) |
 | `unit` | `channel.unit` |
 | `bloc` | id de l'entité du `scope` s'il n'y en a qu'une ; sinon `meter.id` |
-| `sub_bloc` | `usage` (ex. `heating`) |
+| `sub_bloc` | `usage` (ex. `heating`), `other` si inconnu |
 
 `meter.tags` permet de surcharger `bloc` et `sub_bloc`. Exemple : `PDL_123_power__W__site-ecole-A__total`.
 
@@ -633,7 +640,11 @@ Plumber(df).show()
 - `load=True` appelle `load()` sur les compteurs dont `data` est vide.
 - Filtres : `usage`, `energy_type`, `meters` (ids), `buildings` / `sites` (ids ou objets). Un filtre sur
   des bâtiments retient les compteurs dont le `scope` contient ces bâtiments ou leurs systèmes propres.
-- Un doublon de nom de colonne lève une erreur.
+- Les noms de colonnes commencent par l'id du compteur : ils sont donc uniques dans le parc.
+- Un compteur sélectionné sans données en mémoire (et sans `load=True`) est ignoré avec un
+  `NoDataWarning`.
+- `park.meters_for(entité)` et `entité.meters()` renvoient les compteurs dont le `scope` contient l'entité
+  ou un de ses systèmes propres.
 
 ---
 

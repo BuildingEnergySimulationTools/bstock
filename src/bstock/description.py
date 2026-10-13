@@ -145,6 +145,11 @@ class DescribedEntity(SourcedModel):
                 return system
         raise UnknownIdError(system_id)
 
+    def meters(self) -> list[Any]:
+        """Return the park meters whose scope contains this entity or one of its own systems."""
+        park = self.park
+        return [] if park is None else park.meters_for(self)
+
     def _notify_park(self, method: str, entity: SourcedModel) -> None:
         """Let the park maintain its id index (no-op for an entity outside a park)."""
         park = self.park
