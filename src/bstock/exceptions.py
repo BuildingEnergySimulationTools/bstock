@@ -19,3 +19,15 @@ class InvalidIdError(BstockError, ValueError):
 
 class EntityInUseError(BstockError):
     """An entity cannot be removed because other entities still reference it."""
+
+
+class UnknownFieldError(BstockError, AttributeError):
+    """The requested name is not a sourced attribute of the model."""
+
+
+class BstockWarning(UserWarning):
+    """Base class for all bstock warnings."""
+
+
+class UnknownAttributeWarning(BstockWarning):
+    """Loaded data contains a sourced attribute unknown to the model class; it is kept as is."""

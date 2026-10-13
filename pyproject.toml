@@ -50,6 +50,8 @@ select = [
     "RUF", # ruff-specific rules
 ]
 
+ignore = ["D105"]  # magic methods document themselves
+
 [tool.ruff.lint.pydocstyle]
 convention = "numpy"
 

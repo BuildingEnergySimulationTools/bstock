@@ -383,9 +383,10 @@ Règles :
 - Un même `source` ne peut avoir **qu'un candidat par attribut** : un nouveau `set` avec la même source le
   remplace.
 - `set` valide la valeur contre le type et les contraintes du champ (Pydantic `TypeAdapter`) et lève
-  `ValidationError` si elle est invalide.
+  `ValidationError` si elle est invalide. `set(attr, None, source=s)` équivaut à `unset(attr, source=s)`.
+- Un nom d'attribut inconnu lève `UnknownFieldError`.
 - À la construction, les kwargs sont enregistrés sous la source `"manual"`, sauf si l'appel précise
-  `source=` :
+  `source=` (une valeur `None` est ignorée) :
   ```python
   park.new_building(rnb_id="...", source="bdnb", year_construction=1970, height=12.5)
   ```
@@ -435,7 +436,7 @@ b.set("year_construction", 1985, source="audit")   # valeur propre : masque l'h�
 - Les grandeurs extensives (`nb_dwellings`, surfaces, `heat_loss_coefficient`…) ne sont **jamais**
   héritées. Une valeur posée sur un site vaut pour le site entier. Les agrégations (somme des bâtiments
   comparée à la valeur du site) sont prévues en v3.
-- Un champ ajouté par un projet choisit son comportement : `sourced(inherit=True)`. Par défaut, il n'est
+- Un champ ajouté par un projet choisit son comportement : `sourced(str, inherit=True)`. Par défaut, il n'est
   pas hérité.
 - Un bâtiment ou un site sans parent n'hérite de rien.
 - L'enveloppe suit la même règle : l'`Envelope` d'un bâtiment hérite de celle de son site parent (ex. le
@@ -443,16 +444,22 @@ b.set("year_construction", 1985, source="audit")   # valeur propre : masque l'h�
 
 ### 4.5 Implémentation (indicatif)
 
-- Le champ est déclaré avec un type normal et un helper de métadonnées :
+- Un attribut sourcé est déclaré **sans annotation**, avec son type en premier argument de `sourced` :
   ```python
   class Building(SourcedModel):
-      rnb_id: str | None = None
-      heated_area: float | None = sourced(unit="m²", ge=0, description="Surface chauffée")
-      year_construction: int | None = sourced(inherit=True)
+      rnb_id: str | None = None                                  # champ Pydantic classique
+      heated_area = sourced(float, unit="m²", ge=0, description="Surface chauffée")
+      year_construction = sourced(int, inherit=True)
   ```
-- `SourcedModel` (Pydantic v2) repère les champs `sourced(...)` à la définition de la classe et stocke
-  leurs candidats dans un dictionnaire interne `_values: dict[str, list[SourcedValue]]`. Il expose les
-  champs comme des propriétés qui renvoient la valeur effective.
+  `sourced(...)` renvoie un descripteur `SourcedField[T]`. Sur une instance, il renvoie la valeur effective
+  (`T | None`), et les IDE et vérificateurs de types connaissent donc son type. Sur la classe, il renvoie
+  la définition du champ (`Building.heated_area.unit == "m²"`).
+- Les candidats sont stockés dans un vrai champ Pydantic `values: dict[str, list[SourcedValue]]`, qui est
+  directement le format JSON du §7.2. Les noms inconnus de la classe y sont conservés tels quels, avec un
+  avertissement `UnknownAttributeWarning`.
+- Les attributs sourcés ne sont pas des champs Pydantic : `SourcedModel` déclare `SourcedField` dans
+  `ignored_types`, surcharge `__setattr__` pour l'affectation directe, et convertit les kwargs du
+  constructeur en candidats dans un validateur `mode="before"`.
 - Le mécanisme est **hérité** : un champ `sourced(...)` ajouté dans une sous-classe projet est traité
   exactement comme un champ du socle.
 
@@ -469,12 +476,12 @@ entités extensibles). L'extension des systèmes et des Meters n'est pas prévue
 from bstock import Building, Site, BuildingPark, sourced
 
 class BayonneSite(Site):
-    secteur: str | None = sourced(description="Secteur de gestion")
+    secteur = sourced(str, description="Secteur de gestion")
 
 class BayonneBuilding(Building):
-    code_patrimoine: str | None = sourced()
-    gestionnaire: str | None = sourced()
-    surface_utile_client: float | None = sourced(unit="m²", ge=0)
+    code_patrimoine = sourced(str)
+    gestionnaire = sourced(str)
+    surface_utile_client = sourced(float, unit="m²", ge=0)
 
 def new_park() -> BuildingPark:
     return BuildingPark(name="Ville de Bayonne",
@@ -521,8 +528,8 @@ Règles :
 | `usage` | sourcé `EndUse` | Usage mesuré |
 | `timestep` | sourcé `str` | Pas de temps nominal (`"10min"`, `"1h"`, `"1D"`…) |
 | `channels` | `list[Channel]` | Grandeurs mesurées (une colonne par grandeur) |
-| `source` | `DataSource \| None` | Où lire les données |
-| `original_source` | `DataSource \| None` | Source d'origine, conservée après `save(include_data=True)` |
+| `data_source` | `DataSource \| None` | Où lire les données (nommé ainsi pour ne pas confondre avec la `source` de provenance) |
+| `original_data_source` | `DataSource \| None` | Source d'origine, conservée après `save(include_data=True)` |
 | `tags` | `dict[str, str]` | Surcharge des tags tide (`bloc`, `sub_bloc`) |
 | `data` | `pd.DataFrame \| None` | Données en mémoire, **non sérialisées en JSON** |
 
@@ -539,7 +546,7 @@ Exemples :
 park.add_meter(Meter(id="PDL_123", scope=["site-ecole-A"], energy_type="electricity",
                      usage="total", timestep="30min",
                      channels=[Channel(name="power", unit="W", column="valeur")],
-                     source=CsvSource(path="data/enedis_PDL_123.csv", index_col="horodate")))
+                     data_source=CsvSource(path="data/enedis_PDL_123.csv", index_col="horodate")))
 
 park.add_meter(Meter(id="SUB_chauff", scope=["heating-chaufferie-A"],
                      energy_type="natural_gas", usage="heating", timestep="1D",
@@ -566,7 +573,7 @@ class ParquetSource(DataSource): type = "parquet"; path
 ### 6.3 Chargement et données en mémoire
 
 ```python
-m.load()                 # source.load() -> sélection et renommage des colonnes -> m.data
+m.load()                 # data_source.load() -> sélection et renommage des colonnes -> m.data
 m.data                   # DataFrame au format décrit ci-dessous
 m.data = df_nettoye      # affectation directe (validée) ; colonnes nommées par channel.name
                          # ou déjà au format tide
@@ -625,8 +632,8 @@ BuildingPark.json_schema(site_cls=..., building_cls=...) -> dict
 ```
 
 Avec `include_data=True`, chaque Meter qui a des données en mémoire les écrit dans
-`timeseries/<meter_id>.parquet`. Sa `source` devient alors une `ParquetSource` vers ce fichier (chemin
-relatif au dossier du parc). L'ancienne source est conservée dans `meter.original_source` pour la
+`timeseries/<meter_id>.parquet`. Sa `data_source` devient alors une `ParquetSource` vers ce fichier
+(chemin relatif au dossier du parc). L'ancienne est conservée dans `meter.original_data_source` pour la
 traçabilité. Le parc sauvegardé est alors **autonome**.
 
 ### 7.2 Format JSON (extrait)
@@ -668,7 +675,7 @@ traçabilité. Le parc sauvegardé est alors **autonome**.
     "id": "PDL_123", "scope": ["site-ecole-A"],
     "channels": [{"name": "power", "unit": "W", "column": "valeur"}],
     "values": {"energy_type": [{"value": "electricity", "source": "manual"}]},
-    "source": {"type": "parquet", "path": "timeseries/PDL_123.parquet"}
+    "data_source": {"type": "parquet", "path": "timeseries/PDL_123.parquet"}
   }]
 }
 ```
@@ -700,7 +707,7 @@ park.add_system(HeatingGenerator(id="heating-chaufferie-A", technology="boiler_c
 park.add_meter(Meter(id="PDL_123", scope=[b.site.id], usage="total", timestep="30min",
                      energy_type="electricity",
                      channels=[Channel(name="power", unit="W", column="valeur")],
-                     source=CsvSource(path="data/enedis_PDL_123.csv", index_col="horodate")))
+                     data_source=CsvSource(path="data/enedis_PDL_123.csv", index_col="horodate")))
 
 df = park.timeseries(load=True)
 park.save("out/bayonne/", include_data=True)

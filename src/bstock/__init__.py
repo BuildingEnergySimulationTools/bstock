@@ -20,10 +20,21 @@ from bstock.enums import (
 )
 from bstock.exceptions import (
     BstockError,
+    BstockWarning,
     DuplicateIdError,
     EntityInUseError,
     InvalidIdError,
+    UnknownAttributeWarning,
+    UnknownFieldError,
     UnknownIdError,
+)
+from bstock.provenance import (
+    DEFAULT_SOURCE_PRIORITY,
+    SourcedField,
+    SourcedModel,
+    SourcedValue,
+    SourcePriority,
+    sourced,
 )
 
 try:
@@ -32,8 +43,10 @@ except PackageNotFoundError:  # pragma: no cover - package not installed
     __version__ = "0.0.0"
 
 __all__ = [
+    "DEFAULT_SOURCE_PRIORITY",
     "Adjacency",
     "BstockError",
+    "BstockWarning",
     "BuildingUsage",
     "ComponentKind",
     "DuplicateIdError",
@@ -47,6 +60,13 @@ __all__ = [
     "InsulationLevel",
     "InvalidIdError",
     "Orientation",
+    "SourcePriority",
+    "SourcedField",
+    "SourcedModel",
+    "SourcedValue",
+    "UnknownAttributeWarning",
+    "UnknownFieldError",
     "UnknownIdError",
     "__version__",
+    "sourced",
 ]

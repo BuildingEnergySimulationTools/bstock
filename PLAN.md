@@ -27,17 +27,17 @@ Règles (voir `CLAUDE.md`) :
 - [x] Tests : valeurs, sérialisation, acceptation de la chaîne ou du membre
 
 ## Étape 2 — Cœur de la provenance (§4.1 à §4.3, §4.5)
-- [ ] `SourcedValue` (`value`, `source`, `date`, `comment`, `ref`, `raw`)
-- [ ] Helper `sourced(unit=, inherit=, description=, **contraintes)` et métadonnées de champ
+- [x] `SourcedValue` (`value`, `source`, `date`, `comment`, `ref`, `raw`)
+- [x] Helper `sourced(unit=, inherit=, description=, **contraintes)` et métadonnées de champ
       (`sourced_fields()`)
-- [ ] `SourcedModel` : stockage des candidats, propriétés qui renvoient la valeur effective
-- [ ] API `set` / `unset` / `sources` / `effective` ; affectation directe = source `"manual"` ;
+- [x] `SourcedModel` : stockage des candidats, propriétés qui renvoient la valeur effective
+- [x] API `set` / `unset` / `sources` / `effective` ; affectation directe = source `"manual"` ;
       affectation de `None` = retrait du candidat `"manual"`
-- [ ] Validation des valeurs contre le type et les contraintes du champ (`TypeAdapter`)
-- [ ] Construction avec kwargs et paramètre `source=`
-- [ ] `SourcePriority` : liste par défaut, surcharge par attribut, joker `"*"`, départage par date puis
+- [x] Validation des valeurs contre le type et les contraintes du champ (`TypeAdapter`)
+- [x] Construction avec kwargs et paramètre `source=`
+- [x] `SourcePriority` : liste par défaut, surcharge par attribut, joker `"*"`, départage par date puis
       ordre d'ajout
-- [ ] Tests : résolution (cas nominal, joker, sources inconnues, égalités), un candidat par source,
+- [x] Tests : résolution (cas nominal, joker, sources inconnues, égalités), un candidat par source,
       validation en erreur, champs ajoutés dans une sous-classe
 
 ## Étape 3 — Héritage des valeurs (§4.4)
