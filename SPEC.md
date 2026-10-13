@@ -1,7 +1,7 @@
 # bstock — Spécification
 
-> Statut : **v0.3**, issue de l'interview de conception du 2026-10-13. Les choix sont validés ; les points
-> encore ouverts sont listés au §11.
+> Statut : **v1.0**, implémentée par bstock 0.1.0 (périmètre v1 du §10). Issue de l'interview de
+> conception du 2026-10-13 et ajustée pendant l'implémentation. Points ouverts : §11.
 
 ---
 
@@ -730,6 +730,8 @@ Seuls les candidats sont sérialisés, pas la valeur effective : elle est recalc
 
 ## 8. Exemple de bout en bout (v1)
 
+Version exécutable, avec des données fictives : `examples/bayonne.py` (vérifiée par les tests).
+
 ```python
 from datetime import date
 from bstock import BuildingPark, HeatingGenerator, Meter, Channel, CsvSource
@@ -763,7 +765,7 @@ park2.get("A1B2C3D4E5F6").sources("heated_area")
 
 ---
 
-## 9. Organisation du package (proposition)
+## 9. Organisation du package
 
 ```
 src/bstock/
@@ -779,8 +781,10 @@ src/bstock/
   meters.py            # Meter, Channel, conventions tide
   sources.py           # DataSource, CsvSource, ParquetSource, registre
   io.py                # to_json/from_json, save/load, JSON Schema
-  exceptions.py        # BstockError et exceptions dérivées
-tests/
+  exceptions.py        # BstockError, BstockWarning et leurs sous-classes
+  _ids.py              # génération et contrôle des identifiants
+tests/                 # un fichier par module, plus test_examples.py
+examples/bayonne.py    # exemple de bout en bout
 ```
 
 - Python ≥ 3.11.

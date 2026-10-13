@@ -98,11 +98,11 @@ Règles (voir `CLAUDE.md`) :
       préservés, parc autonome rechargé sans les fichiers d'origine (`tmp_path`)
 
 ## Étape 10 — Finalisation v0.1.0
-- [ ] Exemple de bout en bout (SPEC §8) sous forme de script `examples/` exécuté par un test
-- [ ] Revue de l'API publique (`__all__`) et des docstrings NumPy
-- [ ] README complété (installation, exemple court)
-- [ ] Mise à jour de `SPEC.md` si l'implémentation a fait évoluer des détails
-- [ ] Version `0.1.0` et tag git
+- [x] Exemple de bout en bout (SPEC §8) : `examples/bayonne.py`, exécuté par `tests/test_examples.py`
+- [x] Revue de l'API publique (`__all__`) et des docstrings NumPy
+- [x] README complété (installation, exemple court)
+- [x] Mise à jour de `SPEC.md` si l'implémentation a fait évoluer des détails
+- [x] Version `0.1.0` et tag git
 
 ---
 

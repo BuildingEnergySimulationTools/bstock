@@ -373,3 +373,10 @@ def test_meters_with_same_tags_get_distinct_columns(park):
     for meter in (first, second):
         meter.data = hourly(energy=[1, 2, 3])
     assert park.timeseries().shape[1] == 2
+
+
+def test_source_equality_ignores_base_dir(tmp_path):
+    first, second = ParquetSource(path="m.parquet"), ParquetSource(path="m.parquet")
+    first._base_dir = tmp_path
+    assert first == second
+    assert first != ParquetSource(path="other.parquet")

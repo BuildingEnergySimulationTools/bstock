@@ -60,6 +60,18 @@ class DataSource(BaseModel):
         if isinstance(type_name, str) and type_name:
             DataSource.registry[type_name] = cls
 
+    def __eq__(self, other: object) -> bool:
+        # The base directory is a runtime detail: two sources describing the same data are equal.
+        if not isinstance(other, BaseModel):
+            return NotImplemented
+        return (
+            type(self) is type(other)
+            and self.__dict__ == other.__dict__
+            and (self.__pydantic_extra__ == other.__pydantic_extra__)
+        )
+
+    __hash__ = None  # type: ignore[assignment]
+
     def read(self) -> pd.DataFrame:
         """Read the raw data; implemented by subclasses."""
         raise NotImplementedError
