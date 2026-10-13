@@ -37,6 +37,10 @@ class DataSourceError(BstockError):
     """A data source cannot be loaded."""
 
 
+class UnsupportedSchemaError(BstockError):
+    """The park file was written with an unsupported format version."""
+
+
 class BstockWarning(UserWarning):
     """Base class for all bstock warnings."""
 
@@ -55,3 +59,7 @@ class IdentifierFormatWarning(BstockWarning):
 
 class NoDataWarning(BstockWarning):
     """A meter selected for a time series has no data in memory and was skipped."""
+
+
+class ClassMismatchWarning(BstockWarning):
+    """A park file was saved with other site or building classes than the ones used to load it."""

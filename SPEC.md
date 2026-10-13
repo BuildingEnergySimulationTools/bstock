@@ -654,7 +654,8 @@ Plumber(df).show()
 
 ```python
 park.to_json() -> str
-BuildingPark.from_json(text, site_cls=..., building_cls=...)
+BuildingPark.from_json(text, site_cls=..., building_cls=...)   # sous-sites et bâtiments imbriqués
+                                                               # créés avec ces classes
 
 park.save("bayonne/")                     # bayonne/park.json
 park.save("bayonne/", include_data=True)  # + bayonne/timeseries/<meter_id>.parquet
@@ -662,6 +663,17 @@ BuildingPark.load("bayonne/", site_cls=..., building_cls=...)
 
 BuildingPark.json_schema(site_cls=..., building_cls=...) -> dict
 ```
+
+- `load` ne lit pas les séries : `meter.load()` ou `park.timeseries(load=True)` les chargent à la demande.
+- Dans un fichier de parc, les chemins relatifs des sources de données sont relatifs au dossier du parc.
+  À la sauvegarde, les chemins relatifs au répertoire courant sont donc rendus absolus. Un dossier de parc
+  sauvegardé avec `include_data=True` peut être déplacé.
+- Un fichier écrit avec une autre version du format (`schema_version`) lève `UnsupportedSchemaError`.
+  Des classes différentes de celles de la sauvegarde émettent un `ClassMismatchWarning`.
+- Les attributs sourcés n'étant pas des champs Pydantic, le JSON Schema les décrit à part, dans
+  `x-bstock-sourced-attributes` : type, unité, héritage et description par classe.
+- `site_cls` et `building_cls` sont des champs du parc exclus de la sérialisation. Le nom du parc se passe
+  par mot-clé : `BuildingPark(name="Ville de Bayonne", site_cls=..., building_cls=...)`.
 
 Avec `include_data=True`, chaque Meter qui a des données en mémoire les écrit dans
 `timeseries/<meter_id>.parquet`. Sa `data_source` devient alors une `ParquetSource` vers ce fichier

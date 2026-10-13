@@ -24,6 +24,7 @@ from bstock.envelope import COMPUTED_SOURCE, Envelope, EnvelopeComponent, Window
 from bstock.exceptions import (
     BstockError,
     BstockWarning,
+    ClassMismatchWarning,
     DataSourceError,
     DuplicateIdError,
     EntityInUseError,
@@ -36,6 +37,7 @@ from bstock.exceptions import (
     UnknownAttributeWarning,
     UnknownFieldError,
     UnknownIdError,
+    UnsupportedSchemaError,
 )
 from bstock.meters import Channel, Meter, tide_column
 from bstock.park import BuildingPark
@@ -74,6 +76,7 @@ __all__ = [
     "BuildingPark",
     "BuildingUsage",
     "Channel",
+    "ClassMismatchWarning",
     "ComponentKind",
     "CoolingGenerator",
     "CsvSource",
@@ -114,6 +117,7 @@ __all__ = [
     "UnknownFieldError",
     "UnknownIdError",
     "UnknownSource",
+    "UnsupportedSchemaError",
     "Ventilation",
     "Window",
     "__version__",

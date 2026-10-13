@@ -196,7 +196,8 @@ class Meter(SourcedModel):
     def load(self) -> pd.DataFrame:
         """Read the data from ``data_source``, keep it in :attr:`data` and return it.
 
-        Each channel reads the column ``channel.column`` (or ``channel.name``); a source with a
+        Columns already in tide format (as saved by the park) are taken as is. Otherwise each
+        channel reads the column ``channel.column`` (or ``channel.name``), and a source with a
         single column feeds a single channel whatever its name.
 
         Raises
@@ -207,7 +208,10 @@ class Meter(SourcedModel):
         if self.data_source is None:
             raise DataSourceError(f"meter {self.id!r} has no data source")
         raw = self.data_source.load()
-        if len(self.channels) == 1 and raw.shape[1] == 1:
+        tide_names = list(self.column_names().values())
+        if all(name in raw.columns for name in tide_names):
+            selected = raw[tide_names]
+        elif len(self.channels) == 1 and raw.shape[1] == 1:
             selected = raw.set_axis([self.channels[0].name], axis=1)
         else:
             missing = [c.source_column for c in self.channels if c.source_column not in raw]

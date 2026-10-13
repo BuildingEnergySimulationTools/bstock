@@ -24,7 +24,7 @@ class BayonneBuilding(Building):
 @pytest.fixture
 def park():
     """client site > BDNB group > A, B ; client site > C ; D at park level."""
-    park = BuildingPark("Ville de Bayonne")
+    park = BuildingPark(name="Ville de Bayonne")
     client = park.new_site("site-ecole-A", name="Groupe scolaire A", usage="tertiary")
     park.new_site(GROUP, parent=client, bdnb_batiment_groupe_id=GROUP)
     park.new_building(RNB_A, site=GROUP, year_construction=1972, source="bdnb")
@@ -141,7 +141,7 @@ def test_systems_are_indexed(park):
 
 
 def test_new_entities_use_project_classes():
-    park = BuildingPark("Bayonne", site_cls=BayonneSite, building_cls=BayonneBuilding)
+    park = BuildingPark(name="Bayonne", site_cls=BayonneSite, building_cls=BayonneBuilding)
     site = park.new_site("s1", secteur="Nord", source="bayonne_xlsx")
     building = park.new_building(RNB_A, site=site, code_patrimoine="BAT-0042")
     assert type(site) is BayonneSite
@@ -153,14 +153,14 @@ def test_new_entities_use_project_classes():
 
 
 def test_add_checks_project_class():
-    park = BuildingPark("Bayonne", building_cls=BayonneBuilding)
+    park = BuildingPark(name="Bayonne", building_cls=BayonneBuilding)
     with pytest.raises(TypeError, match="BayonneBuilding"):
         park.add_building(Building(rnb_id=RNB_A))
 
 
 def test_invalid_class_is_rejected():
-    with pytest.raises(TypeError):
-        BuildingPark("x", building_cls=Site)
+    with pytest.raises(ValidationError):
+        BuildingPark(name="x", building_cls=Site)
 
 
 # --- shared systems ---------------------------------------------------------------------------
@@ -274,7 +274,7 @@ def test_park_built_from_nested_data_is_indexed():
 def test_duplicate_ids_in_data_are_rejected():
     with pytest.raises(DuplicateIdError):
         BuildingPark(
-            "x",
+            name="x",
             sites=[Site(id="s", buildings=[Building(id="b")])],
             buildings=[Building(id="b")],
         )

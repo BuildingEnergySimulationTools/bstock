@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Iterator
 from typing import Any
 
-from pydantic import Field, field_validator
+from pydantic import Field, ValidationInfo, field_validator, model_validator
 
 from bstock._ids import check_external_id
 from bstock.building import Building
@@ -36,6 +36,11 @@ class Site(DescribedEntity):
     bdnb_batiment_groupe_id: str | None = None
     sites: list[Site] = Field(default_factory=list)
     buildings: list[Building] = Field(default_factory=list)
+
+    @model_validator(mode="before")
+    @classmethod
+    def _build_children_with_context_classes(cls, data: Any, info: ValidationInfo) -> Any:
+        return build_children(data, info)
 
     @field_validator("bdnb_batiment_groupe_id")
     @classmethod
@@ -125,3 +130,26 @@ class Site(DescribedEntity):
             raise ValueError(f"cannot attach {child.id!r} inside itself")
         if any(c.id == child.id for c in [*self.sites, *self.buildings]):
             raise DuplicateIdError(f"id {child.id!r} is already used in site {self.id!r}")
+
+
+CLASSES_CONTEXT_KEY = "bstock_classes"
+"""Validation context key holding the ``(site_cls, building_cls)`` used for nested entities."""
+
+
+def build_children(data: Any, info: ValidationInfo) -> Any:
+    """Instantiate the ``sites`` and ``buildings`` of ``data`` with the context classes, if any.
+
+    Used when loading a park, so that nested entities are project subclasses (SPEC §5).
+    """
+    classes = (info.context or {}).get(CLASSES_CONTEXT_KEY)
+    if classes is None or not isinstance(data, dict):
+        return data
+    site_cls, building_cls = classes
+    data = dict(data)
+    for key, cls in (("sites", site_cls), ("buildings", building_cls)):
+        if key in data:
+            data[key] = [
+                cls.model_validate(item, context=info.context) if isinstance(item, dict) else item
+                for item in data[key]
+            ]
+    return data

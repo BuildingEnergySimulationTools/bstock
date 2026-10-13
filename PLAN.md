@@ -89,12 +89,12 @@ Règles (voir `CLAUDE.md`) :
 - [x] Tests : index sans fuseau refusé ou localisé, changement d'heure, noms tide, assemblage multi-compteurs
 
 ## Étape 9 — Persistance (§7)
-- [ ] `to_json` / `from_json` : arbre complet, candidats seulement, métadonnées de version et de classes
-- [ ] Conservation des attributs inconnus avec avertissement ; avertissement si les classes diffèrent
-- [ ] `save(dir)` / `load(dir)` ; `include_data=True` → Parquet par compteur, `source` repointée,
+- [x] `to_json` / `from_json` : arbre complet, candidats seulement, métadonnées de version et de classes
+- [x] Conservation des attributs inconnus avec avertissement ; avertissement si les classes diffèrent
+- [x] `save(dir)` / `load(dir)` ; `include_data=True` → Parquet par compteur, `source` repointée,
       `original_source` conservée
-- [ ] `json_schema(site_cls=, building_cls=)`
-- [ ] Tests : aller-retour (sites imbriqués, sous-classes, provenance, héritage), attributs inconnus
+- [x] `json_schema(site_cls=, building_cls=)`
+- [x] Tests : aller-retour (sites imbriqués, sous-classes, provenance, héritage), attributs inconnus
       préservés, parc autonome rechargé sans les fichiers d'origine (`tmp_path`)
 
 ## Étape 10 — Finalisation v0.1.0

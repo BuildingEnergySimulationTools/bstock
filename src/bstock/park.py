@@ -4,10 +4,12 @@ from __future__ import annotations
 
 import warnings
 from collections.abc import Iterable, Iterator
+from pathlib import Path
 from typing import Any
 
 import pandas as pd
-from pydantic import BaseModel, ConfigDict, Field, PrivateAttr
+from pydantic import BaseModel, ConfigDict, Field, PrivateAttr, ValidationInfo, model_validator
+from pydantic.json_schema import SkipJsonSchema
 
 from bstock.building import Building
 from bstock.description import DescribedEntity
@@ -20,7 +22,7 @@ from bstock.exceptions import (
 )
 from bstock.meters import Meter
 from bstock.provenance import SourcedModel, SourcePriority
-from bstock.site import Site
+from bstock.site import Site, build_children
 from bstock.systems import System
 
 __all__ = ["BuildingPark"]
@@ -52,29 +54,16 @@ class BuildingPark(BaseModel):
     sites: list[Site] = Field(default_factory=list)
     buildings: list[Building] = Field(default_factory=list)
     meters: list[Meter] = Field(default_factory=list)
+    site_cls: SkipJsonSchema[type[Site]] = Field(default=Site, exclude=True)
+    building_cls: SkipJsonSchema[type[Building]] = Field(default=Building, exclude=True)
 
-    _site_cls: type[Site] = PrivateAttr(default=Site)
-    _building_cls: type[Building] = PrivateAttr(default=Building)
     _index: dict[str, Entity] = PrivateAttr(default_factory=dict)
     _rnb_index: dict[str, Building] = PrivateAttr(default_factory=dict)
 
-    def __init__(
-        self,
-        name: str,
-        *,
-        site_cls: type[Site] = Site,
-        building_cls: type[Building] = Building,
-        **data: Any,
-    ) -> None:
-        super().__init__(name=name, **data)
-        self._set_classes(site_cls, building_cls)
-
-    def _set_classes(self, site_cls: type[Site], building_cls: type[Building]) -> None:
-        if not (isinstance(site_cls, type) and issubclass(site_cls, Site)):
-            raise TypeError(f"site_cls must be a subclass of Site, got {site_cls!r}")
-        if not (isinstance(building_cls, type) and issubclass(building_cls, Building)):
-            raise TypeError(f"building_cls must be a subclass of Building, got {building_cls!r}")
-        self._site_cls, self._building_cls = site_cls, building_cls
+    @model_validator(mode="before")
+    @classmethod
+    def _build_children_with_context_classes(cls, data: Any, info: ValidationInfo) -> Any:
+        return build_children(data, info)
 
     def model_post_init(self, context: Any) -> None:
         """Attach the top-level entities and build the id index."""
@@ -93,15 +82,57 @@ class BuildingPark(BaseModel):
 
     __hash__ = None  # type: ignore[assignment]
 
-    @property
-    def site_cls(self) -> type[Site]:
-        """Class used to create sites."""
-        return self._site_cls
+    # --- persistence (implemented in bstock.io) ------------------------------------------------
 
-    @property
-    def building_cls(self) -> type[Building]:
-        """Class used to create buildings."""
-        return self._building_cls
+    def to_json(self, *, indent: int | None = 2) -> str:
+        """Serialise the park to JSON (SPEC §7.2); metered data is not included."""
+        from bstock import io  # circular import
+
+        return io.to_json(self, indent=indent)
+
+    @classmethod
+    def from_json(
+        cls,
+        text: str | bytes,
+        *,
+        site_cls: type[Site] = Site,
+        building_cls: type[Building] = Building,
+    ) -> BuildingPark:
+        """Load a park serialised by :meth:`to_json`, building project classes for its entities."""
+        from bstock import io  # circular import
+
+        return io.from_json(text, site_cls=site_cls, building_cls=building_cls)
+
+    def save(self, directory: str | Path, *, include_data: bool = False) -> Path:
+        """Save the park in ``directory`` (``park.json``, plus Parquet files with ``include_data``).
+
+        See :func:`bstock.io.save`.
+        """
+        from bstock import io  # circular import
+
+        return io.save(self, directory, include_data=include_data)
+
+    @classmethod
+    def load(
+        cls,
+        directory: str | Path,
+        *,
+        site_cls: type[Site] = Site,
+        building_cls: type[Building] = Building,
+    ) -> BuildingPark:
+        """Load a park saved by :meth:`save`. See :func:`bstock.io.load`."""
+        from bstock import io  # circular import
+
+        return io.load(directory, site_cls=site_cls, building_cls=building_cls)
+
+    @classmethod
+    def json_schema(
+        cls, *, site_cls: type[Site] = Site, building_cls: type[Building] = Building
+    ) -> dict[str, Any]:
+        """Return the JSON Schema of the park file. See :func:`bstock.io.json_schema`."""
+        from bstock import io  # circular import
+
+        return io.json_schema(site_cls=site_cls, building_cls=building_cls)
 
     # --- lookup -------------------------------------------------------------------------------
 
@@ -169,7 +200,7 @@ class BuildingPark(BaseModel):
         **attrs
             Site fields and sourced attributes.
         """
-        site = self._site_cls(id=id, source=source, **attrs)
+        site = self.site_cls(id=id, source=source, **attrs)
         return self.add_site(site, parent)
 
     def new_building(
@@ -196,7 +227,7 @@ class BuildingPark(BaseModel):
         **attrs
             Building fields and sourced attributes.
         """
-        building = self._building_cls(rnb_id=rnb_id, id=id, source=source, **attrs)
+        building = self.building_cls(rnb_id=rnb_id, id=id, source=source, **attrs)
         return self.add_building(building, site)
 
     def add_site(self, site: Site, parent: Site | str | None = None) -> Site:
@@ -211,7 +242,7 @@ class BuildingPark(BaseModel):
         UnknownIdError
             If ``parent`` is an unknown id.
         """
-        self._check_class(site, self._site_cls)
+        self._check_class(site, self.site_cls)
         if parent is None:
             self._register(site)
             site._container = self
@@ -231,7 +262,7 @@ class BuildingPark(BaseModel):
         UnknownIdError
             If ``site`` is an unknown id.
         """
-        self._check_class(building, self._building_cls)
+        self._check_class(building, self.building_cls)
         if site is None:
             self._register(building)
             building._container = self
