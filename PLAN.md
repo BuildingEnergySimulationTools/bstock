@@ -21,10 +21,10 @@ Règles (voir `CLAUDE.md`) :
 - [x] Installation éditable dans le `.venv` ; `pytest` et `ruff` tournent sur un test trivial
 
 ## Étape 1 — Enums (§3.9)
-- [ ] `enums.py` : `BuildingUsage`, `EnergyType`, `GeneratorTechnology`, `Inertia`, `InsulationLevel`,
+- [x] `enums.py` : `BuildingUsage`, `EnergyType`, `GeneratorTechnology`, `Inertia`, `InsulationLevel`,
       `GlazingType`, `FrameType`, `ComponentKind`, `Orientation`, `Adjacency`, `EndUse` (`StrEnum`,
       valeur = nom en minuscules)
-- [ ] Tests : valeurs, sérialisation, acceptation de la chaîne ou du membre
+- [x] Tests : valeurs, sérialisation, acceptation de la chaîne ou du membre
 
 ## Étape 2 — Cœur de la provenance (§4.1 à §4.3, §4.5)
 - [ ] `SourcedValue` (`value`, `source`, `date`, `comment`, `ref`, `raw`)
