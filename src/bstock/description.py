@@ -120,8 +120,13 @@ class DescribedEntity(SourcedModel):
         ------
         DuplicateIdError
             If the entity, or the park it belongs to, already uses the id.
+        ValueError
+            If ``serves`` is set on a system added to a building.
+        UnknownIdError
+            If ``serves`` names a building outside the site.
         """
         _check_kind(system.kind)
+        self._check_served(system.serves)
         if any(s.id == system.id for s in self.iter_systems()):
             raise DuplicateIdError(f"system id {system.id!r} is already used in {self.id!r}")
         self._notify_park("_register", system)
@@ -144,6 +149,11 @@ class DescribedEntity(SourcedModel):
                 system._container = None
                 return system
         raise UnknownIdError(system_id)
+
+    def _check_served(self, serves: list[str] | None) -> None:
+        """Check the ``serves`` of a system owned by this entity; only sites accept one."""
+        if serves is not None:
+            raise ValueError(f"'serves' only applies to systems owned by a site, not {self.id!r}")
 
     def meters(self) -> list[Any]:
         """Return the park meters whose scope contains this entity or one of its own systems."""

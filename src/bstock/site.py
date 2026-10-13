@@ -87,6 +87,9 @@ class Site(DescribedEntity):
         ------
         DuplicateIdError
             If the id is already used by a direct child or in the park.
+        TypeError
+            If the site belongs to a park and a site or building of the added subtree is not an
+            instance of the park ``site_cls`` or ``building_cls``.
         """
         self._check_new_child(site)
         self._notify_park("_register", site)
@@ -101,6 +104,9 @@ class Site(DescribedEntity):
         ------
         DuplicateIdError
             If the id is already used by a direct child or in the park.
+        TypeError
+            If the site belongs to a park and a site or building of the added subtree is not an
+            instance of the park ``site_cls`` or ``building_cls``.
         """
         self._check_new_child(building)
         self._notify_park("_register", building)
@@ -130,26 +136,44 @@ class Site(DescribedEntity):
             raise ValueError(f"cannot attach {child.id!r} inside itself")
         if any(c.id == child.id for c in [*self.sites, *self.buildings]):
             raise DuplicateIdError(f"id {child.id!r} is already used in site {self.id!r}")
+        park = self.park
+        if park is not None:
+            park._check_classes(child)
+
+    def _check_served(self, serves: list[str] | None) -> None:
+        """Check that ``serves`` names buildings of the site or of its sub-sites."""
+        if serves is None:
+            return
+        served = {b.id for b in self.iter_buildings()}
+        unknown = [i for i in serves if i not in served]
+        if unknown:
+            raise UnknownIdError(f"buildings {unknown} are not in site {self.id!r}")
 
 
 CLASSES_CONTEXT_KEY = "bstock_classes"
 """Validation context key holding the ``(site_cls, building_cls)`` used for nested entities."""
 
 
-def build_children(data: Any, info: ValidationInfo) -> Any:
+def build_children(
+    data: Any,
+    info: ValidationInfo,
+    default: tuple[type[Site], type[Building]] | None = None,
+) -> Any:
     """Instantiate the ``sites`` and ``buildings`` of ``data`` with the context classes, if any.
 
-    Used when loading a park, so that nested entities are project subclasses (SPEC §5).
+    Used when loading a park, so that nested entities are project subclasses (SPEC §5). Without
+    classes in the validation context, ``default`` is used.
     """
-    classes = (info.context or {}).get(CLASSES_CONTEXT_KEY)
+    classes = (info.context or {}).get(CLASSES_CONTEXT_KEY) or default
     if classes is None or not isinstance(data, dict):
         return data
     site_cls, building_cls = classes
+    context = {**(info.context or {}), CLASSES_CONTEXT_KEY: classes}
     data = dict(data)
     for key, cls in (("sites", site_cls), ("buildings", building_cls)):
         if key in data:
             data[key] = [
-                cls.model_validate(item, context=info.context) if isinstance(item, dict) else item
+                cls.model_validate(item, context=context) if isinstance(item, dict) else item
                 for item in data[key]
             ]
     return data

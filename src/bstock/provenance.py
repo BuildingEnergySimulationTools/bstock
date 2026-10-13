@@ -139,6 +139,10 @@ class SourcedField(Generic[T]):
 
     On an instance it returns the effective value (``T | None``); on the class it returns itself,
     which exposes the field definition (``Building.heated_area.unit``).
+
+    Assigning sets the ``"manual"`` candidate. Assigning ``None`` removes that candidate only: the
+    attribute may keep a value from another source. Use :meth:`SourcedModel.unset` without
+    ``source`` to remove every candidate.
     """
 
     def __init__(

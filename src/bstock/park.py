@@ -21,7 +21,7 @@ from bstock.exceptions import (
     UnknownIdError,
 )
 from bstock.meters import Meter
-from bstock.provenance import SourcedModel, SourcePriority
+from bstock.provenance import SourcePriority
 from bstock.site import Site, build_children
 from bstock.systems import System
 
@@ -44,6 +44,12 @@ class BuildingPark(BaseModel):
         Classes instantiated by :meth:`new_site` and :meth:`new_building` and required by
         :meth:`add_site` and :meth:`add_building`; project subclasses of :class:`Site` and
         :class:`Building` (SPEC §5). Not serialised.
+
+    Notes
+    -----
+    Use :meth:`to_json` / :meth:`from_json` (or :meth:`save` / :meth:`load`) rather than the
+    Pydantic ``model_dump_json`` / ``model_validate_json``: these skip the file metadata (format
+    version, class paths), so neither the format version nor the classes are checked on loading.
     """
 
     model_config = ConfigDict(extra="forbid", validate_assignment=True)
@@ -63,15 +69,23 @@ class BuildingPark(BaseModel):
     @model_validator(mode="before")
     @classmethod
     def _build_children_with_context_classes(cls, data: Any, info: ValidationInfo) -> Any:
-        return build_children(data, info)
+        default = None
+        if isinstance(data, dict):
+            default = (
+                _class_or(data.get("site_cls"), Site),
+                _class_or(data.get("building_cls"), Building),
+            )
+        return build_children(data, info, default)
 
     def model_post_init(self, context: Any) -> None:
-        """Attach the top-level entities and build the id index."""
+        """Check the entity classes, attach the top-level entities and build the id index."""
+        for entity in [*self.sites, *self.buildings]:
+            self._check_classes(entity)
         for entity in [*self.sites, *self.buildings]:
             self._register(entity)
             entity._container = self
         for meter in self.meters:
-            self._check_scope(meter)
+            self._check_scope(meter.id, meter.scope)
             self._register(meter)
             meter._container = self
 
@@ -106,7 +120,8 @@ class BuildingPark(BaseModel):
     def save(self, directory: str | Path, *, include_data: bool = False) -> Path:
         """Save the park in ``directory`` (``park.json``, plus Parquet files with ``include_data``).
 
-        See :func:`bstock.io.save`.
+        The park itself is modified: relative paths of data sources become absolute and, with
+        ``include_data``, the meters point to the saved Parquet files. See :func:`bstock.io.save`.
         """
         from bstock import io  # circular import
 
@@ -236,13 +251,14 @@ class BuildingPark(BaseModel):
         Raises
         ------
         TypeError
-            If ``site`` is not an instance of :attr:`site_cls`.
+            If a site of the subtree is not an instance of :attr:`site_cls`, or a building of
+            :attr:`building_cls`.
         DuplicateIdError
             If an id of the site subtree is already used in the park.
         UnknownIdError
             If ``parent`` is an unknown id.
         """
-        self._check_class(site, self.site_cls)
+        self._check_classes(site)
         if parent is None:
             self._register(site)
             site._container = self
@@ -262,7 +278,7 @@ class BuildingPark(BaseModel):
         UnknownIdError
             If ``site`` is an unknown id.
         """
-        self._check_class(building, self.building_cls)
+        self._check_classes(building)
         if site is None:
             self._register(building)
             building._container = self
@@ -282,14 +298,7 @@ class BuildingPark(BaseModel):
         DuplicateIdError
             If the system id is already used in the park.
         """
-        entity = self._resolve(owner, (Site, Building))
-        if system.serves is not None:
-            if not isinstance(entity, Site):
-                raise ValueError("'serves' only applies to systems owned by a site")
-            served = {b.id for b in entity.iter_buildings()}
-            unknown = [i for i in system.serves if i not in served]
-            if unknown:
-                raise UnknownIdError(f"buildings {unknown} are not in site {entity.id!r}")
+        entity: DescribedEntity = self._resolve(owner, (Site, Building))
         return entity.add_system(system)
 
     def add_meter(self, meter: Meter) -> Meter:
@@ -302,18 +311,17 @@ class BuildingPark(BaseModel):
         DuplicateIdError
             If the meter id is already used in the park.
         """
-        self._check_scope(meter)
+        self._check_scope(meter.id, meter.scope)
         self._register(meter)
         meter._container = self
         self.meters.append(meter)
         return meter
 
-    def _check_scope(self, meter: Meter) -> None:
-        unknown = [
-            i for i in meter.scope if not isinstance(self._index.get(i), Site | Building | System)
-        ]
+    def _check_scope(self, meter_id: str, scope: Iterable[str]) -> None:
+        """Check that every id of ``scope`` is a site, building or system of the park."""
+        unknown = [i for i in scope if not isinstance(self._index.get(i), Site | Building | System)]
         if unknown:
-            raise UnknownIdError(f"meter {meter.id!r}: unknown scope ids {unknown}")
+            raise UnknownIdError(f"meter {meter_id!r}: unknown scope ids {unknown}")
 
     # --- time series --------------------------------------------------------------------------
 
@@ -390,10 +398,22 @@ class BuildingPark(BaseModel):
 
     # --- move / remove ------------------------------------------------------------------------
 
-    def move(self, entity_id: str, new_parent: Site | str | None) -> Site | Building:
+    def move(
+        self, entity_id: str, new_parent: Site | str | None, *, force: bool = False
+    ) -> Site | Building:
         """Move a site or a building under ``new_parent`` (``None``: top level) and return it.
 
         Ids and provenance are kept; inherited values now come from the new parent.
+
+        Parameters
+        ----------
+        entity_id
+            Id of the site or building to move.
+        new_parent
+            New parent site (object or id), or ``None`` for the top level.
+        force
+            Move even if systems of the sites left behind serve moved buildings, removing those
+            buildings from their ``serves``.
 
         Raises
         ------
@@ -401,6 +421,8 @@ class BuildingPark(BaseModel):
             If ``entity_id`` or ``new_parent`` is unknown.
         ValueError
             If a site would be moved inside itself.
+        EntityInUseError
+            If a system of a site left behind serves a moved building and ``force`` is False.
         """
         entity = self._resolve(entity_id, (Site, Building))
         target = None if new_parent is None else self._resolve_site(new_parent)
@@ -410,6 +432,15 @@ class BuildingPark(BaseModel):
             and (target is entity or any(target is s for s in entity.iter_sites()))
         ):
             raise ValueError(f"cannot move {entity.id!r} inside itself")
+        moved = {e.id for e in _walk(entity) if isinstance(e, Building)}
+        stale = _systems_left_serving(entity, target, moved)
+        if stale and not force:
+            raise EntityInUseError(
+                f"{entity.id!r} is served by {sorted(s.id for s in stale)} from a site it leaves; "
+                "use force=True to drop these references"
+            )
+        for system in stale:
+            system.serves = [i for i in system.serves or [] if i not in moved]
         self._take_out(entity)
         if target is None:
             entity._container = self
@@ -527,12 +558,17 @@ class BuildingPark(BaseModel):
         site: Site = self._resolve(ref, (Site,))
         return site
 
-    @staticmethod
-    def _check_class(entity: SourcedModel, expected: type) -> None:
-        if not isinstance(entity, expected):
-            raise TypeError(
-                f"expected an instance of {expected.__name__}, got {type(entity).__name__}"
-            )
+    def _check_classes(self, entity: Site | Building) -> None:
+        """Check that the sites and buildings of the subtree are instances of the park classes."""
+        for item in _walk(entity):
+            if not isinstance(item, Site | Building):
+                continue
+            expected = self.site_cls if isinstance(item, Site) else self.building_cls
+            if not isinstance(item, expected):
+                raise TypeError(
+                    f"{item.id!r}: expected an instance of {expected.__name__}, "
+                    f"got {type(item).__name__}"
+                )
 
 
 def _walk(entity: Entity) -> Iterator[Entity]:
@@ -550,6 +586,24 @@ def _dropper(entity: System | Meter, field: str, ids: set[str]) -> Any:
         setattr(entity, field, [i for i in getattr(entity, field) or [] if i not in ids])
 
     return drop
+
+
+def _systems_left_serving(
+    entity: Site | Building, target: Site | None, moved: set[str]
+) -> list[System]:
+    """Return the systems of the sites ``entity`` leaves that serve a ``moved`` building."""
+    kept = [] if target is None else [target, *target._ancestor_sites()]
+    stale: list[System] = []
+    for site in entity._ancestor_sites():
+        if any(site is k for k in kept):
+            continue  # the moved buildings stay inside this site
+        stale.extend(s for s in site.iter_systems() if s.serves and moved & set(s.serves))
+    return stale
+
+
+def _class_or(value: Any, base: type) -> type:
+    """Return ``value`` if it is a subclass of ``base``, else ``base`` (the field validates it)."""
+    return value if isinstance(value, type) and issubclass(value, base) else base
 
 
 def _as_set(value: Any, enum: type) -> set[Any]:

@@ -71,7 +71,8 @@ class System(SourcedModel):
         Unique id in the park; generated from :attr:`kind` when omitted.
     serves
         For a system owned by a site: ids of the buildings it serves; ``None`` means every
-        building of the site and of its sub-sites. Ignored for a system owned by a building.
+        building of the site and of its sub-sites. Must stay ``None`` for a system owned by a
+        building. Checked when the system is added to its owner and on assignment.
     """
 
     kind: ClassVar[str] = "system"
@@ -98,6 +99,11 @@ class System(SourcedModel):
     @classmethod
     def _check_served_ids(cls, value: list[str] | None) -> list[str] | None:
         return None if value is None else [check_id(v) for v in value]
+
+    def __setattr__(self, name: str, value: Any) -> None:
+        if name == "serves" and self._container is not None:
+            self._container._check_served(value)
+        super().__setattr__(name, value)
 
 
 class Generator(System):

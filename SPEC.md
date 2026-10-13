@@ -136,7 +136,7 @@ Méthodes principales :
 | `add_meter(meter)` | Ajoute un compteur ; les ids du `scope` doivent exister |
 | `get(id)`, `get_by_rnb(rnb_id)` | Recherche ; renvoie `None` si absent. `park[id]` lève `UnknownIdError`, `id in park` teste la présence |
 | `iter_sites()`, `iter_buildings()`, `iter_systems()` | Parcours de tout l'arbre |
-| `move(id, new_parent)` | Déplace un site ou un bâtiment (`new_parent` = site, ou `None` pour le premier niveau) |
+| `move(id, new_parent, force=False)` | Déplace un site ou un bâtiment (`new_parent` = site, ou `None` pour le premier niveau). Lève `EntityInUseError` si un système d'un site quitté dessert un bâtiment déplacé (`serves`), sauf avec `force=True`, qui retire ces bâtiments du `serves` |
 | `remove(id, force=False)` | Supprime une entité (un site avec tout son contenu). Lève une erreur si elle est référencée (`scope` d'un Meter, `serves` d'un système), sauf avec `force=True`, qui retire aussi les références |
 
 > Changement par rapport au draw.io : `municipality`, `country`, `lat` et `lon` sont déplacés vers
@@ -287,8 +287,12 @@ Classe de base commune `System` : `id: str`, `name` (sourcé `str`), `serves: li
 
 - `serves` n'a de sens que pour un système de **site** : c'est la liste des `id` des bâtiments desservis. `None`
   signifie « tous les bâtiments du site et de ses sous-sites ».
-- Un système porté par un bâtiment dessert implicitement ce seul bâtiment.
-- Les ids de `serves` doivent désigner des bâtiments du site ou de ses sous-sites (vérifié par le parc).
+- Un système porté par un bâtiment dessert implicitement ce seul bâtiment : son `serves` doit rester `None`
+  (sinon `ValueError`).
+- Les ids de `serves` doivent désigner des bâtiments du site ou de ses sous-sites (sinon `UnknownIdError`).
+  C'est vérifié par `add_system` (celui du parc comme celui du site ou du bâtiment) et à chaque affectation
+  de `system.serves` sur un système rattaché. Une modification en place (`system.serves.append(...)`) n'est
+  pas contrôlée, ni un `serves` reçu à la construction ou au chargement.
 
 **Generator(System)**, base de `HeatingGenerator`, `CoolingGenerator` et `DHWGenerator` (draw.io :
 HeatingPlant, CoolingPlant, DomesticHotWater) :
@@ -526,7 +530,11 @@ Règles :
   futurs connecteurs RNB, BDNB et DPE passeront aussi par ces méthodes : ils produiront donc des
   `BayonneBuilding` sans rien connaître de Bayonne.
 - `park.add_building(b, site=None)` et `park.add_site(s)` vérifient que l'objet est une instance de la
-  classe configurée.
+  classe configurée, ainsi que tous les sites et bâtiments qu'il contient. `site.add_site` et
+  `site.add_building` font le même contrôle quand le site appartient à un parc, de même que la construction
+  directe `BuildingPark(..., site_cls=..., building_cls=..., sites=[...])`. Dans ce dernier cas, les
+  entités données sous forme de dict sont créées avec ces classes. Une instance d'une autre classe lève
+  `TypeError`.
 - **Chargement** : `BuildingPark.load(path, site_cls=BayonneSite, building_cls=BayonneBuilding)`. Si un
   fichier contient des attributs inconnus de la classe utilisée (par exemple, un parc Bayonne rechargé avec
   `Building`), ils sont **conservés tels quels** et réécrits à la sauvegarde. Un avertissement est émis :
@@ -544,7 +552,7 @@ Règles :
 |---|---|---|
 | `id` | `str` | Identifiant unique (ex. numéro de PDL) |
 | `name` | sourcé `str` | |
-| `scope` | `list[str]` | Ids des entités concernées : sites, bâtiments ou systèmes. Peut être vide (compteur pas encore rattaché, ou après `remove(..., force=True)`) |
+| `scope` | `list[str]` | Ids des entités concernées : sites, bâtiments ou systèmes. Peut être vide (compteur pas encore rattaché, ou après `remove(..., force=True)`). Dans un parc, les ids doivent exister : vérifié par `add_meter` et à chaque affectation de `meter.scope` (pas pour une modification en place) |
 | `energy_type` | sourcé `EnergyType` | Pour un compteur d'énergie |
 | `usage` | sourcé `EndUse` | Usage mesuré |
 | `timestep` | sourcé `str` | Pas de temps nominal (`"10min"`, `"1h"`, `"1D"`…) |
@@ -672,6 +680,11 @@ BuildingPark.json_schema(site_cls=..., building_cls=...) -> dict
   Des classes différentes de celles de la sauvegarde émettent un `ClassMismatchWarning`.
 - Les attributs sourcés n'étant pas des champs Pydantic, le JSON Schema les décrit à part, dans
   `x-bstock-sourced-attributes` : type, unité, héritage et description par classe.
+- Les méthodes Pydantic `model_dump_json` / `model_validate_json` du parc ne sont pas surchargées : elles
+  ignorent les métadonnées (version du format, classes). La docstring de `BuildingPark` renvoie vers
+  `to_json` / `from_json`.
+- `save` modifie le parc : chemins rendus absolus et, avec `include_data=True`, `data_source` remplacée
+  (voir ci-dessous).
 - `site_cls` et `building_cls` sont des champs du parc exclus de la sérialisation. Le nom du parc se passe
   par mot-clé : `BuildingPark(name="Ville de Bayonne", site_cls=..., building_cls=...)`.
 

@@ -89,7 +89,8 @@ class Meter(SourcedModel):
     id
         Unique id in the park (e.g. a delivery point number); generated when omitted.
     scope
-        Ids of the measured entities: sites, buildings or systems.
+        Ids of the measured entities: sites, buildings or systems. In a park, they must exist;
+        this is checked when the meter is added and on assignment.
     channels
         Measured quantities, one column each.
     data_source
@@ -140,6 +141,11 @@ class Meter(SourcedModel):
         if len(set(names)) != len(names):
             raise ValueError(f"channel names must be unique, got {names}")
         return self
+
+    def __setattr__(self, name: str, value: Any) -> None:
+        if name == "scope" and self._container is not None:
+            self._container._check_scope(self.id, value)
+        super().__setattr__(name, value)
 
     def set(self, name: str, value: Any, **provenance: Any) -> Any:
         """Set a sourced attribute (see :meth:`SourcedModel.set`); validates ``timestep``."""

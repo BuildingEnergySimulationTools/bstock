@@ -158,6 +158,47 @@ def test_add_checks_project_class():
         park.add_building(Building(rnb_id=RNB_A))
 
 
+def test_site_methods_check_project_class():
+    park = BuildingPark(name="Bayonne", site_cls=BayonneSite, building_cls=BayonneBuilding)
+    site = park.new_site("s1")
+    with pytest.raises(TypeError, match="BayonneBuilding"):
+        site.add_building(Building(rnb_id=RNB_A))
+    with pytest.raises(TypeError, match="BayonneSite"):
+        site.add_site(Site(id="s2"))
+    assert site.buildings == []
+    assert site.sites == []
+    assert RNB_A not in park
+
+
+def test_add_site_checks_classes_of_subtree():
+    park = BuildingPark(name="Bayonne", site_cls=BayonneSite, building_cls=BayonneBuilding)
+    with pytest.raises(TypeError, match="BayonneBuilding"):
+        park.add_site(BayonneSite(id="s1", buildings=[Building(rnb_id=RNB_A)]))
+    assert "s1" not in park
+
+
+def test_park_built_from_data_uses_project_classes():
+    park = BuildingPark(
+        name="Bayonne",
+        site_cls=BayonneSite,
+        building_cls=BayonneBuilding,
+        sites=[{"id": "s1", "sites": [{"id": "s2", "buildings": [{"rnb_id": RNB_A}]}]}],
+        buildings=[{"id": "b1"}],
+    )
+    assert type(park["s2"]) is BayonneSite
+    assert type(park[RNB_A]) is BayonneBuilding
+    assert type(park["b1"]) is BayonneBuilding
+
+
+def test_park_built_with_other_classes_is_rejected():
+    with pytest.raises(TypeError, match="BayonneBuilding"):
+        BuildingPark(
+            name="Bayonne",
+            building_cls=BayonneBuilding,
+            sites=[Site(id="s1", buildings=[Building(rnb_id=RNB_A)])],
+        )
+
+
 def test_invalid_class_is_rejected():
     with pytest.raises(ValidationError):
         BuildingPark(name="x", building_cls=Site)
@@ -174,6 +215,35 @@ def test_add_shared_system_checks_served_buildings(park):
         park.add_system(HeatingGenerator(serves=["bldg-isolated"]), "site-ecole-A")
     with pytest.raises(ValueError, match="serves"):
         park.add_system(HeatingGenerator(serves=[RNB_A]), RNB_A)
+
+
+@pytest.mark.parametrize(
+    ("owner", "serves", "error"),
+    [
+        ("site-ecole-A", ["bldg-isolated"], UnknownIdError),
+        (GROUP, [RNB_C], UnknownIdError),  # in the parent site, not in the group
+        (RNB_A, [RNB_A], ValueError),
+    ],
+)
+def test_entity_add_system_checks_served_buildings(park, owner, serves, error):
+    entity = park[owner]
+    with pytest.raises(error):
+        entity.add_system(HeatingGenerator(id="plant", serves=serves))
+    assert "plant" not in park
+    assert entity.heating == []
+
+
+def test_serves_assignment_is_checked(park):
+    plant = park.add_system(HeatingGenerator(id="plant", serves=[RNB_A]), "site-ecole-A")
+    with pytest.raises(UnknownIdError):
+        plant.serves = ["bldg-isolated"]
+    assert plant.serves == [RNB_A]
+    plant.serves = [RNB_A, RNB_C]
+    assert plant.serves == [RNB_A, RNB_C]
+    own = park.add_system(HeatingGenerator(id="own"), RNB_A)
+    with pytest.raises(ValueError, match="serves"):
+        own.serves = [RNB_A]
+    assert own.serves is None
 
 
 def test_add_system_to_unknown_owner(park):
@@ -204,6 +274,32 @@ def test_move_site_keeps_its_content(park):
     assert group in park.sites
     assert park[RNB_A].site is group
     assert park[RNB_A].usage is None  # no longer under the client site
+
+
+@pytest.mark.parametrize(
+    ("moved", "new_parent"), [(RNB_A, None), (GROUP, None), (RNB_A, "site-B"), (GROUP, "site-B")]
+)
+def test_move_out_of_serving_site_needs_force(park, moved, new_parent):
+    park.new_site("site-B")
+    plant = park.add_system(HeatingGenerator(id="plant", serves=[RNB_A, RNB_C]), "site-ecole-A")
+    with pytest.raises(EntityInUseError, match="plant"):
+        park.move(moved, new_parent)
+    assert park[RNB_A].site is park[GROUP]
+    assert plant.serves == [RNB_A, RNB_C]
+    park.move(moved, new_parent, force=True)
+    assert plant.serves == [RNB_C]
+
+
+def test_move_inside_serving_site_keeps_references(park):
+    plant = park.add_system(HeatingGenerator(id="plant", serves=[RNB_A]), "site-ecole-A")
+    park.move(RNB_A, "site-ecole-A")
+    assert plant.serves == [RNB_A]
+    assert park[RNB_A].systems("heating") == [plant]
+    park.move(RNB_A, GROUP)
+    group_boiler = park.add_system(HeatingGenerator(id="group-boiler", serves=[RNB_A]), GROUP)
+    park.move(GROUP, None, force=True)  # the group boiler moves with its buildings
+    assert plant.serves == []
+    assert group_boiler.serves == [RNB_A]
 
 
 def test_site_cannot_move_inside_itself(park):

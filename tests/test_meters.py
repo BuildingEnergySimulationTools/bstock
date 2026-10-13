@@ -299,6 +299,21 @@ def test_add_meter_checks_scope_and_id(park):
         park.add_meter(make_meter(RNB_A, ["site-A"]))
 
 
+def test_scope_assignment_is_checked_in_park(park):
+    meter = park.add_meter(make_meter("PDL_1", ["site-A"]))
+    with pytest.raises(UnknownIdError, match="GHOST"):
+        meter.scope = ["GHOST"]
+    assert meter.scope == ["site-A"]
+    meter.scope = [RNB_A, "boiler"]
+    assert meter.scope == [RNB_A, "boiler"]
+
+
+def test_scope_assignment_is_free_outside_park():
+    meter = make_meter("PDL_1", ["site-A"])
+    meter.scope = ["anything"]
+    assert meter.scope == ["anything"]
+
+
 def test_meter_uses_park_priority(park):
     meter = park.add_meter(make_meter("PDL_1", ["site-A"]))
     assert meter.active_source_priority() is park.source_priority
