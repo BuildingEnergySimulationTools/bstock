@@ -20,7 +20,7 @@ from bstock.enums import (
 from bstock.exceptions import DuplicateIdError, IncompleteDataError, UnknownIdError
 from bstock.provenance import COMPUTED_SOURCE, SourcedModel, SourcedValue, sourced
 
-__all__ = ["COMPUTED_SOURCE", "Envelope", "EnvelopeComponent", "Window"]
+__all__ = ["Envelope", "EnvelopeComponent", "Window"]
 
 
 class EnvelopeComponent(SourcedModel):

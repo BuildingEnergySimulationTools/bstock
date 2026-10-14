@@ -22,7 +22,7 @@ from bstock._ids import TIDE_SEPARATOR, check_id, new_id
 from bstock.enums import EndUse, EnergyType
 from bstock.exceptions import DataSourceError, InvalidTagError, TimeSeriesError
 from bstock.provenance import SourcedModel, sourced
-from bstock.sources import DataSource, data_source_from_dict, ensure_time_index
+from bstock.sources import DataSource, _data_source_from_dict, _ensure_time_index
 
 __all__ = ["Channel", "Meter", "tide_column"]
 
@@ -38,7 +38,7 @@ def _check_timestep(value: str) -> str:
 Timestep = Annotated[str, AfterValidator(_check_timestep)]
 """A pandas offset alias such as ``"30min"`` or ``"1h"``."""
 
-AnySource = Annotated[SerializeAsAny[DataSource], BeforeValidator(data_source_from_dict)]
+AnySource = Annotated[SerializeAsAny[DataSource], BeforeValidator(_data_source_from_dict)]
 
 
 def tide_column(name: str, unit: str, bloc: str, sub_bloc: str) -> str:
@@ -204,7 +204,7 @@ class Meter(SourcedModel):
         if frame is None:
             self._data = None
             return
-        frame = ensure_time_index(frame)
+        frame = _ensure_time_index(frame)
         names = self.tide_columns()
         renamed = frame.rename(columns=names)
         expected = list(names.values())

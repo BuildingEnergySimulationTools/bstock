@@ -31,8 +31,10 @@ tests/             # miroir de src/bstock : tests/test_<module>.py
 SPEC.md            # spécification
 ```
 
-- L'API publique est exportée explicitement dans `src/bstock/__init__.py` (`__all__`). Tout le reste est
-  considéré comme interne.
+- L'API publique est exportée explicitement dans `src/bstock/__init__.py` (`__all__`), plus les `__all__`
+  des sous-modules documentés : `bstock.io`, `bstock.export`, `bstock.connectors` et ses modules `rnb`,
+  `bdnb`, `dpe` (SPEC §11). Les `__all__` des autres modules ne listent que des noms réexportés par
+  `bstock`. Tout le reste est considéré comme interne.
 - Les modules privés ou les helpers internes sont préfixés par `_`.
 
 ## Style de code

@@ -1,3 +1,6 @@
+import importlib
+import pkgutil
+
 import pytest
 
 import bstock
@@ -41,6 +44,34 @@ def test_specific_errors_keep_their_builtin_base(error, builtin):
 def test_public_api_is_explicit():
     for name in bstock.__all__:
         assert hasattr(bstock, name)
+
+
+PUBLIC_SUBMODULES = {
+    "bstock.io",
+    "bstock.export",
+    "bstock.connectors",
+    "bstock.connectors.rnb",
+    "bstock.connectors.bdnb",
+    "bstock.connectors.dpe",
+}
+OTHER_MODULES = sorted(
+    info.name
+    for info in pkgutil.walk_packages(bstock.__path__, "bstock.")
+    if info.name not in PUBLIC_SUBMODULES and not info.name.rsplit(".", 1)[-1].startswith("_")
+)
+
+
+@pytest.mark.parametrize("module_name", OTHER_MODULES)
+def test_other_modules_only_list_names_exported_by_bstock(module_name):
+    module = importlib.import_module(module_name)
+    assert set(getattr(module, "__all__", [])) <= set(bstock.__all__)
+
+
+@pytest.mark.parametrize("module_name", sorted(PUBLIC_SUBMODULES))
+def test_public_submodules_define_their_api(module_name):
+    module = importlib.import_module(module_name)
+    for name in module.__all__:
+        assert hasattr(module, name)
 
 
 def test_unmapped_value_warning_is_a_bstock_warning():

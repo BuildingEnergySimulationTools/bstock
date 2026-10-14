@@ -39,13 +39,17 @@ class _StrEnum(StrEnum):
 
 
 class BuildingUsage(_StrEnum):
-    """Main usage of a building or site (BDNB ``usage_principal_bdnb_open``)."""
+    """Main usage of a building or site (BDNB ``usage_principal_bdnb_open``).
+
+    ``PRIMARY``, ``SECONDARY`` and ``TERTIARY`` are the economic sectors: agriculture, industry and
+    services (offices, schools, shops...).
+    """
 
     RESIDENTIAL_INDIVIDUAL = auto()
     RESIDENTIAL_COLLECTIVE = auto()
-    TERTIARY = auto()
-    SECONDARY = auto()
-    PRIMARY = auto()
+    TERTIARY = auto()  # services
+    SECONDARY = auto()  # industry, not a second home
+    PRIMARY = auto()  # agriculture
     OUTBUILDING = auto()  # "Dépendance"
     UNDETERMINED = auto()
 

@@ -368,7 +368,7 @@ tenir compte de la casse (`Orientation("N") is Orientation.N`).
 
 | Enum | Valeurs |
 |---|---|
-| `BuildingUsage` | `RESIDENTIAL_INDIVIDUAL`, `RESIDENTIAL_COLLECTIVE`, `TERTIARY`, `SECONDARY`, `PRIMARY`, `OUTBUILDING`, `UNDETERMINED` (les 7 valeurs de `usage_principal_bdnb_open`) |
+| `BuildingUsage` | `RESIDENTIAL_INDIVIDUAL`, `RESIDENTIAL_COLLECTIVE`, `TERTIARY`, `SECONDARY`, `PRIMARY`, `OUTBUILDING`, `UNDETERMINED` (les 7 valeurs de `usage_principal_bdnb_open` ; `PRIMARY`, `SECONDARY`, `TERTIARY` sont les secteurs économiques : agriculture, industrie, services) |
 | `EnergyType` | `ELECTRICITY`, `NATURAL_GAS`, `FUEL_OIL`, `LPG` (GPL, propane, butane), `WOOD`, `WOOD_LOGS`, `WOOD_PELLETS`, `WOOD_CHIPS`, `COAL`, `DISTRICT_HEATING`, `DISTRICT_COOLING`, `SOLAR`, `OTHER_FOSSIL`, `OTHER` |
 | `GeneratorTechnology` | `BOILER` (type inconnu), `BOILER_STANDARD`, `BOILER_LOW_TEMPERATURE`, `BOILER_CONDENSING`, `ELECTRIC_BOILER`, `ELECTRIC_RESISTANCE` (effet Joule), `ELECTRIC_STORAGE_HEATER`, `HEAT_PUMP` (type inconnu), `HEAT_PUMP_AIR_AIR`, `HEAT_PUMP_AIR_WATER`, `HEAT_PUMP_WATER_WATER`, `HEAT_PUMP_GROUND`, `HEAT_PUMP_GAS`, `HEAT_PUMP_HYBRID`, `STOVE_INSERT`, `GAS_RADIATOR`, `WARM_AIR_GENERATOR`, `DISTRICT_SUBSTATION`, `SOLAR_THERMAL`, `WATER_HEATER` (chauffe-eau non thermodynamique, type inconnu), `ELECTRIC_WATER_TANK`, `INSTANT_WATER_HEATER`, `THERMODYNAMIC_WATER_HEATER`, `CHILLER`, `OTHER` |
 | `Inertia` | `LIGHT`, `MEDIUM`, `HEAVY`, `VERY_HEAVY` (classes du DPE) |
@@ -1092,6 +1092,10 @@ examples/bayonne.py    # exemple de bout en bout
 scripts/               # outils de maintenance (régénération de dpe_generators.csv)
 ```
 
+- **API publique** : `bstock.__all__`, plus les `__all__` des sous-modules documentés `bstock.io`,
+  `bstock.export`, `bstock.connectors`, `bstock.connectors.rnb`, `bstock.connectors.bdnb` et
+  `bstock.connectors.dpe`. Les `__all__` des autres modules ne listent que des noms réexportés par
+  `bstock` ; leurs autres noms, et les modules préfixés par `_`, sont internes.
 - Python ≥ 3.11.
 - Dépendances : `pydantic>=2`, `pandas`, `pyarrow` (Parquet). Extras : `[plot]` (plotly, seule lib de
   graphiques), `[connectors]` (requests), `[geo]` (shapely, geopandas, pyproj), `[dev]` (pytest, ruff). tide n'est **pas** une dépendance : bstock

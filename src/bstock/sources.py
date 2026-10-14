@@ -21,8 +21,6 @@ __all__ = [
     "DataSource",
     "ParquetSource",
     "UnknownSource",
-    "data_source_from_dict",
-    "ensure_time_index",
 ]
 
 
@@ -94,7 +92,7 @@ class DataSource(BaseModel):
             frame = self.read()
         except (OSError, ValueError, KeyError) as error:
             raise DataSourceError(f"cannot load {self!r}: {error}") from error
-        return ensure_time_index(
+        return _ensure_time_index(
             frame, tz=self.tz, ambiguous=self.tz_ambiguous, nonexistent=self.tz_nonexistent
         )
 
@@ -166,7 +164,7 @@ class UnknownSource(DataSource):
         )
 
 
-def data_source_from_dict(value: Any) -> Any:
+def _data_source_from_dict(value: Any) -> Any:
     """Build the source registered for ``value["type"]``, or an :class:`UnknownSource`."""
     if isinstance(value, dict):
         cls = DataSource.registry.get(value.get("type", ""), UnknownSource)
@@ -174,7 +172,7 @@ def data_source_from_dict(value: Any) -> Any:
     return value
 
 
-def ensure_time_index(
+def _ensure_time_index(
     frame: pd.DataFrame,
     *,
     tz: str | None = None,
