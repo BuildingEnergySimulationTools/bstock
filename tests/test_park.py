@@ -108,6 +108,15 @@ def test_duplicate_rnb_id_is_rejected(park):
         park.new_building(RNB_A, id="other-id")
 
 
+def test_rnb_lookup_and_change_accept_any_form(park):
+    a = park[RNB_A]
+    assert park.get_by_rnb("a1b2-c3d4-e5f6") is a
+    a.rnb_id = "zzzz-zzzz-zzzz"
+    assert park.get_by_rnb("ZZZZZZZZZZZZ") is a
+    with pytest.raises(DuplicateIdError):
+        park.new_building("b1b2c3d4e5f6", id="other-id")
+
+
 def test_changing_rnb_id_keeps_index_consistent(park):
     a = park[RNB_A]
     a.rnb_id = "ZZZZZZZZZZZZ"

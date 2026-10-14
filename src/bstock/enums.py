@@ -2,13 +2,15 @@
 
 All enums are :class:`enum.StrEnum` whose value is the lower-case member name, e.g.
 ``EnergyType.NATURAL_GAS == "natural_gas"``. They serialise to that value, and every API
-accepts either the member or its string value.
+accepts either the member or its string value, in any case (``Orientation("N")`` is
+``Orientation.N``).
 
 Source labels (BDNB, DPE) are translated to these values by the connectors; the mapping
 tables are in SPEC appendix A.
 """
 
 from enum import StrEnum, auto
+from typing import Any, Self
 
 __all__ = [
     "Adjacency",
@@ -26,7 +28,17 @@ __all__ = [
 ]
 
 
-class BuildingUsage(StrEnum):
+class _StrEnum(StrEnum):
+    """StrEnum whose lookup by value ignores the case."""
+
+    @classmethod
+    def _missing_(cls, value: Any) -> Self | None:
+        if isinstance(value, str):
+            return next((m for m in cls if m.value == value.lower()), None)
+        return None
+
+
+class BuildingUsage(_StrEnum):
     """Main usage of a building or site (BDNB ``usage_principal_bdnb_open``)."""
 
     RESIDENTIAL_INDIVIDUAL = auto()
@@ -38,7 +50,7 @@ class BuildingUsage(StrEnum):
     UNDETERMINED = auto()
 
 
-class EnergyType(StrEnum):
+class EnergyType(_StrEnum):
     """Final energy carrier consumed by a generator or measured by a meter."""
 
     ELECTRICITY = auto()
@@ -57,7 +69,7 @@ class EnergyType(StrEnum):
     OTHER = auto()
 
 
-class GeneratorTechnology(StrEnum):
+class GeneratorTechnology(_StrEnum):
     """Technology of a heating, cooling or domestic hot water generator.
 
     It tells how to read the generator performance ratios: a heat pump ratio is expected above 1, a
@@ -91,7 +103,7 @@ class GeneratorTechnology(StrEnum):
     OTHER = auto()
 
 
-class Inertia(StrEnum):
+class Inertia(_StrEnum):
     """Thermal inertia class of a building (DPE ``classe_inertie``)."""
 
     LIGHT = auto()
@@ -100,7 +112,7 @@ class Inertia(StrEnum):
     VERY_HEAVY = auto()
 
 
-class InsulationLevel(StrEnum):
+class InsulationLevel(_StrEnum):
     """Insulation quality of an envelope component (DPE ``qualite_isolation_*``)."""
 
     INSUFFICIENT = auto()
@@ -109,7 +121,7 @@ class InsulationLevel(StrEnum):
     VERY_GOOD = auto()
 
 
-class GlazingType(StrEnum):
+class GlazingType(_StrEnum):
     """Glazing of a window (DPE ``type_vitrage``)."""
 
     SINGLE = auto()
@@ -120,7 +132,7 @@ class GlazingType(StrEnum):
     POLYCARBONATE = auto()
 
 
-class FrameType(StrEnum):
+class FrameType(_StrEnum):
     """Window frame material (DPE ``type_materiaux_menuiserie``)."""
 
     WOOD = auto()
@@ -131,7 +143,7 @@ class FrameType(StrEnum):
     OTHER = auto()
 
 
-class ComponentKind(StrEnum):
+class ComponentKind(_StrEnum):
     """Kind of envelope component."""
 
     WALL = auto()
@@ -142,7 +154,7 @@ class ComponentKind(StrEnum):
     THERMAL_BRIDGE = auto()
 
 
-class Orientation(StrEnum):
+class Orientation(_StrEnum):
     """Orientation of an envelope component."""
 
     N = auto()
@@ -156,7 +168,7 @@ class Orientation(StrEnum):
     HORIZONTAL = auto()
 
 
-class Adjacency(StrEnum):
+class Adjacency(_StrEnum):
     """What lies on the other side of an envelope component."""
 
     EXTERIOR = auto()
@@ -165,7 +177,7 @@ class Adjacency(StrEnum):
     ADJACENT_BUILDING = auto()
 
 
-class SystemKind(StrEnum):
+class SystemKind(_StrEnum):
     """Kind of technical system; also the name of the matching list on sites and buildings.
 
     ``DHW`` is domestic hot water and ``PV`` photovoltaics, the usual abbreviations of the field.
@@ -178,7 +190,7 @@ class SystemKind(StrEnum):
     PV = auto()
 
 
-class EndUse(StrEnum):
+class EndUse(_StrEnum):
     """End use measured by a meter."""
 
     HEATING = auto()

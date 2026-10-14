@@ -161,6 +161,8 @@ class Envelope(SourcedModel):
         orientation: Orientation | str | None = None,
     ) -> list[EnvelopeComponent]:
         """Return the components matching ``kind`` and ``orientation`` (``None`` matches all)."""
+        kind = None if kind is None else ComponentKind(kind)
+        orientation = None if orientation is None else Orientation(orientation)
         return [
             c
             for c in self.components

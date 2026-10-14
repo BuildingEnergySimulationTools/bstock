@@ -37,6 +37,11 @@ def check_id(value: str) -> str:
     return value
 
 
+def normalize_rnb_id(rnb_id: str) -> str:
+    """Return ``rnb_id`` in the RNB canonical form: upper case, without dashes or spaces."""
+    return rnb_id.replace("-", "").replace(" ", "").upper()
+
+
 def check_external_id(kind: str, value: str | None) -> str | None:
     """Return ``value``, warning if it does not match the expected format of ``kind``.
 

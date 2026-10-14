@@ -13,6 +13,7 @@ import pandas as pd
 from pydantic import BaseModel, ConfigDict, Field, PrivateAttr, ValidationInfo, model_validator
 from pydantic.json_schema import SkipJsonSchema
 
+from bstock._ids import normalize_rnb_id
 from bstock.building import Building
 from bstock.description import DescribedEntity
 from bstock.enums import EndUse, EnergyType, SystemKind
@@ -257,8 +258,8 @@ class BuildingPark(BaseModel):
         return entity_id in self._index
 
     def get_by_rnb(self, rnb_id: str) -> Building | None:
-        """Return the building whose RNB id is ``rnb_id``, or ``None``."""
-        return self._rnb_index.get(rnb_id)
+        """Return the building whose RNB id is ``rnb_id`` (any case, with dashes), or ``None``."""
+        return self._rnb_index.get(normalize_rnb_id(rnb_id))
 
     def iter_sites(self, *, recursive: bool = True) -> Iterator[Site]:
         """Iterate over the sites of the park: every site, depth first, or the top-level ones."""

@@ -39,6 +39,15 @@ def test_building_id_defaults_to_rnb_id():
     assert Building(rnb_id=RNB_A).id == RNB_A
 
 
+@pytest.mark.parametrize("raw", ["a1b2c3d4e5f6", "A1B2-C3D4-E5F6", " a1b2 c3d4 e5f6 "])
+def test_rnb_id_is_normalized(raw):
+    building = Building(rnb_id=raw)
+    assert building.rnb_id == RNB_A
+    assert building.id == RNB_A
+    building.rnb_id = raw.replace("a1", "b1").replace("A1", "B1")
+    assert building.rnb_id == RNB_B
+
+
 def test_building_without_rnb_gets_generated_id():
     building = Building()
     assert building.id.startswith("bldg-")

@@ -6,7 +6,7 @@ from typing import Any
 
 from pydantic import field_validator, model_validator
 
-from bstock._ids import check_external_id, new_id
+from bstock._ids import check_external_id, new_id, normalize_rnb_id
 from bstock.description import DescribedEntity
 from bstock.enums import SystemKind
 from bstock.systems import System
@@ -23,7 +23,8 @@ class Building(DescribedEntity):
         Stable internal id. Defaults to ``rnb_id`` when known at creation, else a generated id. It
         never changes, even if ``rnb_id`` is corrected later.
     rnb_id
-        RNB identifier (12 characters), unique in the park.
+        RNB identifier (12 characters), unique in the park. Given in any case, with or without
+        dashes or spaces, it is stored in the RNB canonical form (``"A1B2C3D4E5F6"``).
     bdnb_batiment_groupe_id
         BDNB group id, when the building is alone in its group (otherwise the group is a site).
     bdnb_batiment_construction_id
@@ -37,14 +38,18 @@ class Building(DescribedEntity):
     @model_validator(mode="before")
     @classmethod
     def _default_id(cls, data: Any) -> Any:
-        if isinstance(data, dict) and not data.get("id"):
+        if not isinstance(data, dict):
+            return data
+        if isinstance(data.get("rnb_id"), str):
+            data = {**data, "rnb_id": normalize_rnb_id(data["rnb_id"])}
+        if not data.get("id"):
             data = {**data, "id": data.get("rnb_id") or new_id("bldg")}
         return data
 
     @field_validator("rnb_id")
     @classmethod
     def _check_rnb_id(cls, value: str | None) -> str | None:
-        return check_external_id("rnb", value)
+        return check_external_id("rnb", None if value is None else normalize_rnb_id(value))
 
     @field_validator("bdnb_batiment_groupe_id")
     @classmethod
@@ -57,6 +62,8 @@ class Building(DescribedEntity):
         return check_external_id("bdnb_batiment_construction", value)
 
     def __setattr__(self, name: str, value: Any) -> None:
+        if name == "rnb_id" and isinstance(value, str):
+            value = normalize_rnb_id(value)
         if name == "rnb_id" and value != self.rnb_id:
             park = self.park
             if park is not None:

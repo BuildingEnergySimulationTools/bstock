@@ -25,6 +25,20 @@ def test_member_and_string_are_interchangeable(enum_cls):
         assert adapter.validate_python(member) is member
 
 
+@pytest.mark.parametrize("enum_cls", ALL_ENUMS)
+def test_lookup_ignores_case(enum_cls):
+    adapter = TypeAdapter(enum_cls)
+    for member in enum_cls:
+        assert enum_cls(member.name) is member
+        assert adapter.validate_python(member.name) is member
+        assert adapter.validate_json(json.dumps(member.name)) is member
+
+
+def test_unknown_value_is_still_rejected():
+    with pytest.raises(ValueError, match="north"):
+        enums.Orientation("north")
+
+
 def test_serialises_to_string_value():
     class Model(BaseModel):
         energy: enums.EnergyType

@@ -14,6 +14,7 @@ from typing import TYPE_CHECKING, Any, Literal
 import pandas as pd
 
 from bstock._geometry import validate_footprint
+from bstock._ids import normalize_rnb_id
 from bstock.building import Building
 from bstock.connectors._http import HttpClient
 from bstock.connectors._report import ImportReport
@@ -108,11 +109,6 @@ class RnbClient:
 
 
 # --- correspondences --------------------------------------------------------------------------
-
-
-def normalize_rnb_id(rnb_id: str) -> str:
-    """Return ``rnb_id`` in the RNB canonical form: upper case, without dashes or spaces."""
-    return rnb_id.replace("-", "").replace(" ", "").upper()
 
 
 def format_address(address: dict[str, Any]) -> str | None:

@@ -105,6 +105,10 @@ def test_find_components(detailed):
     assert len(detailed.find_components()) == 6
 
 
+def test_find_components_ignores_case(detailed):
+    assert [c.id for c in detailed.find_components(kind="WALL", orientation="N")] == ["wall-n"]
+
+
 # --- computations -----------------------------------------------------------------------------
 
 

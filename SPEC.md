@@ -181,7 +181,7 @@ retiré (`scope` d'un Meter, `serves` d'un système). Pour retirer aussi ces ré
 | Attribut | Type | Unité | Description |
 |---|---|---|---|
 | `id` | `str` | | Id interne stable (§3.2) |
-| `rnb_id` | `str \| None` | | Identifiant RNB, unique dans le parc |
+| `rnb_id` | `str \| None` | | Identifiant RNB, unique dans le parc. Stocké sous forme canonique (majuscules, sans tirets ni espaces), quelle que soit la forme donnée |
 | `bdnb_batiment_groupe_id` | `str \| None` | | Groupe BDNB, quand le bâtiment est seul dans son groupe |
 | `bdnb_batiment_construction_id` | `str \| None` | | Construction BDNB (c'est elle que référence le RNB) |
 | `dpe_ids` | `list[str]` | | Numéros des DPE rattachés |
@@ -363,7 +363,8 @@ instantanée ou inconnue (open data DPE : `volume_stockage_generateur_n*_ecs_n1`
 Les enums sont **compactes et en anglais**. Les connecteurs traduisent les libellés des sources (tables
 de correspondance en annexe A), et le libellé d'origine est conservé dans `SourcedValue.raw` (§4.1).
 Ce sont des `StrEnum` dont la valeur est le nom en minuscules (`EnergyType.NATURAL_GAS == "natural_gas"`).
-Elles sont sérialisées par cette valeur, et les API acceptent indifféremment le membre ou la chaîne.
+Elles sont sérialisées par cette valeur, et les API acceptent indifféremment le membre ou la chaîne, sans
+tenir compte de la casse (`Orientation("N") is Orientation.N`).
 
 | Enum | Valeurs |
 |---|---|
@@ -852,7 +853,7 @@ géographiques (§9). Un extra manquant lève `MissingDependencyError` avec la c
   `MultiPolygon`), première adresse → `address`, `municipality`, `insee_code`, identifiant externe BDNB →
   `bdnb_batiment_construction_id` s'il n'est pas déjà renseigné (ces liens datent de 2023 : la BDNB, qui
   référence elle-même le `rnb_id`, fait foi).
-- Un `rnb_id` est normalisé (majuscules, sans tirets) avant comparaison.
+- Un `rnb_id` est normalisé (majuscules, sans tirets) avant comparaison, comme dans le modèle (§3.6).
 - Signalés dans le rapport, sans rien modifier ni supprimer dans le parc : id inconnu du RNB, bâtiment
   démoli (`status`), id désactivé après une fusion ou une scission (`is_active: false` ; le rapport
   donne le ou les ids successeurs lus dans l'historique du bâtiment).
