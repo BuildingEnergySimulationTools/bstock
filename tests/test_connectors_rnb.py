@@ -145,6 +145,13 @@ def test_unknown_id_is_reported_not_created(park, client):
     assert list(park.iter_buildings()) == []
 
 
+def test_unknown_id_of_existing_building_is_reported_under_its_id(park, client):
+    park.new_building(id="BAY-001", rnb_id="ZZZZZZZZZZZZ")
+    report = rnb.add_buildings(park, ["ZZZZZZZZZZZZ"], client=client)
+    assert report.not_found == ["BAY-001"]
+    assert "ZZZZZZZZZZZZ" in report.messages["BAY-001"][0]
+
+
 def test_demolished_building_is_reported_and_left_aside(park, client):
     report = rnb.add_buildings(park, [DEMOLISHED], client=client)
     assert DEMOLISHED not in park

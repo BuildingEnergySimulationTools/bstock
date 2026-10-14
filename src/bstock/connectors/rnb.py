@@ -24,6 +24,7 @@ from bstock.provenance import SourcedValue
 
 if TYPE_CHECKING:
     from bstock.park import BuildingPark
+    from bstock.site import Site
 
 __all__ = [
     "SOURCE",
@@ -200,7 +201,7 @@ def successors(history: list[dict[str, Any]]) -> tuple[str | None, list[str]]:
 def add_buildings(
     park: BuildingPark,
     rnb_ids: Iterable[str],
-    parent: Any | None = None,
+    parent: Site | str | None = None,
     *,
     client: RnbClient | None = None,
 ) -> ImportReport:
@@ -223,8 +224,9 @@ def add_buildings(
     Returns
     -------
     ImportReport
-        ``created`` and ``enriched`` building ids, ``not_found`` RNB ids, and a message for the
-        demolished and inactive ids (with their successors), which are left aside.
+        ``created`` and ``enriched`` building ids; ``not_found`` and messages (demolished and
+        inactive ids, with their successors, which are left aside) under the building id when the
+        building is in the park, else under the RNB id.
 
     Raises
     ------
@@ -238,10 +240,11 @@ def add_buildings(
     client = client or RnbClient()
     report = ImportReport(source=SOURCE)
     for rnb_id in dict.fromkeys(normalize_rnb_id(i) for i in rnb_ids):
-        record = _fetch_usable(client, rnb_id, report)
+        existing = _find(park, rnb_id)
+        record = _fetch_usable(client, rnb_id, report, None if existing is None else existing.id)
         if record is None:
             continue
-        building = _find(park, record["rnb_id"])
+        building = existing or _find(park, record["rnb_id"])
         if building is None:
             building = park.new_building(rnb_id=record["rnb_id"], parent=parent)
             _apply(building, record)
@@ -307,6 +310,9 @@ def suggest_matches(
 ) -> pd.DataFrame:
     """Propose RNB buildings for park buildings that have no ``rnb_id`` (SPEC §8.3).
 
+    Unlike the other connector functions, which return an :class:`ImportReport`, this returns a
+    table of proposals to review: the user validates them and sets ``building.rnb_id``.
+
     Parameters
     ----------
     park
@@ -321,7 +327,8 @@ def suggest_matches(
         Search radius around the point, in m (at most 1000).
     assign
         ``"unique"`` sets ``rnb_id`` when a building has exactly one candidate that no other park
-        building uses. ``None`` (default) changes nothing.
+        building uses. ``None`` (default) changes nothing. A string rather than a boolean, so that
+        other assignment strategies can be added later.
     client
         RNB client; a default one is created when omitted.
 

@@ -838,7 +838,10 @@ géographiques (§9). Un extra manquant lève `MissingDependencyError` avec la c
   n'est pas posée ; un `UnmappedValueWarning` cite le libellé, et `raw` le conserve.
 - **Rapport** : les fonctions de haut niveau renvoient un `ImportReport` (ids créés, enrichis, non
   trouvés, ambigus, et un message par id), avec `report.to_dataframe()`. Les cas attendus (bâtiment
-  absent de la source, DPE d'appartement ignoré) y figurent au lieu d'émettre des avertissements.
+  absent de la source, DPE d'appartement ignoré) y figurent au lieu d'émettre des avertissements. Les ids
+  sont ceux des entités du parc ; un id externe sans entité correspondante (RNB id inconnu passé à
+  `add_buildings`) figure sous cet id externe. `report.add()` et `report.note()` restent publics pour les
+  connecteurs écrits par un projet.
 - **Erreurs** : une erreur HTTP persistante ou une réponse inattendue lève `ConnectorError`. Les erreurs
   429 et 5xx sont réessayées avec attente avant d'abandonner.
 - **Pas de cache** dans bstock : on sauvegarde le parc enrichi, ou on passe au client sa propre session
@@ -870,6 +873,8 @@ l'emprise) ou score de géocodage de l'adresse, adresse RNB. L'utilisateur valid
 `building.rnb_id`. Aucune affectation automatique, sauf `assign="unique"` : le `rnb_id` est posé quand il
 n'y a qu'un candidat (dans le rayon, ou à l'adresse). Un `rnb_id` déjà utilisé dans le parc est signalé
 mais jamais affecté. Une valeur invalide de `by`, `radius` ou `assign` lève `InvalidArgumentError`.
+Contrairement aux autres fonctions des connecteurs, le résultat est un tableau de propositions à examiner,
+pas un `ImportReport`. `assign` est une chaîne et non un booléen pour accueillir d'autres stratégies.
 
 Précisions d'implémentation :
 - les candidats RNB n'ont pas de `date` (la réponse ne date pas l'information) ; `ref` = `rnb_id`, et le

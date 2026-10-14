@@ -19,6 +19,13 @@ class ImportReport(BaseModel):
     Expected cases (a building absent from the source, an apartment DPE ignored...) are recorded
     here rather than emitted as warnings.
 
+    Every id is the id of a park entity, except for an external id (e.g. an RNB id given to
+    ``rnb.add_buildings``) that matches no entity of the park: the external id is used then. The
+    messages always cite the external id concerned.
+
+    :meth:`add` and :meth:`note` fill the report; a project writing its own connector (client
+    files...) can use them to report the same way.
+
     Parameters
     ----------
     source
@@ -28,7 +35,7 @@ class ImportReport(BaseModel):
     enriched
         Ids of the entities that received values.
     not_found
-        Ids (entity or external) absent from the source.
+        Ids absent from the source (entity ids, or external ids without entity).
     ambiguous
         Ids for which the source gave several candidates and nothing was done.
     messages
