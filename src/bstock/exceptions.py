@@ -26,7 +26,11 @@ class InvalidTagError(BstockError, ValueError):
 
 
 class UnknownKindError(BstockError, ValueError):
-    """A system kind is not one of :class:`~bstock.enums.SystemKind`."""
+    """A kind argument is not one of the accepted values.
+
+    For example a system kind outside :class:`~bstock.enums.SystemKind`, or an export kind other
+    than ``"building"`` and ``"site"``.
+    """
 
 
 class HierarchyError(BstockError, ValueError):

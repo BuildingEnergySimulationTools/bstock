@@ -945,8 +945,10 @@ park.to_geoparquet("batiments.parquet", kind="building", geometry="footprint")
 
 - Une ligne par entité, indexée par `id`. Colonnes : `rnb_id`, identifiants BDNB, `dpe_ids`,
   `parent_id`, puis la **valeur effective** de chaque attribut sourcé, héritage compris, y compris les
-  attributs ajoutés par une sous-classe projet. Les enums sont rendues par leur valeur (chaîne),
-  `footprint` est exclu de `to_dataframe`.
+  attributs ajoutés par une sous-classe projet. Les enums sont rendues par leur valeur (chaîne), les
+  listes restent des listes, les attributs entiers sont en `Int64` (nullable) et une valeur absente est
+  manquante au sens de pandas (`pd.isna`). `footprint` est exclu de `to_dataframe`. Un autre `kind`
+  lève `UnknownKindError`.
 - `provenance=True` ajoute pour chaque attribut `<attr>_source` (source de la valeur retenue) et
   `<attr>_provider` (id de l'entité qui la fournit, différent de la ligne si elle est héritée).
 - `to_geodataframe` utilise `footprint` (`geometry="footprint"`) ou le point `lat` / `lon`

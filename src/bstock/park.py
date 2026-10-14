@@ -5,7 +5,7 @@ from __future__ import annotations
 import warnings
 from collections.abc import Iterable, Iterator
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 import pandas as pd
 from pydantic import BaseModel, ConfigDict, Field, PrivateAttr, ValidationInfo, model_validator
@@ -150,6 +150,19 @@ class BuildingPark(BaseModel):
         from bstock import io  # circular import
 
         return io.json_schema(site_cls=site_cls, building_cls=building_cls)
+
+    # --- exports (implemented in bstock.export) -------------------------------------------------
+
+    def to_dataframe(
+        self, kind: Literal["building", "site"] = "building", *, provenance: bool = False
+    ) -> pd.DataFrame:
+        """Return one row per building (or site) with the effective attribute values (SPEC §9).
+
+        See :func:`bstock.export.to_dataframe`.
+        """
+        from bstock import export  # circular import
+
+        return export.to_dataframe(self, kind, provenance=provenance)
 
     # --- lookup -------------------------------------------------------------------------------
 

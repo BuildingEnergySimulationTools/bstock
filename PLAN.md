@@ -159,12 +159,12 @@ inconnus, `ImportReport`, erreurs, pas de cache, format JSON inchangé).
       valeur de référence (écart < 0,1 %), priorité `computed` vs `bdnb`
 
 ## Étape 13 — Export tabulaire
-- [ ] `park.to_dataframe(kind="building" | "site", provenance=False)` (module `export.py`) : une ligne
+- [x] `park.to_dataframe(kind="building" | "site", provenance=False)` (module `export.py`) : une ligne
       par entité indexée par `id`, colonnes `rnb_id`, ids BDNB, `dpe_ids`, `parent_id`, valeurs
       effectives des attributs sourcés (héritage compris, y compris les champs d'une sous-classe projet)
-- [ ] `provenance=True` : colonnes `<attr>_source` et `<attr>_provider`
-- [ ] Types : enums en chaînes, listes conservées, `footprint` exclu
-- [ ] Tests : sous-classe projet, héritage, provenance, parc vide
+- [x] `provenance=True` : colonnes `<attr>_source` et `<attr>_provider`
+- [x] Types : enums en chaînes, listes conservées, `footprint` exclu
+- [x] Tests : sous-classe projet, héritage, provenance, parc vide
 
 ## Étape 14 — Socle des connecteurs
 - [ ] Extras `[connectors]` (`requests>=2`) et `[geo]` (`shapely>=2`, `geopandas>=1`, `pyproj>=3`) dans
