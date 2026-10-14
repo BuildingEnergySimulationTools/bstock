@@ -8,16 +8,29 @@ a new response no longer produces are removed (or kept and reported when a meter
 from __future__ import annotations
 
 import re
-from collections.abc import Mapping, Sequence
+from collections.abc import Iterable, Iterator, Mapping, Sequence
+from typing import TYPE_CHECKING
 
+from bstock.building import Building
 from bstock.connectors._report import ImportReport
 from bstock.description import DescribedEntity
 from bstock.enums import ComponentKind, SystemKind
 from bstock.envelope import Envelope, EnvelopeComponent, Window
+from bstock.exceptions import UnknownIdError
 from bstock.provenance import SourcedModel, SourcedValue
 from bstock.systems import SYSTEM_CLASSES, System
 
-__all__ = ["component_id", "put", "sync_components", "sync_systems", "system_id"]
+if TYPE_CHECKING:
+    from bstock.park import BuildingPark
+
+__all__ = [
+    "component_id",
+    "put",
+    "select_buildings",
+    "sync_components",
+    "sync_systems",
+    "system_id",
+]
 
 Candidates = Mapping[str, SourcedValue]
 """Candidates produced by a correspondence function, by sourced attribute name."""
@@ -157,3 +170,23 @@ def sync_components(
         if kind not in produced and cid in existing:
             envelope.remove_component(cid)
     return components
+
+
+def select_buildings(
+    park: BuildingPark, buildings: Iterable[Building | str] | None
+) -> Iterator[Building]:
+    """Yield the requested buildings, or every building with an ``rnb_id`` when ``None``.
+
+    Raises
+    ------
+    UnknownIdError
+        If an id is not a building of the park.
+    """
+    if buildings is None:
+        yield from (b for b in park.iter_buildings() if b.rnb_id)
+        return
+    for item in buildings:
+        building = park[item] if isinstance(item, str) else item
+        if not isinstance(building, Building):
+            raise UnknownIdError(f"{item!r} is not a building of the park")
+        yield building

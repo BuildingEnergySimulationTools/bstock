@@ -17,8 +17,8 @@ from bstock._geometry import validate_footprint
 from bstock.building import Building
 from bstock.connectors._http import HttpClient
 from bstock.connectors._report import ImportReport
-from bstock.connectors._sync import put
-from bstock.exceptions import ConnectorError, UnknownIdError
+from bstock.connectors._sync import put, select_buildings
+from bstock.exceptions import ConnectorError
 from bstock.provenance import SourcedValue
 
 if TYPE_CHECKING:
@@ -286,7 +286,7 @@ def enrich(
     """
     client = client or RnbClient()
     report = ImportReport(source=SOURCE)
-    for building in _select(park, buildings):
+    for building in select_buildings(park, buildings):
         if not building.rnb_id:
             report.note(building.id, "no rnb_id: use rnb.suggest_matches")
             continue
@@ -354,7 +354,7 @@ def suggest_matches(
     targets = (
         [b for b in park.iter_buildings() if not b.rnb_id]
         if buildings is None
-        else list(_select(park, buildings))
+        else list(select_buildings(park, buildings))
     )
     rows: list[dict[str, Any]] = []
     for building in targets:
@@ -410,17 +410,6 @@ def _find(park: BuildingPark, rnb_id: str) -> Building | None:
         (b for b in park.iter_buildings() if b.rnb_id and normalize_rnb_id(b.rnb_id) == target),
         None,
     )
-
-
-def _select(park: BuildingPark, buildings: Iterable[Building | str] | None) -> Iterator[Building]:
-    if buildings is None:
-        yield from (b for b in park.iter_buildings() if b.rnb_id)
-        return
-    for item in buildings:
-        building = park[item] if isinstance(item, str) else item
-        if not isinstance(building, Building):
-            raise UnknownIdError(f"{item!r} is not a building of the park")
-        yield building
 
 
 def _candidates(

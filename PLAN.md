@@ -213,22 +213,22 @@ inconnus, `ImportReport`, erreurs, pas de cache, format JSON inchangé).
       `network`
 
 ## Étape 17 — Connecteur BDNB
-- [ ] `BdnbClient(api_key=None)` : requêtes groupées par lots (`in.(...)`, taille selon l'offre),
+- [x] `BdnbClient(api_key=None)` : requêtes groupées par lots (`in.(...)`, taille selon l'offre),
       construction par `rnb_id`, groupe complet, DPE représentatif, nombre de constructions d'un groupe
       (`Prefer: count=exact`)
-- [ ] Correspondances construction → bâtiment : `bdnb_batiment_construction_id`, `height`,
+- [x] Correspondances construction → bâtiment : `bdnb_batiment_construction_id`, `height`,
       `footprint_area` (`s_geom_cstr`), `footprint` (`geom_cstr` reprojetée, extra `[geo]` ; sans
       l'extra, ignorée avec un avertissement)
-- [ ] Correspondances groupe : `usage`, `construction_year`, `dwelling_count`, `level_count`, `height`,
+- [x] Correspondances groupe : `usage`, `construction_year`, `dwelling_count`, `level_count`, `height`,
       emprise du groupe, générateurs principal et d'appoint (chauffage, ECS, froid) avec la date du DPE
       représentatif, numéro du DPE représentatif ajouté à `dpe_ids`
-- [ ] Règle des groupes (D4, D7) : groupe de plusieurs constructions BDNB → sous-site `bdnb-bg-…` sous
+- [x] Règle des groupes (D4, D7) : groupe de plusieurs constructions BDNB → sous-site `bdnb-bg-…` sous
       le parent commun avec `park.move`, même avec un seul bâtiment du parc ; groupe d'une seule
       construction → valeurs portées par le bâtiment ; parents différents ou `group_sites=False` →
       intensifs sur chaque bâtiment, extensifs non posés, signalé ; sous-site existant réutilisé
-- [ ] Plusieurs constructions pour un même `rnb_id` → ambigu dans le rapport, non enrichi
-- [ ] `bdnb.enrich(park, buildings=None, group_sites=True)`
-- [ ] Tests : groupe à une et à plusieurs constructions, parents différents, relance idempotente,
+- [x] Plusieurs constructions pour un même `rnb_id` → ambigu dans le rapport, non enrichi
+- [x] `bdnb.enrich(park, buildings=None, group_sites=True)`
+- [x] Tests : groupe à une et à plusieurs constructions, parents différents, relance idempotente,
       héritage des valeurs de groupe, systèmes de site, sans l'extra `[geo]` ; un test `network`
 
 ## Étape 18 — Connecteur DPE

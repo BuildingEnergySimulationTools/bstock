@@ -913,6 +913,22 @@ bâtiments.
     le signale.
   - `group_sites=False` désactive la création des sous-sites : on applique alors la règle précédente.
 
+Précisions d'implémentation :
+- Groupe d'une construction : la construction et le groupe donnent tous deux `height`,
+  `footprint_area` et `footprint`, et une source n'a qu'un candidat par attribut ; la valeur de la
+  construction l'emporte (plus précise que la moyenne du groupe).
+- Générateurs : un système par générateur renseigné, principal puis appoint, avec `name` = `"main"` ou
+  `"backup"`, et les ids déterministes du §8.2 (`heating-<entité>-bdnb-1`…). Les dates de la BDNB sont
+  des horodatages UTC sans décalage (`2026-03-09T23:00:00` = minuit à Paris le 10 mars) : elles sont
+  converties en date de Paris.
+- Bâtiments du groupe répartis (parents différents ou `group_sites=False`) : chacun reçoit les valeurs
+  intensives, les générateurs et le numéro du DPE représentatif du groupe, et le rapport le signale.
+- Sous-site de groupe : un site existant de même id est réutilisé là où il se trouve. Un bâtiment que
+  `park.move` refuse de déplacer (servi par un système d'un site qu'il quitterait) reste en place, reçoit
+  les valeurs intensives, et le rapport le signale.
+- Taille des lots : 10 ids par appel sans clé, 1 000 avec une clé (offre Open+), réglable par
+  `BdnbClient(page_size=...)`. Un lot plein est complété par `offset`.
+
 ### 8.5 DPE
 
 `dpe.enrich(park, buildings=None, *, client=None) -> ImportReport` cherche les DPE par `rnb_id` (colonne
