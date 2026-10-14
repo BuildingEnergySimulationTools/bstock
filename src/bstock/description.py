@@ -7,11 +7,18 @@ from typing import TYPE_CHECKING, Any
 
 from pydantic import Field, field_validator
 
+from bstock._geometry import Footprint, geometry_area
 from bstock._ids import check_external_id, check_id
 from bstock.enums import BuildingUsage, SystemKind
 from bstock.envelope import Envelope
-from bstock.exceptions import DuplicateIdError, HierarchyError, UnknownIdError, UnknownKindError
-from bstock.provenance import SourcedModel, sourced
+from bstock.exceptions import (
+    DuplicateIdError,
+    HierarchyError,
+    IncompleteDataError,
+    UnknownIdError,
+    UnknownKindError,
+)
+from bstock.provenance import COMPUTED_SOURCE, SourcedModel, SourcedValue, sourced
 from bstock.systems import (
     SYSTEM_CLASSES,
     CoolingGenerator,
@@ -57,6 +64,9 @@ class DescribedEntity(SourcedModel):
     level_count = sourced(int, ge=1, inherit=True, description="Number of levels, ground floor = 1")
     height = sourced(float, unit="m", ge=0, inherit=True)
     dwelling_count = sourced(int, ge=0, description="Number of dwellings")
+    footprint = sourced(
+        Footprint, unit="°", description="Footprint: GeoJSON Polygon or MultiPolygon in WGS84"
+    )
     footprint_area = sourced(float, unit="m²", ge=0, description="Footprint area")
     floor_area = sourced(float, unit="m²", ge=0, description="Gross floor area")
     heated_area = sourced(float, unit="m²", ge=0, description="Heated area")
@@ -107,6 +117,37 @@ class DescribedEntity(SourcedModel):
         while site is not None:
             yield site
             site = site.parent
+
+    # --- footprint ----------------------------------------------------------------------------
+
+    def compute_footprint_area(self) -> SourcedValue:
+        """Add a ``"computed"`` candidate to ``footprint_area`` from the effective ``footprint``.
+
+        The area, in m², is computed without dependency on a local equirectangular projection
+        (SPEC §3.6): holes are subtracted and the polygons of a ``MultiPolygon`` added up. Like any
+        computed value it is a snapshot: compute again after changing the footprint.
+
+        Returns
+        -------
+        SourcedValue
+            The ``"computed"`` candidate added, in m².
+
+        Raises
+        ------
+        IncompleteDataError
+            If the entity has no footprint.
+        """
+        footprint = self.footprint
+        if footprint is None:
+            raise IncompleteDataError(f"{self.id!r} has no footprint")
+        candidate = self.set(
+            "footprint_area",
+            geometry_area(footprint),
+            source=COMPUTED_SOURCE,
+            comment="from footprint",
+        )
+        assert candidate is not None
+        return candidate
 
     # --- systems ------------------------------------------------------------------------------
 

@@ -150,12 +150,12 @@ inconnus, `ImportReport`, erreurs, pas de cache, format JSON inchangé).
       DPE (§8.5), clés exactes de l'API DPE (A.4)
 
 ## Étape 12 — Emprise au sol (socle)
-- [ ] Champ `footprint` (sourcé, dict GeoJSON, `inherit=False`) sur Site et Building
-- [ ] Validation légère sans dépendance : type `Polygon` / `MultiPolygon`, anneaux fermés d'au moins
+- [x] Champ `footprint` (sourcé, dict GeoJSON, `inherit=False`) sur Site et Building
+- [x] Validation légère sans dépendance : type `Polygon` / `MultiPolygon`, anneaux fermés d'au moins
       4 positions, coordonnées dans les bornes WGS84 (`ValidationError` sinon)
-- [ ] `compute_footprint_area()` sur Site et Building (D9) : candidat `"computed"`, trous et
+- [x] `compute_footprint_area()` sur Site et Building (D9) : candidat `"computed"`, trous et
       `MultiPolygon` pris en compte, `IncompleteDataError` sans emprise
-- [ ] Tests : validation, aller-retour JSON, non hérité, JSON Schema, aire calculée comparée à une
+- [x] Tests : validation, aller-retour JSON, non hérité, JSON Schema, aire calculée comparée à une
       valeur de référence (écart < 0,1 %), priorité `computed` vs `bdnb`
 
 ## Étape 13 — Export tabulaire

@@ -10,6 +10,7 @@ from bstock.exceptions import (
     DuplicateIdError,
     HierarchyError,
     IdentifierFormatWarning,
+    IncompleteDataError,
     UnknownIdError,
     UnknownKindError,
 )
@@ -105,6 +106,7 @@ def test_common_attributes_on_site_and_building():
         ("lat", True),
         ("name", False),
         ("dwelling_count", False),
+        ("footprint", False),
         ("footprint_area", False),
         ("floor_area", False),
         ("heated_area", False),
@@ -121,6 +123,66 @@ def test_inheritance_flags_follow_spec(name, inherited):
 def test_out_of_range_values_are_rejected(name, value):
     with pytest.raises(ValidationError):
         Building().set(name, value, source="bdnb")
+
+
+# --- footprint --------------------------------------------------------------------------------
+
+FOOTPRINT = {
+    "type": "Polygon",
+    "coordinates": [
+        [[-1.475, 43.49], [-1.4745, 43.49], [-1.4745, 43.4905], [-1.475, 43.4905], [-1.475, 43.49]]
+    ],
+}
+
+
+@pytest.mark.parametrize("cls", [Site, Building])
+def test_footprint_is_a_sourced_geojson_geometry(cls):
+    entity = cls(id="e", footprint=FOOTPRINT, source="rnb")
+    assert entity.footprint == FOOTPRINT
+    assert entity.effective("footprint").source == "rnb"
+    assert cls.footprint.unit == "°"
+
+
+@pytest.mark.parametrize(
+    "geometry",
+    [
+        {"type": "Point", "coordinates": [-1.475, 43.49]},
+        {"type": "Polygon", "coordinates": [FOOTPRINT["coordinates"][0][:-1]]},
+        {"type": "Polygon", "coordinates": [[[600, 43], [601, 43], [601, 44], [600, 43]]]},
+    ],
+)
+def test_invalid_footprint_raises_validation_error(geometry):
+    with pytest.raises(ValidationError):
+        Building().set("footprint", geometry, source="bdnb")
+
+
+def test_footprint_is_not_inherited(tree):
+    client, _group, a, _b, _c = tree
+    client.footprint = FOOTPRINT
+    assert a.footprint is None
+
+
+@pytest.mark.parametrize("cls", [Site, Building])
+def test_compute_footprint_area_adds_computed_candidate(cls):
+    entity = cls(id="e", footprint=FOOTPRINT)
+    candidate = entity.compute_footprint_area()
+    assert candidate.source == "computed"
+    # 0.0005° x 0.0005° at 43.49° N: about 40.4 m x 55.6 m
+    assert candidate.value == pytest.approx(2245.6, rel=1e-3)
+    assert entity.footprint_area == candidate.value
+
+
+def test_compute_footprint_area_without_footprint_raises():
+    with pytest.raises(IncompleteDataError):
+        Building().compute_footprint_area()
+
+
+def test_computed_footprint_area_wins_over_bdnb_by_default():
+    building = Building(footprint=FOOTPRINT)
+    building.set("footprint_area", 2000.0, source="bdnb")
+    computed = building.compute_footprint_area()
+    assert building.footprint_area == computed.value
+    assert {c.source for c in building.candidates("footprint_area")} == {"bdnb", "computed"}
 
 
 # --- hierarchy and inheritance ----------------------------------------------------------------
@@ -252,3 +314,11 @@ def test_json_round_trip_rebuilds_tree(tree):
     assert loaded_a.envelope.u_bat == 1.1
     assert [s.id for s in loaded_a.systems("heating")] == ["heating-group"]
     assert loaded_a.usage is BuildingUsage.TERTIARY
+
+
+def test_footprint_json_round_trip():
+    building = Building(rnb_id=RNB_A, footprint=FOOTPRINT, source="rnb")
+    building.compute_footprint_area()
+    loaded = Building.model_validate_json(building.model_dump_json())
+    assert loaded.footprint == FOOTPRINT
+    assert loaded.candidates("footprint_area") == building.candidates("footprint_area")

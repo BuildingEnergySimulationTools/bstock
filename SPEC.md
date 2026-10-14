@@ -222,7 +222,8 @@ par le connecteur, ce qui demande l'extra `[geo]` (§8.1).
 
 `compute_footprint_area()` (Site et Building) ajoute un candidat `footprint_area` de source `"computed"`,
 calculé depuis la valeur effective de `footprint`, sans dépendance : projection équirectangulaire locale
-autour du centre de la géométrie, puis formule du lacet (trous soustraits, polygones d'un `MultiPolygon`
+autour du centre du rectangle englobant, mise à l'échelle par les rayons de courbure de l'ellipsoïde WGS84
+à cette latitude (une sphère de rayon moyen donnerait jusqu'à 0,2 % d'écart), puis formule du lacet (trous soustraits, polygones d'un `MultiPolygon`
 additionnés). L'écart avec une projection à aires égales est inférieur à 0,1 % à l'échelle d'un
 bâtiment. Sans emprise, il lève `IncompleteDataError`. Comme pour l'enveloppe (§3.7), c'est un instantané
 et la priorité des sources arbitre avec la valeur de la BDNB.
