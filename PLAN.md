@@ -232,20 +232,20 @@ inconnus, `ImportReport`, erreurs, pas de cache, format JSON inchangé).
       héritage des valeurs de groupe, systèmes de site, sans l'extra `[geo]` ; un test `network`
 
 ## Étape 18 — Connecteur DPE
-- [ ] `DpeClient` (data-fair ADEME) : DPE par numéros et par `id_rnb` (filtres `_in`), sur les trois
+- [x] `DpeClient` (data-fair ADEME) : DPE par numéros et par `id_rnb` (filtres `_in`), sur les trois
       jeux (D5) ; `select` et `count=false` pour ménager le budget
-- [ ] Sélection (D6) : `type_batiment` `immeuble` / `maison`, tertiaire hors « dans un bâtiment de
+- [x] Sélection (D6) : `type_batiment` `immeuble` / `maison`, tertiaire hors « dans un bâtiment de
       logement » ; DPE d'appartement → `dpe_ids` seulement, et suivi de `numero_dpe_immeuble_associe` ;
       DPE remplacés écartés ; le plus récent retenu
-- [ ] Correspondances logement : `construction_year`, `dwelling_count`, `level_count`, `usage`,
+- [x] Correspondances logement : `construction_year`, `dwelling_count`, `level_count`, `usage`,
       `u_bat`, inertie, une paroi par poste avec `heat_loss_coefficient` et qualité d'isolation (toiture
       : la moins bonne des trois), générateurs (jusqu'à 4 de chauffage, 2 d'ECS ; `storage_volume`,
       COP d'ECS)
-- [ ] Surfaces (D8) : surface habitable ou utile → `heated_area`, `comment` = nom de la surface d'origine
-- [ ] Correspondances tertiaire : surface utile, usage, énergie de chauffage
-- [ ] Valeurs posées sur l'entité qui porte le DPE (bâtiment, ou site par ses `dpe_ids`)
-- [ ] `dpe.enrich(park, buildings=None)`
-- [ ] Tests : sélection (appartement ignoré, immeuble associé suivi, remplacé écarté, plus récent
+- [x] Surfaces (D8) : surface habitable ou utile → `heated_area`, `comment` = nom de la surface d'origine
+- [x] Correspondances tertiaire : surface utile, usage, énergie de chauffage
+- [x] Valeurs posées sur l'entité qui porte le DPE (bâtiment, ou site par ses `dpe_ids`)
+- [x] `dpe.enrich(park, buildings=None)`
+- [x] Tests : sélection (appartement ignoré, immeuble associé suivi, remplacé écarté, plus récent
       retenu), correspondances sur réponses enregistrées, idempotence des parois et systèmes ; un test
       `network` par jeu
 

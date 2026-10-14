@@ -962,6 +962,24 @@ juillet 2021), logements neufs et tertiaire. Le XML des DPE n'est pas couvert.
   générateurs) et deux d'ECS, avec `technology`, `energy_type` et, pour l'ECS, `storage_volume` (L) et
   le COP en `nominal_performance_ratio`. L'open data ne donne aucun rendement de chauffage. Ids
   déterministes (§8.2).
+- **Froid** (DPE logement) : un générateur (`type_generateur_froid`, énergie `type_energie_climatisation`
+  quand le jeu la donne), traduit par la table A.5.
+- **Tertiaire** : un générateur de chauffage avec la seule énergie principale
+  (`type_energie_principale_chauffage`), sans technologie.
+
+Précisions d'implémentation :
+- `buildings=None` vise les bâtiments qui ont un `rnb_id` ou des `dpe_ids`, et les sites qui ont des
+  `dpe_ids`. Une liste explicite ne vise que ces bâtiments.
+- Les DPE sont cherchés par numéro dans le jeu que désigne le 5e caractère du numéro, et par `id_rnb`
+  dans les trois jeux, en ne demandant que les colonnes utiles (`select`, `count=false`). Le jeu
+  `dpe02neuf` n'a pas les colonnes de qualité des combles perdus et du toit terrasse, ni
+  `type_energie_climatisation`.
+- Tous les numéros trouvés, sauf ceux d'un DPE remplacé, sont ajoutés à `dpe_ids` : un immeuble peut
+  ainsi recevoir les dizaines de DPE de ses appartements.
+- Un nouveau DPE retenu remplace l'ensemble des candidats `"dpe"`, parois et systèmes compris (un DPE
+  tertiaire retire donc les parois d'un DPE logement plus ancien).
+- Générateurs : `name` = `installation <i>, generator <g>` (chauffage) ou `generator <g>` (ECS) ; un
+  volume de stockage nul (chaudière mixte) n'est pas posé.
 
 ---
 
