@@ -1000,10 +1000,14 @@ park.to_geoparquet("batiments.parquet", kind="building", geometry="footprint")
   lève `UnknownKindError`.
 - `provenance=True` ajoute pour chaque attribut `<attr>_source` (source de la valeur retenue) et
   `<attr>_provider` (id de l'entité qui la fournit, différent de la ligne si elle est héritée).
-- `to_geodataframe` utilise `footprint` (`geometry="footprint"`) ou le point `lat` / `lon`
-  (`geometry="point"`), en EPSG:4326. Une entité sans géométrie est conservée avec une géométrie vide.
-- GeoPackage et GeoParquet sont écrits avec geopandas. Pour le GeoPackage, qui n'accepte pas les listes
-  ni les dicts, ces valeurs sont écrites en chaîne JSON.
+- `to_geodataframe` utilise `footprint` (`geometry="footprint"`) ou le point `lat` / `lon` effectif, donc
+  hérité du site au besoin (`geometry="point"`), en EPSG:4326. Une entité sans géométrie est conservée
+  avec une géométrie manquante (`None`). Une autre valeur de `geometry` lève `ValueError`.
+- GeoPackage et GeoParquet sont écrits avec geopandas (pyogrio). Le GeoPackage a deux couches, `sites`
+  et `buildings` (vides s'il n'y a pas d'entité), avec `id` en colonne ; il n'accepte pas les listes ni
+  les dicts, qui sont écrits en chaîne JSON, et ses couches sont remplacées si le fichier existe. Le
+  GeoParquet garde les listes et l'index `id`.
+- Sans l'extra `[geo]`, ces trois exports lèvent `MissingDependencyError`.
 
 ---
 

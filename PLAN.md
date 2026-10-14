@@ -250,11 +250,11 @@ inconnus, `ImportReport`, erreurs, pas de cache, format JSON inchangé).
       `network` par jeu
 
 ## Étape 19 — Exports géographiques (extra `[geo]`)
-- [ ] `park.to_geodataframe(kind=..., geometry="footprint" | "point")` (CRS EPSG:4326 ; entités sans
+- [x] `park.to_geodataframe(kind=..., geometry="footprint" | "point")` (CRS EPSG:4326 ; entités sans
       géométrie conservées avec une géométrie vide)
-- [ ] `park.to_geopackage(path)` (une couche sites, une couche bâtiments) et `park.to_geoparquet(path)`
-- [ ] Listes, enums et dicts convertis pour les formats qui ne les acceptent pas (JSON en chaîne)
-- [ ] Tests (sautés si `[geo]` absent) : aller-retour de lecture GeoPackage et GeoParquet dans
+- [x] `park.to_geopackage(path)` (une couche sites, une couche bâtiments) et `park.to_geoparquet(path)`
+- [x] Listes, enums et dicts convertis pour les formats qui ne les acceptent pas (JSON en chaîne)
+- [x] Tests (sautés si `[geo]` absent) : aller-retour de lecture GeoPackage et GeoParquet dans
       `tmp_path`, erreur claire sans l'extra
 
 ## Étape 20 — Finalisation v0.3.0

@@ -1,8 +1,10 @@
+import sys
+
 import pandas as pd
 import pytest
 
 from bstock.building import Building
-from bstock.exceptions import UnknownKindError
+from bstock.exceptions import MissingDependencyError, UnknownKindError
 from bstock.park import BuildingPark
 from bstock.provenance import sourced
 from bstock.site import Site
@@ -129,3 +131,11 @@ def test_empty_park_gives_empty_frame_with_columns(kind):
 def test_unknown_kind_is_rejected(park):
     with pytest.raises(UnknownKindError, match="export kind"):
         park.to_dataframe("meter")
+
+
+@pytest.mark.parametrize("method", ["to_geodataframe", "to_geopackage", "to_geoparquet"])
+def test_geographic_exports_need_the_geo_extra(park, tmp_path, monkeypatch, method):
+    monkeypatch.setitem(sys.modules, "geopandas", None)
+    args = [] if method == "to_geodataframe" else [tmp_path / "out"]
+    with pytest.raises(MissingDependencyError, match=r"bstock\[geo\]"):
+        getattr(park, method)(*args)

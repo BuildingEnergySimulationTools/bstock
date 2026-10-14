@@ -2,20 +2,30 @@
 
 from __future__ import annotations
 
+import json
 from enum import Enum
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal
 
 import pandas as pd
 
+from bstock._deps import require
 from bstock.description import DescribedEntity
 from bstock.exceptions import UnknownKindError
 
 if TYPE_CHECKING:
+    from geopandas import GeoDataFrame
+
     from bstock.park import BuildingPark
 
-__all__ = ["to_dataframe"]
+__all__ = ["to_dataframe", "to_geodataframe", "to_geopackage", "to_geoparquet"]
 
 ExportKind = Literal["building", "site"]
+GeometryKind = Literal["footprint", "point"]
+CRS = "EPSG:4326"
+"""Coordinate reference system of the exported geometries (WGS84)."""
+LAYERS: dict[ExportKind, str] = {"site": "sites", "building": "buildings"}
+"""GeoPackage layer of each kind of entity."""
 
 EXCLUDED_ATTRIBUTES = ("footprint",)
 """Sourced attributes left out of :func:`to_dataframe`."""
@@ -125,3 +135,144 @@ def _cell(value: Any) -> Any:
     if isinstance(value, list):
         return [_cell(v) for v in value]
     return value
+
+
+# --- geographic exports (extra [geo]) ---------------------------------------------------------
+
+
+def to_geodataframe(
+    park: BuildingPark,
+    kind: ExportKind = "building",
+    *,
+    geometry: GeometryKind = "footprint",
+    provenance: bool = False,
+) -> GeoDataFrame:
+    """Return :func:`to_dataframe` as a GeoDataFrame in WGS84 (EPSG:4326).
+
+    Parameters
+    ----------
+    park, kind, provenance
+        As in :func:`to_dataframe`.
+    geometry
+        ``"footprint"``: the footprint polygons; ``"point"``: the effective ``lat`` / ``lon``
+        point, inheritance included. An entity without geometry is kept with a missing geometry
+        (``None``).
+
+    Returns
+    -------
+    geopandas.GeoDataFrame
+        The columns of :func:`to_dataframe` and a ``geometry`` column, in degrees (WGS84).
+
+    Raises
+    ------
+    MissingDependencyError
+        If the ``[geo]`` extra is not installed.
+    UnknownKindError
+        If ``kind`` is invalid.
+    ValueError
+        If ``geometry`` is neither ``"footprint"`` nor ``"point"``.
+    """
+    if geometry not in ("footprint", "point"):
+        raise ValueError(f"geometry must be 'footprint' or 'point', not {geometry!r}")
+    geopandas = require("geopandas", "geo")
+    shapely_geometry = require("shapely.geometry", "geo")
+    frame = to_dataframe(park, kind, provenance=provenance)
+    entities = {
+        e.id: e for e in (park.iter_buildings() if kind == "building" else park.iter_sites())
+    }
+    shapes: list[Any] = []
+    for entity_id in frame.index:
+        entity = entities[entity_id]
+        if geometry == "footprint":
+            footprint = entity.footprint
+            shapes.append(None if footprint is None else shapely_geometry.shape(footprint))
+        elif entity.lat is None or entity.lon is None:
+            shapes.append(None)
+        else:
+            shapes.append(shapely_geometry.Point(entity.lon, entity.lat))
+    return geopandas.GeoDataFrame(frame, geometry=shapes, crs=CRS)
+
+
+def to_geopackage(
+    park: BuildingPark,
+    path: str | Path,
+    *,
+    geometry: GeometryKind = "footprint",
+    provenance: bool = False,
+) -> Path:
+    """Write the sites and the buildings to the ``sites`` and ``buildings`` layers of a GeoPackage.
+
+    The GeoPackage format has no list column: lists (``dpe_ids``, ``sub_usages``...) are written as
+    JSON strings. The ``id`` index is written as a column. Existing layers are replaced.
+
+    Parameters
+    ----------
+    park
+        The park to export.
+    path
+        File to write (``.gpkg``).
+    geometry, provenance
+        As in :func:`to_geodataframe`.
+
+    Returns
+    -------
+    pathlib.Path
+        The written file.
+
+    Raises
+    ------
+    MissingDependencyError
+        If the ``[geo]`` extra is not installed.
+    """
+    path = Path(path)
+    for kind, layer in LAYERS.items():
+        frame = to_geodataframe(park, kind, geometry=geometry, provenance=provenance)
+        _lists_to_json(frame).to_file(path, layer=layer, driver="GPKG", index=True)
+    return path
+
+
+def to_geoparquet(
+    park: BuildingPark,
+    path: str | Path,
+    kind: ExportKind = "building",
+    *,
+    geometry: GeometryKind = "footprint",
+    provenance: bool = False,
+) -> Path:
+    """Write the buildings (or the sites) to a GeoParquet file; lists are kept as lists.
+
+    Parameters
+    ----------
+    park
+        The park to export.
+    path
+        File to write (``.parquet``).
+    kind, geometry, provenance
+        As in :func:`to_geodataframe`.
+
+    Returns
+    -------
+    pathlib.Path
+        The written file.
+
+    Raises
+    ------
+    MissingDependencyError
+        If the ``[geo]`` extra is not installed.
+    """
+    path = Path(path)
+    to_geodataframe(park, kind, geometry=geometry, provenance=provenance).to_parquet(path)
+    return path
+
+
+def _lists_to_json(frame: GeoDataFrame) -> GeoDataFrame:
+    """Return ``frame`` with list and dict values written as JSON strings."""
+    frame = frame.copy()
+    for column in frame.columns:
+        if column == frame.geometry.name or frame[column].dtype != object:
+            continue
+        if frame[column].map(lambda v: isinstance(v, (list, dict))).any():
+            frame[column] = frame[column].map(
+                lambda v: json.dumps(v, ensure_ascii=False) if isinstance(v, (list, dict)) else v
+            )
+    return frame

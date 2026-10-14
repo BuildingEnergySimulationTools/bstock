@@ -164,6 +164,52 @@ class BuildingPark(BaseModel):
 
         return export.to_dataframe(self, kind, provenance=provenance)
 
+    def to_geodataframe(
+        self,
+        kind: Literal["building", "site"] = "building",
+        *,
+        geometry: Literal["footprint", "point"] = "footprint",
+        provenance: bool = False,
+    ) -> Any:
+        """Return :meth:`to_dataframe` as a GeoDataFrame in WGS84 (SPEC §9, extra ``[geo]``).
+
+        See :func:`bstock.export.to_geodataframe`.
+        """
+        from bstock import export  # circular import
+
+        return export.to_geodataframe(self, kind, geometry=geometry, provenance=provenance)
+
+    def to_geopackage(
+        self,
+        path: str | Path,
+        *,
+        geometry: Literal["footprint", "point"] = "footprint",
+        provenance: bool = False,
+    ) -> Path:
+        """Write the ``sites`` and ``buildings`` layers of a GeoPackage (extra ``[geo]``).
+
+        See :func:`bstock.export.to_geopackage`.
+        """
+        from bstock import export  # circular import
+
+        return export.to_geopackage(self, path, geometry=geometry, provenance=provenance)
+
+    def to_geoparquet(
+        self,
+        path: str | Path,
+        kind: Literal["building", "site"] = "building",
+        *,
+        geometry: Literal["footprint", "point"] = "footprint",
+        provenance: bool = False,
+    ) -> Path:
+        """Write the buildings (or sites) to a GeoParquet file (extra ``[geo]``).
+
+        See :func:`bstock.export.to_geoparquet`.
+        """
+        from bstock import export  # circular import
+
+        return export.to_geoparquet(self, path, kind, geometry=geometry, provenance=provenance)
+
     # --- lookup -------------------------------------------------------------------------------
 
     def get(self, entity_id: str) -> Entity | None:
