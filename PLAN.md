@@ -167,19 +167,19 @@ inconnus, `ImportReport`, erreurs, pas de cache, format JSON inchangé).
 - [x] Tests : sous-classe projet, héritage, provenance, parc vide
 
 ## Étape 14 — Socle des connecteurs
-- [ ] Extras `[connectors]` (`requests>=2`) et `[geo]` (`shapely>=2`, `geopandas>=1`, `pyproj>=3`) dans
+- [x] Extras `[connectors]` (`requests>=2`) et `[geo]` (`shapely>=2`, `geopandas>=1`, `pyproj>=3`) dans
       `pyproject.toml`
-- [ ] Paquet `bstock.connectors` : `_http.py` (session, timeout, nouvel essai sur 429/5xx et sur le
+- [x] Paquet `bstock.connectors` : `_http.py` (session, timeout, nouvel essai sur 429/5xx et sur le
       message de budget de l'ADEME, avec attente ; pagination par `next` ; User-Agent), import
       paresseux de `requests`
-- [ ] Exceptions et avertissements : `ConnectorError`, `MissingDependencyError`, `UnmappedValueWarning`
-- [ ] `ImportReport` (créés, enrichis, non trouvés, ambigus, messages ; `to_dataframe()`)
-- [ ] Helper interne de reprojection Lambert-93 → WGS84 (extra `[geo]`)
-- [ ] Helper interne de systèmes et parois à id déterministe : création, mise à jour, retrait de ceux
+- [x] Exceptions et avertissements : `ConnectorError`, `MissingDependencyError`, `UnmappedValueWarning`
+- [x] `ImportReport` (créés, enrichis, non trouvés, ambigus, messages ; `to_dataframe()`)
+- [x] Helper interne de reprojection Lambert-93 → WGS84 (extra `[geo]`)
+- [x] Helper interne de systèmes et parois à id déterministe : création, mise à jour, retrait de ceux
       qui ne sont plus produits (conservés et signalés s'ils sont référencés)
-- [ ] Convention de test : réponses réelles enregistrées dans `tests/data/{rnb,bdnb,dpe}/` (reprises
+- [x] Convention de test : réponses réelles enregistrées dans `tests/data/{rnb,bdnb,dpe}/` (reprises
       des réponses collectées à l'étape 11), faux client injecté, tests `@pytest.mark.network`
-- [ ] Tests : retry, pagination, erreurs HTTP, dépendance manquante (session factice, sans réseau)
+- [x] Tests : retry, pagination, erreurs HTTP, dépendance manquante (session factice, sans réseau)
 
 ## Étape 15 — Enums et tables de correspondance (annexe A)
 - [ ] `GeneratorTechnology` : `BOILER`, `HEAT_PUMP`, `WATER_HEATER` (D11), et leurs familles dans le

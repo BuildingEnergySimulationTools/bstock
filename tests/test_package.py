@@ -15,6 +15,7 @@ def test_version_is_exposed():
         bstock.UnknownIdError,
         bstock.InvalidIdError,
         bstock.EntityInUseError,
+        bstock.ConnectorError,
     ],
 )
 def test_errors_derive_from_bstock_error(error):
@@ -28,6 +29,7 @@ def test_errors_derive_from_bstock_error(error):
         (bstock.UnknownKindError, ValueError),
         (bstock.HierarchyError, ValueError),
         (bstock.ProjectClassError, TypeError),
+        (bstock.MissingDependencyError, ImportError),
     ],
 )
 def test_specific_errors_keep_their_builtin_base(error, builtin):
@@ -38,3 +40,7 @@ def test_specific_errors_keep_their_builtin_base(error, builtin):
 def test_public_api_is_explicit():
     for name in bstock.__all__:
         assert hasattr(bstock, name)
+
+
+def test_unmapped_value_warning_is_a_bstock_warning():
+    assert issubclass(bstock.UnmappedValueWarning, bstock.BstockWarning)

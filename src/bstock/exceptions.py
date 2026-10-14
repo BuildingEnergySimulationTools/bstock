@@ -65,6 +65,14 @@ class UnsupportedSchemaError(BstockError):
     """The park file was written with an unsupported format version."""
 
 
+class ConnectorError(BstockError):
+    """An API called by a connector failed persistently or returned an unexpected response."""
+
+
+class MissingDependencyError(BstockError, ImportError):
+    """An optional dependency is not installed; the message gives the extra to install."""
+
+
 class BstockWarning(UserWarning):
     """Base class for all bstock warnings."""
 
@@ -87,3 +95,7 @@ class NoDataWarning(BstockWarning):
 
 class ClassMismatchWarning(BstockWarning):
     """A park file was saved with other site or building classes than the ones used to load it."""
+
+
+class UnmappedValueWarning(BstockWarning):
+    """A source label is missing from the correspondence tables; ``raw`` keeps the label."""

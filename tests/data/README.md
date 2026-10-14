@@ -16,3 +16,12 @@ Files that are not raw responses:
 - `dpe/schema_*.json`: dataset schemas (`GET /datasets/<id>`);
 - `dpe/values_agg_generators_and_scales.json`: national distinct values with counts (`values_agg`) of
   the generator, energy, scale and period columns, merged from one call per field.
+
+## How tests use them
+
+- Unit tests never reach the network. The `recorded` fixture (`tests/conftest.py`) loads a file of this
+  directory, e.g. `recorded("rnb/building_6X3K8HHY9FFC.json")`.
+- HTTP behaviour (retries, pagination, errors) is tested with the `fake_session` fixture, a fake
+  `requests` session serving queued responses. High-level connector functions are tested with a fake
+  client passed as `client=`.
+- Tests calling the real APIs carry `@pytest.mark.network`; skip them with `pytest -m "not network"`.

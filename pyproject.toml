@@ -24,6 +24,8 @@ dependencies = [
 
 [project.optional-dependencies]
 plot = ["plotly>=5"]
+connectors = ["requests>=2"]
+geo = ["shapely>=2", "geopandas>=1", "pyproj>=3"]
 dev = ["pytest>=8", "ruff"]
 
 [tool.hatch.build.targets.wheel]

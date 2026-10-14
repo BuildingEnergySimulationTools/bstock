@@ -781,6 +781,9 @@ Les connecteurs créent et enrichissent les entités du parc à partir des API p
 src/bstock/connectors/
   __init__.py      # ImportReport ; les sous-modules s'importent explicitement
   _http.py         # session requests, timeout, nouvel essai, pagination
+  _report.py       # ImportReport
+  _sync.py         # écriture idempotente : candidats, systèmes et parois à id déterministe
+  _geo.py          # reprojection des géométries vers WGS84 (extra [geo])
   _mappings.py     # tables de correspondance de l'annexe A (fonctions pures)
   data/            # dpe_generators.csv (annexe A.5)
   rnb.py           # RnbClient, add_buildings, enrich, suggest_matches
@@ -1013,6 +1016,7 @@ src/bstock/
   io.py                # to_json/from_json, save/load, JSON Schema
   export.py            # to_dataframe, to_geodataframe, GeoPackage, GeoParquet (§9)
   _geometry.py         # validation GeoJSON, aire de l'emprise (sans dépendance)
+  _deps.py             # import des dépendances optionnelles (MissingDependencyError)
   connectors/          # RNB, BDNB, DPE (§8.1)
   exceptions.py        # BstockError, BstockWarning et leurs sous-classes
   _ids.py              # génération et contrôle des identifiants
