@@ -27,6 +27,7 @@ _T = GeneratorTechnology
 #: Technologies whose performance ratio should not exceed ~1 (combustion, Joule effect, substation).
 NON_THERMODYNAMIC = frozenset(
     {
+        _T.BOILER,
         _T.BOILER_STANDARD,
         _T.BOILER_LOW_TEMPERATURE,
         _T.BOILER_CONDENSING,
@@ -37,6 +38,7 @@ NON_THERMODYNAMIC = frozenset(
         _T.GAS_RADIATOR,
         _T.WARM_AIR_GENERATOR,
         _T.DISTRICT_SUBSTATION,
+        _T.WATER_HEATER,
         _T.ELECTRIC_WATER_TANK,
         _T.INSTANT_WATER_HEATER,
     }
@@ -45,6 +47,7 @@ NON_THERMODYNAMIC = frozenset(
 #: Technologies whose performance ratio is expected above 1.
 THERMODYNAMIC = frozenset(
     {
+        _T.HEAT_PUMP,
         _T.HEAT_PUMP_AIR_AIR,
         _T.HEAT_PUMP_AIR_WATER,
         _T.HEAT_PUMP_WATER_WATER,

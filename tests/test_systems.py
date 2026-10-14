@@ -132,6 +132,9 @@ def test_only_dhw_has_storage_volume():
         ("heat_pump_air_water", 0.9),
         ("chiller", 0.5),
         ("thermodynamic_water_heater", 0.8),
+        ("boiler", 1.3),
+        ("water_heater", 1.5),
+        ("heat_pump", 0.9),
     ],
 )
 def test_inconsistent_ratio_warns(technology, ratio):
@@ -145,6 +148,9 @@ def test_inconsistent_ratio_warns(technology, ratio):
         ("boiler_condensing", 1.05),
         ("boiler_standard", 0.85),
         ("heat_pump_air_water", 3.2),
+        ("boiler", 0.9),
+        ("water_heater", 0.95),
+        ("heat_pump", 3.0),
         ("heat_pump_hybrid", 0.9),  # hybrids are not checked
         ("solar_thermal", 5.0),  # not checked either
     ],

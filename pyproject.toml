@@ -59,6 +59,9 @@ convention = "numpy"
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["D"]
+# exact source labels: en dashes and typographic apostrophes are intended
+"src/bstock/connectors/_mappings.py" = ["RUF001"]
+"tests/test_connectors_mappings.py" = ["D", "RUF001"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

@@ -1165,6 +1165,23 @@ La comparaison des libellés est exacte, sans normalisation. Un libellé absent 
 ajouté plus tard par l'ADEME, donne `OTHER` et un `UnmappedValueWarning` jusqu'à la mise à jour de la
 table. L'énergie vient de la colonne `type_energie_generateur_*` (table A.3).
 
+Contenu de la table (210 libellés distincts, version 2.6 des tables d'enums, générée le 2026-10-14) :
+- elle couvre aussi la feuille `type_generateur_fr` (froid, 23 libellés, colonne `type_generateur_froid`
+  de l'open data). Un libellé présent dans plusieurs feuilles n'a qu'une ligne ; la colonne `sheets` les
+  cite, et `categorie_open_data` est gardée pour la relecture ;
+- `energy_type` est l'énergie impliquée par le générateur, déduite des énergies autorisées
+  (`enum_type_energie_id`, union des feuilles) : `autre combustible fossile` et le réseau de chaleur des
+  générateurs « multi bâtiment » sont ignorés à côté d'une autre énergie, plusieurs formes de bois
+  donnent `WOOD`, et plusieurs énergies distinctes laissent la case vide (un poêle bûche peut brûler du
+  charbon). Les PAC du froid reçoivent `ELECTRICITY` ;
+- pompe à chaleur hybride : la partie PAC donne `HEAT_PUMP_HYBRID`, la partie chaudière la technologie
+  de cette chaudière (le DPE les décrit comme deux générateurs) ;
+- accumulateurs gaz ou GPL → `WATER_HEATER` ; chauffe-eau gaz à production instantanée →
+  `INSTANT_WATER_HEATER` ; PAC eau glycolée/eau → `HEAT_PUMP_GROUND` ; PAC double service → `HEAT_PUMP` ;
+  chaudières bois et charbon (type non précisé) → `BOILER` ; « autre système à combustion … » et
+  « autre système de refroidissement » → `OTHER` ; « autre système thermodynamique gaz » →
+  `HEAT_PUMP_GAS`.
+
 ### A.6 Contrats des API (vérifiés le 2026-10-13)
 
 Réponses réelles enregistrées dans `tests/data/` lors de l'écriture de chaque connecteur.

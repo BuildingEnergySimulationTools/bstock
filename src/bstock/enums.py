@@ -64,12 +64,14 @@ class GeneratorTechnology(StrEnum):
     combustion or Joule-effect ratio around or below 1.
     """
 
+    BOILER = auto()  # boiler of unknown type
     BOILER_STANDARD = auto()
     BOILER_LOW_TEMPERATURE = auto()
     BOILER_CONDENSING = auto()
     ELECTRIC_BOILER = auto()
     ELECTRIC_RESISTANCE = auto()  # Joule effect: convectors, radiant panels...
     ELECTRIC_STORAGE_HEATER = auto()
+    HEAT_PUMP = auto()  # heat pump of unknown type
     HEAT_PUMP_AIR_AIR = auto()
     HEAT_PUMP_AIR_WATER = auto()
     HEAT_PUMP_WATER_WATER = auto()
@@ -81,6 +83,7 @@ class GeneratorTechnology(StrEnum):
     WARM_AIR_GENERATOR = auto()
     DISTRICT_SUBSTATION = auto()
     SOLAR_THERMAL = auto()
+    WATER_HEATER = auto()  # non-thermodynamic water heater of unknown type
     ELECTRIC_WATER_TANK = auto()
     INSTANT_WATER_HEATER = auto()
     THERMODYNAMIC_WATER_HEATER = auto()

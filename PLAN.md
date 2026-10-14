@@ -182,17 +182,17 @@ inconnus, `ImportReport`, erreurs, pas de cache, format JSON inchangé).
 - [x] Tests : retry, pagination, erreurs HTTP, dépendance manquante (session factice, sans réseau)
 
 ## Étape 15 — Enums et tables de correspondance (annexe A)
-- [ ] `GeneratorTechnology` : `BOILER`, `HEAT_PUMP`, `WATER_HEATER` (D11), et leurs familles dans le
+- [x] `GeneratorTechnology` : `BOILER`, `HEAT_PUMP`, `WATER_HEATER` (D11), et leurs familles dans le
       contrôle des ratios (`systems.py`)
-- [ ] Module interne `connectors/_mappings.py` : fonctions pures libellé → enum ; comparaison exacte
+- [x] Module interne `connectors/_mappings.py` : fonctions pures libellé → enum ; comparaison exacte
       des libellés (les sources mélangent apostrophes droites et typographiques, tiret demi-cadratin
       dans les libellés bois)
-- [ ] `BuildingUsage` (A.2), `EnergyType` (A.3), enveloppe DPE (A.4)
-- [ ] Générateurs BDNB (table A.5, dans le code)
-- [ ] `scripts/build_dpe_generators.py` et `connectors/data/dpe_generators.csv` (D12) : génération depuis
+- [x] `BuildingUsage` (A.2), `EnergyType` (A.3), enveloppe DPE (A.4)
+- [x] Générateurs BDNB (table A.5, dans le code)
+- [x] `scripts/build_dpe_generators.py` et `connectors/data/dpe_generators.csv` (D12) : génération depuis
       `enum_tables.xlsx`, relecture ligne par ligne, en-tête citant la source et sa date ; fichier
       inclus dans le paquet
-- [ ] Tests paramétrés sur les tables, libellé inconnu → `OTHER` ou rien, avec `UnmappedValueWarning` ;
+- [x] Tests paramétrés sur les tables, libellé inconnu → `OTHER` ou rien, avec `UnmappedValueWarning` ;
       tous les libellés DPE collectés à l'étape 11 sont couverts par la table
 
 ## Étape 16 — Connecteur RNB
