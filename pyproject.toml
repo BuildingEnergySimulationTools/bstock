@@ -62,7 +62,7 @@ convention = "numpy"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = ["-ra", "--strict-markers"]
+addopts = ["-ra", "--strict-markers", "-m", "not network"]  # network tests: pytest -m network
 markers = [
     "network: tests that call real external APIs (RNB, BDNB, DPE)",
 ]

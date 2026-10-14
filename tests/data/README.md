@@ -24,4 +24,5 @@ Files that are not raw responses:
 - HTTP behaviour (retries, pagination, errors) is tested with the `fake_session` fixture, a fake
   `requests` session serving queued responses. High-level connector functions are tested with a fake
   client passed as `client=`.
-- Tests calling the real APIs carry `@pytest.mark.network`; skip them with `pytest -m "not network"`.
+- Tests calling the real APIs carry `@pytest.mark.network`; they are deselected by default, run them with
+  `pytest -m network`.

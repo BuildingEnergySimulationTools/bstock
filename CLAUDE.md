@@ -8,15 +8,15 @@ toute évolution, et la mettre à jour quand un choix de conception change.
 
 - Virtualenv local `.venv` (Python 3.14). Cible de compatibilité : **Python ≥ 3.11**. Ne pas utiliser de
   syntaxe plus récente que 3.11.
-- Installation : `.venv/Scripts/python -m pip install -e ".[dev]"`
+- Installation : `.venv/Scripts/python -m pip install -e ".[dev,connectors,geo]"` (les tests des connecteurs ont besoin des extras)
 - Configuration unique dans `pyproject.toml` (build, dépendances, ruff, pytest). Pas de `setup.py` ni de
   `requirements.txt`.
 
 ## Commandes
 
 ```bash
-.venv/Scripts/python -m pytest                 # tests
-.venv/Scripts/python -m pytest -m "not network"  # sans les tests qui appellent des API
+.venv/Scripts/python -m pytest                 # tests (sans les tests qui appellent des API)
+.venv/Scripts/python -m pytest -m network      # seulement les tests qui appellent des API
 .venv/Scripts/python -m ruff check --fix .     # lint
 .venv/Scripts/python -m ruff format .          # formatage
 ```
