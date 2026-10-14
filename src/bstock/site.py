@@ -112,14 +112,21 @@ class Site(DescribedEntity):
     def detach(self, child_id: str) -> Site | Building:
         """Detach the direct child (sub-site or building) ``child_id`` and return it.
 
+        In a park, the child and its content leave the park, as with :meth:`BuildingPark.remove`.
+
         Raises
         ------
         UnknownIdError
             If no direct child has this id.
+        EntityInUseError
+            If, in a park, an entity outside the child references it or its content (``scope`` of a
+            meter, ``serves`` of a system); use ``park.remove(child_id, force=True)`` to drop the
+            references.
         """
         for collection in (self.sites, self.buildings):
             for child in collection:
                 if child.id == child_id:
+                    self._notify_park("_release", child)
                     self._notify_park("_unregister", child)
                     collection.remove(child)
                     child._container = None

@@ -9,6 +9,7 @@ from bstock.exceptions import (
     ProjectClassError,
     UnknownIdError,
 )
+from bstock.meters import Channel, Meter
 from bstock.park import BuildingPark
 from bstock.provenance import SourcePriority, sourced
 from bstock.site import Site
@@ -356,6 +357,39 @@ def test_references_inside_removed_subtree_do_not_block(park):
     park.add_system(HeatingGenerator(id="group-boiler", serves=[RNB_A]), GROUP)
     park.remove(GROUP)
     assert "group-boiler" not in park
+
+
+def test_detach_referenced_building_is_refused(park):
+    plant = park.add_system(HeatingGenerator(id="plant", serves=[RNB_A]), "site-ecole-A")
+    with pytest.raises(EntityInUseError, match="plant"):
+        park[GROUP].detach(RNB_A)
+    assert RNB_A in park
+    assert park[RNB_A].parent is park[GROUP]
+    assert plant.serves == [RNB_A]
+
+
+def test_detach_measured_building_is_refused_and_park_stays_reloadable(park):
+    park.add_meter(Meter(id="m", scope=[RNB_A], channels=[Channel(name="e", unit="kWh")]))
+    with pytest.raises(EntityInUseError, match="'m'"):
+        park[GROUP].detach(RNB_A)
+    assert BuildingPark.from_json(park.to_json()) == park
+
+
+def test_remove_system_referenced_by_meter_is_refused(park):
+    park.add_system(HeatingGenerator(id="heating-a"), RNB_A)
+    park.add_meter(Meter(id="m", scope=["heating-a"], channels=[Channel(name="e", unit="kWh")]))
+    with pytest.raises(EntityInUseError, match="'m'"):
+        park[RNB_A].remove_system("heating-a")
+    assert "heating-a" in park
+    park.remove("heating-a", force=True)
+    assert park["m"].scope == []
+
+
+def test_json_schema_on_a_park_uses_its_classes():
+    park = BuildingPark(name="p", site_cls=BayonneSite, building_cls=BayonneBuilding)
+    attributes = park.json_schema()["x-bstock-sourced-attributes"]
+    assert {"BayonneSite", "BayonneBuilding"} <= set(attributes)
+    assert "Building" in BuildingPark.json_schema()["x-bstock-sourced-attributes"]
 
 
 def test_remove_unknown_id(park):

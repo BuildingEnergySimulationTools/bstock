@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import functools
+import types
 import warnings
-from collections.abc import Iterable, Iterator
+from collections.abc import Callable, Iterable, Iterator
 from pathlib import Path
 from typing import Any, Literal
 
@@ -32,6 +34,17 @@ __all__ = ["BuildingPark"]
 Entity = Site | Building | System | Meter
 
 
+class _class_or_instance_method:  # noqa: N801 - used as a decorator, like classmethod
+    """Like :func:`classmethod`, but the method receives the instance when called on one."""
+
+    def __init__(self, func: Callable[..., Any]) -> None:
+        self.__func__ = func
+        functools.update_wrapper(self, func)
+
+    def __get__(self, obj: Any, owner: type | None = None) -> Callable[..., Any]:
+        return types.MethodType(self.__func__, owner if obj is None else obj)
+
+
 class BuildingPark(BaseModel):
     """A building stock: top-level sites and buildings, and the source priority.
 
@@ -54,7 +67,9 @@ class BuildingPark(BaseModel):
     version, class paths), so neither the format version nor the classes are checked on loading.
     """
 
-    model_config = ConfigDict(extra="forbid", validate_assignment=True)
+    model_config = ConfigDict(
+        extra="forbid", validate_assignment=True, ignored_types=(_class_or_instance_method,)
+    )
 
     name: str
     description: str | None = None
@@ -120,7 +135,9 @@ class BuildingPark(BaseModel):
         return io.from_json(text, site_cls=site_cls, building_cls=building_cls)
 
     def save(self, directory: str | Path, *, include_data: bool = False) -> Path:
-        """Save the park in ``directory`` (``park.json``, plus Parquet files with ``include_data``).
+        """Save the park in ``directory`` and return the path of ``park.json``.
+
+        ``directory`` receives ``park.json``, plus Parquet files with ``include_data``.
 
         The park itself is modified: relative paths of data sources become absolute and, with
         ``include_data``, the meters point to the saved Parquet files. See :func:`bstock.io.save`.
@@ -137,19 +154,32 @@ class BuildingPark(BaseModel):
         site_cls: type[Site] = Site,
         building_cls: type[Building] = Building,
     ) -> BuildingPark:
-        """Load a park saved by :meth:`save`. See :func:`bstock.io.load`."""
+        """Load a park saved by :meth:`save`, from its directory or its ``park.json`` file.
+
+        See :func:`bstock.io.load`.
+        """
         from bstock import io  # circular import
 
         return io.load(directory, site_cls=site_cls, building_cls=building_cls)
 
-    @classmethod
+    @_class_or_instance_method
     def json_schema(
-        cls, *, site_cls: type[Site] = Site, building_cls: type[Building] = Building
+        self_or_cls: BuildingPark | type[BuildingPark],  # noqa: N805 - class or instance
+        *,
+        site_cls: type[Site] | None = None,
+        building_cls: type[Building] | None = None,
     ) -> dict[str, Any]:
-        """Return the JSON Schema of the park file. See :func:`bstock.io.json_schema`."""
+        """Return the JSON Schema of the park file. See :func:`bstock.io.json_schema`.
+
+        Callable on the class or on a park. Classes not given default to the park ``site_cls`` and
+        ``building_cls`` when called on a park, to :class:`Site` and :class:`Building` otherwise.
+        """
         from bstock import io  # circular import
 
-        return io.json_schema(site_cls=site_cls, building_cls=building_cls)
+        if isinstance(self_or_cls, BuildingPark):
+            site_cls = site_cls or self_or_cls.site_cls
+            building_cls = building_cls or self_or_cls.building_cls
+        return io.json_schema(site_cls=site_cls or Site, building_cls=building_cls or Building)
 
     # --- exports (implemented in bstock.export) -------------------------------------------------
 
@@ -535,15 +565,7 @@ class BuildingPark(BaseModel):
             If the entity is referenced (e.g. in the ``serves`` of a system) and ``force`` is False.
         """
         entity = self._resolve(entity, (Site, Building, System, Meter))
-        removed_ids = set(self._subtree_ids(entity))
-        references = self._references_to(removed_ids)
-        outside = [ref for ref in references if ref[0] not in removed_ids]
-        if outside and not force:
-            raise EntityInUseError(
-                f"{entity.id!r} is referenced by {sorted({r[0] for r in outside})}"
-            )
-        for _, drop in outside:
-            drop()
+        self._release(entity, force=force)
         if isinstance(entity, System):
             owner = entity._container
             assert isinstance(owner, DescribedEntity)
@@ -557,6 +579,28 @@ class BuildingPark(BaseModel):
         self._unregister(entity)
         entity._container = None
         return entity
+
+    def _release(self, entity: Entity, *, force: bool = False) -> None:
+        """Check, before taking ``entity`` out, that nothing outside its subtree references it.
+
+        Also called by ``site.detach`` and ``entity.remove_system``, so that no way of taking an
+        entity out of the park leaves dangling ``serves`` or ``scope`` ids.
+
+        Raises
+        ------
+        EntityInUseError
+            If an entity outside the subtree references it and ``force`` is False. With ``force``,
+            the references are dropped instead.
+        """
+        removed_ids = set(self._subtree_ids(entity))
+        outside = [ref for ref in self._references_to(removed_ids) if ref[0] not in removed_ids]
+        if outside and not force:
+            raise EntityInUseError(
+                f"{entity.id!r} is referenced by {sorted({r[0] for r in outside})}; "
+                "use park.remove(..., force=True) to drop these references"
+            )
+        for _, drop in outside:
+            drop()
 
     def _references_to(self, ids: set[str]) -> list[tuple[str, Any]]:
         """Return the references to ``ids``, as ``(referencing_id, drop_callback)`` pairs."""

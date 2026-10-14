@@ -185,9 +185,13 @@ class DescribedEntity(SourcedModel):
         ------
         UnknownIdError
             If this entity owns no system with this id.
+        EntityInUseError
+            If the entity belongs to a park where a meter measures the system; use
+            ``park.remove(system_id, force=True)`` to drop the reference.
         """
         for system in self.iter_systems():
             if system.id == system_id:
+                self._notify_park("_release", system)
                 self._notify_park("_unregister", system)
                 getattr(self, system.kind).remove(system)
                 system._container = None
@@ -210,7 +214,7 @@ class DescribedEntity(SourcedModel):
         return [] if park is None else park.meters_for(self)
 
     def _notify_park(self, method: str, entity: SourcedModel) -> None:
-        """Let the park maintain its id index (no-op for an entity outside a park)."""
+        """Let the park check references and maintain its index (no-op outside a park)."""
         park = self.park
         if park is not None and hasattr(park, method):
             getattr(park, method)(entity)

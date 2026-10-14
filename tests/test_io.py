@@ -154,6 +154,12 @@ def test_empty_park_round_trip():
 # --- directories ------------------------------------------------------------------------------
 
 
+def test_load_accepts_the_path_returned_by_save(park, tmp_path):
+    path = park.save(tmp_path / "bayonne")
+    loaded = BuildingPark.load(path, site_cls=BayonneSite, building_cls=BayonneBuilding)
+    assert loaded == park
+
+
 def test_save_and_load_without_data(park, tmp_path):
     path = park.save(tmp_path / "bayonne")
     assert path == tmp_path / "bayonne" / "park.json"

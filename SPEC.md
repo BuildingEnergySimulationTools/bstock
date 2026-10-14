@@ -171,7 +171,10 @@ Accès dérivés (non sérialisés) : `site.parent` (site parent ou `None`, comm
 Gestion des enfants au niveau du site : `site.add_site(s)`, `site.add_building(b)`, `site.detach(id)`. Site
 et Building ont aussi `add_system(system)` (rangé dans la liste de son `kind`), `remove_system(id)` et
 `iter_systems(kind=None)`. Quand l'entité appartient à un parc, ces méthodes mettent à jour l'index des ids
-du parc.
+du parc. `detach` et `remove_system` font sortir l'entité du parc avec les mêmes contrôles que
+`park.remove` : elles lèvent `EntityInUseError` si l'entité ou son contenu est référencé hors du sous-arbre
+retiré (`scope` d'un Meter, `serves` d'un système). Pour retirer aussi ces références, utiliser
+`park.remove(id, force=True)`.
 
 ### 3.6 Building
 
@@ -697,7 +700,10 @@ park.save("bayonne/", include_data=True)  # + bayonne/timeseries/<meter_id>.parq
 BuildingPark.load("bayonne/", site_cls=..., building_cls=...)
 
 BuildingPark.json_schema(site_cls=..., building_cls=...) -> dict
+park.json_schema()                        # classes du parc par défaut
 ```
+
+- `save` renvoie le chemin de `park.json` ; `load` accepte ce chemin ou le dossier.
 
 - `load` ne lit pas les séries : `meter.load_data()` ou `park.timeseries(load_data=True)` les chargent à la demande.
 - Dans un fichier de parc, les chemins relatifs des sources de données sont relatifs au dossier du parc.
