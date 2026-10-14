@@ -196,19 +196,19 @@ inconnus, `ImportReport`, erreurs, pas de cache, format JSON inchangé).
       tous les libellés DPE collectés à l'étape 11 sont couverts par la table
 
 ## Étape 16 — Connecteur RNB
-- [ ] `RnbClient` : bâtiment par id (une requête par id, pas de lecture groupée), historique d'un id
+- [x] `RnbClient` : bâtiment par id (une requête par id, pas de lecture groupée), historique d'un id
       inactif, bâtiment le plus proche (`point=lat,lon`, rayon ≤ 1000 m), recherche par adresse
-- [ ] Correspondances : `point` → `lat`/`lon`, `shape` → `footprint` (si polygone), première adresse →
+- [x] Correspondances : `point` → `lat`/`lon`, `shape` → `footprint` (si polygone), première adresse →
       `address`, `municipality`, `insee_code` ; `ext_ids` BDNB → `bdnb_batiment_construction_id` s'il
       est vide ; normalisation des ids (majuscules, sans tirets)
-- [ ] `rnb.add_buildings(park, rnb_ids, parent=None)` : crée les bâtiments absents via
+- [x] `rnb.add_buildings(park, rnb_ids, parent=None)` : crée les bâtiments absents via
       `park.new_building` (donc avec `building_cls`), enrichit les existants
-- [ ] `rnb.enrich(park, buildings=None)` : bâtiments du parc qui ont un `rnb_id`
-- [ ] Rapport : id inconnu, démoli, inactif (successeurs lus dans l'historique) ; rien n'est supprimé
-- [ ] `rnb.suggest_matches(park, buildings=None, by="point" | "address", radius=..., assign=None)`
+- [x] `rnb.enrich(park, buildings=None)` : bâtiments du parc qui ont un `rnb_id`
+- [x] Rapport : id inconnu, démoli, inactif (successeurs lus dans l'historique) ; rien n'est supprimé
+- [x] `rnb.suggest_matches(park, buildings=None, by="point" | "address", radius=..., assign=None)`
       (D10) : DataFrame (id du bâtiment, `rnb_id` candidat, distance ou score BAN, adresse RNB) ;
       `assign="unique"` ; `rnb_id` déjà pris dans le parc → signalé, jamais affecté
-- [ ] Tests : correspondances sur réponses enregistrées, classe projet respectée, idempotence,
+- [x] Tests : correspondances sur réponses enregistrées, classe projet respectée, idempotence,
       ids inactifs, suggestions (zéro, un, plusieurs candidats ; `rnb_id` déjà utilisé) ; un test
       `network`
 

@@ -860,6 +860,18 @@ l'emprise) ou score de géocodage de l'adresse, adresse RNB. L'utilisateur valid
 n'y a qu'un candidat (dans le rayon, ou à l'adresse). Un `rnb_id` déjà utilisé dans le parc est signalé
 mais jamais affecté.
 
+Précisions d'implémentation :
+- les candidats RNB n'ont pas de `date` (la réponse ne date pas l'information) ; `ref` = `rnb_id`, et le
+  `comment` de `address` donne la clé BAN (`BAN 64102_0885_00004`). L'adresse est mise sur une ligne :
+  `4 Rue de la Gabarre, 64100 Bayonne` ;
+- un relancement remplace les candidats `"rnb"` et retire ceux que le RNB ne donne plus ;
+- id inconnu → `not_found` ; bâtiment démoli ou id inactif → un message seulement, sans statut ; dans
+  `enrich`, un bâtiment sans `rnb_id` est signalé (renvoi vers `suggest_matches`) ;
+- `suggest_matches` : rayon par défaut 30 m ; le point et l'adresse sont les valeurs effectives, donc
+  hérités du site si le bâtiment n'en a pas. Colonnes : `building_id`, `rnb_id`, `distance`, `score`,
+  `address`, `used_by` (bâtiment du parc qui porte déjà ce `rnb_id`), `assigned`. Un bâtiment sans point
+  (ou sans adresse) ou sans candidat n'a pas de ligne.
+
 La recherche par adresse s'appuie sur l'API RNB, qui géocode elle-même l'adresse avec la BAN et ne garde
 que la meilleure adresse : il n'y a pas de géocodage séparé dans bstock. Une adresse sans numéro ou mal
 reconnue ne donne aucun candidat.
