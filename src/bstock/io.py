@@ -108,7 +108,8 @@ def from_json(
         saved = metadata[key]
         if saved is not None and saved != class_path(cls):
             warnings.warn(
-                f"the park was saved with {key}={saved}, loaded with {class_path(cls)}",
+                f"the park was saved with {key}={saved}, loaded with {class_path(cls)}; "
+                f"import that class and pass {key}= to load it with its project attributes",
                 ClassMismatchWarning,
                 stacklevel=3,
             )
@@ -122,6 +123,8 @@ def from_json(
 
 def save(park: BuildingPark, directory: str | Path, *, include_data: bool = False) -> Path:
     """Save ``park`` in ``directory`` and return the path of ``park.json``.
+
+    The park in memory is modified so that it describes what was saved: see Notes.
 
     Parameters
     ----------
@@ -137,7 +140,9 @@ def save(park: BuildingPark, directory: str | Path, *, include_data: bool = Fals
     Notes
     -----
     Relative paths of the other data sources are made absolute, since relative paths in a park
-    file are relative to the park directory.
+    file are relative to the park directory. With ``include_data``, the ``data_source`` of the
+    meters is replaced in memory too: saving again does not rewrite unchanged data from the
+    original files, and the park keeps working if the working directory changes.
     """
     directory = Path(directory)
     directory.mkdir(parents=True, exist_ok=True)

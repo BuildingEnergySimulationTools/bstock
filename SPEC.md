@@ -410,7 +410,8 @@ La **valeur effective** est choisie parmi les candidats selon la priorité des s
 ```python
 b.construction_year                    # -> 1972 (valeur effective) ou None
 b.construction_year = 1968             # équivaut à b.set(..., source="manual")
-b.construction_year = None             # retire le candidat "manual" (équivaut à unset(source="manual"))
+b.construction_year = None             # retire le candidat "manual" (équivaut à unset(source="manual")) :
+                                       # une valeur d'une autre source peut rester ; unset(name) retire tout
 
 b.set("construction_year", 1970, source="bdnb", date=date(2024, 10, 1))
 b.set("construction_year", 1972, source="dpe", ref="2364E0123456X")
@@ -477,7 +478,7 @@ site.set("construction_year", 1972, source="bdnb")   # posé sur le groupe BDNB
 b.construction_year                           # -> 1972 (hérité)
 b.provider_id("construction_year")                 # -> "bdnb-bg-1111-1HRT-8SVH" (id de l'entité qui fournit la valeur)
 b.candidates("construction_year")                # -> [] (candidats propres seulement)
-b.candidates("construction_year", inherited=True)
+b.inherited_candidates("construction_year")
 # [("bdnb-bg-1111-1HRT-8SVH", SourcedValue(1972, source="bdnb"))]
 b.set("construction_year", 1985, source="audit")   # valeur propre : masque l'héritage
 ```
@@ -571,7 +572,8 @@ Règles :
   `Building`), ils sont **conservés tels quels** et réécrits à la sauvegarde. Un avertissement est émis :
   pas de perte de données.
 - Le JSON enregistre le chemin des classes utilisées (`"building_cls": "projet_bayonne.model.BayonneBuilding"`)
-  à titre informatif. Un avertissement est émis si la classe passée au chargement diffère.
+  à titre informatif. Un avertissement est émis si la classe passée au chargement diffère. Ces classes ne
+  sont jamais importées automatiquement : ouvrir un fichier reçu d'un tiers ne doit pas exécuter de code.
 
 ---
 
@@ -718,7 +720,9 @@ park.json_schema()                        # classes du parc par défaut
   ignorent les métadonnées (version du format, classes). La docstring de `BuildingPark` renvoie vers
   `to_json` / `from_json`.
 - `save` modifie le parc : chemins rendus absolus et, avec `include_data=True`, `data_source` remplacée
-  (voir ci-dessous).
+  (voir ci-dessous). C'est délibéré : le parc en mémoire décrit ce qui a été sauvegardé, une nouvelle
+  sauvegarde ne relit pas les fichiers d'origine, et les chemins restent valides si le répertoire courant
+  change.
 - `site_cls` et `building_cls` sont des champs du parc exclus de la sérialisation. Le nom du parc se passe
   par mot-clé : `BuildingPark(name="Ville de Bayonne", site_cls=..., building_cls=...)`.
 

@@ -140,8 +140,12 @@ class BuildingPark(BaseModel):
 
         ``directory`` receives ``park.json``, plus Parquet files with ``include_data``.
 
-        The park itself is modified: relative paths of data sources become absolute and, with
-        ``include_data``, the meters point to the saved Parquet files. See :func:`bstock.io.save`.
+        Warnings
+        --------
+        The park in memory is modified, so that it describes what was saved: relative paths of data
+        sources become absolute and, with ``include_data``, the meters read their data from the
+        saved Parquet files (the former source is kept in ``original_data_source``). See
+        :func:`bstock.io.save`.
         """
         from bstock import io  # circular import
 

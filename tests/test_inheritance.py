@@ -117,7 +117,7 @@ def test_inherited_sources_list_every_level_nearest_first(tree):
     building.set("year", 1985, source="audit")
     group.set("year", 1972, source="bdnb")
     client.set("year", 1950, source="manual")
-    assert building.candidates("year", inherited=True) == [
+    assert building.inherited_candidates("year") == [
         ("A1B2C3D4E5F6", SourcedValue(value=1985, source="audit")),
         ("bdnb-bg-1111", SourcedValue(value=1972, source="bdnb")),
         ("client-site", SourcedValue(value=1950, source="manual")),
@@ -127,7 +127,15 @@ def test_inherited_sources_list_every_level_nearest_first(tree):
 def test_inherited_sources_of_extensive_field_are_own_only(tree):
     _, group, building = tree
     group.dwellings = 48
-    assert building.candidates("dwellings", inherited=True) == []
+    assert building.inherited_candidates("dwellings") == []
+
+
+def test_candidates_inherited_flag_is_deprecated(tree):
+    _, group, building = tree
+    group.set("year", 1972, source="bdnb")
+    with pytest.warns(DeprecationWarning, match="inherited_candidates"):
+        pairs = building.candidates("year", inherited=True)
+    assert pairs == building.inherited_candidates("year")
 
 
 def test_field_missing_on_parent_stops_inheritance(tree):

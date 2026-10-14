@@ -112,7 +112,7 @@ def main(output: Path) -> BuildingPark:
     a.set("construction_year", 1974, source="audit", date=date(2025, 3, 12), comment="plans")
     a.set("heated_area", 1250.0, source="audit")
     print(f"A built in {a.construction_year} ({a.effective('construction_year').source}),")
-    for entity_id, candidate in a.candidates("construction_year", inherited=True):
+    for entity_id, candidate in a.inherited_candidates("construction_year"):
         print(f"  {entity_id}: {candidate.value} from {candidate.source}")
     print(f"A usage {a.usage} inherited from {a.provider_id('usage')}")
 

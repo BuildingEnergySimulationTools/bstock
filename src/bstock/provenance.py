@@ -272,6 +272,11 @@ class SourcedModel(BaseModel):
     given by ``source`` (``"manual"`` by default); ``None`` values are ignored::
 
         Building(rnb_id="A1B2C3D4E5F6", construction_year=1970, source="bdnb")
+
+    Reading a sourced attribute returns the effective value; assigning it writes the ``"manual"``
+    candidate only. In particular ``b.heated_area = None`` removes the manual value, and
+    ``b.heated_area`` may still return a value from another source: use ``b.unset("heated_area")``
+    to remove every candidate.
     """
 
     model_config = ConfigDict(
@@ -464,16 +469,46 @@ class SourcedModel(BaseModel):
     def candidates(
         self, name: str, *, inherited: bool = False
     ) -> list[SourcedValue] | list[tuple[str | None, SourcedValue]]:
-        """Return the candidates of ``name``, in insertion order.
+        """Return the own candidates of ``name``, in insertion order.
 
         Parameters
         ----------
         name
             Attribute name. Names unknown to the class but present in loaded data are accepted.
         inherited
-            If False (default), return the own candidates only. If True, return
-            ``(entity_id, candidate)`` pairs for this entity and, for an inherited attribute, for
-            every ancestor up the inheritance chain, nearest first.
+            Deprecated: use :meth:`inherited_candidates`, which returns what ``inherited=True``
+            returned.
+
+        Raises
+        ------
+        UnknownFieldError
+            If ``name`` is neither a sourced attribute nor present in ``values``.
+        """
+        if inherited:
+            warnings.warn(
+                "candidates(name, inherited=True) is deprecated; use inherited_candidates(name)",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+            return self.inherited_candidates(name)
+        if name not in self.values:
+            self._field(name)
+        return list(self.values.get(name, []))
+
+    def inherited_candidates(self, name: str) -> list[tuple[str | None, SourcedValue]]:
+        """Return the candidates of ``name`` along the inheritance chain, nearest first.
+
+        Parameters
+        ----------
+        name
+            Attribute name. Names unknown to the class but present in loaded data are accepted.
+
+        Returns
+        -------
+        list of (str or None, SourcedValue)
+            ``(entity_id, candidate)`` pairs: the own candidates first then, for an inherited
+            attribute, those of every ancestor up the chain. For an attribute that is not
+            inherited, the own candidates only.
 
         Raises
         ------
@@ -482,8 +517,6 @@ class SourcedModel(BaseModel):
         """
         if name not in self.values:
             self._field(name)
-        if not inherited:
-            return list(self.values.get(name, []))
         return [
             (node._entity_id(), candidate)
             for node in self._inheritance_chain(name)
