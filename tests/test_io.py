@@ -103,10 +103,10 @@ def test_json_round_trip_with_project_classes(park):
     assert a.usage == "tertiary"
     assert a.envelope.u_bat == 1.1
     assert type(a.envelope.components[1]) is Window
-    assert [s.id for s in a.systems("heating")] == ["plant"]
+    assert [s.id for s in a.serving_systems("heating")] == ["plant"]
     assert loaded.get_by_rnb(RNB_B) is loaded[RNB_B]
-    assert a.meters() == []
-    assert loaded["site-ecole-A"].meters()[0].id == "PDL_123"
+    assert a.find_meters() == []
+    assert loaded["site-ecole-A"].find_meters()[0].id == "PDL_123"
 
 
 def test_round_trip_keeps_source_priority(park):

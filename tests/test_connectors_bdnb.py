@@ -184,7 +184,7 @@ def test_multi_construction_group_becomes_a_site(park, client):
     # systems and DPE on the site, served to the building
     assert [s.id for s in site.heating] == [f"heating-{MULTI_GROUP}-bdnb-1"]
     assert building.heating == []
-    assert [s.id for s in building.systems("heating")] == [f"heating-{MULTI_GROUP}-bdnb-1"]
+    assert [s.id for s in building.serving_systems("heating")] == [f"heating-{MULTI_GROUP}-bdnb-1"]
     assert site.dpe_ids == ["2664E0684239O"]
 
 

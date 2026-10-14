@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import warnings
 from typing import Annotated, Any
 
 import pandas as pd
@@ -169,13 +170,26 @@ class Meter(SourcedModel):
         sub_bloc = self.sub_bloc or str(self.end_use or EndUse.OTHER)
         return bloc, sub_bloc
 
-    def column_names(self) -> dict[str, str]:
-        """Return the tide column name of each channel, by channel name."""
+    def tide_columns(self) -> dict[str, str]:
+        """Return the tide column name of each channel, by channel name.
+
+        These are the columns of :attr:`data`; ``Channel.column`` is the column read in the raw
+        source data.
+        """
         bloc, sub_bloc = self.tide_tags()
         return {
             c.name: tide_column(f"{self.id}_{c.name}", c.unit, bloc, sub_bloc)
             for c in self.channels
         }
+
+    def column_names(self) -> dict[str, str]:
+        """Return the same as :meth:`tide_columns` (deprecated alias)."""
+        warnings.warn(
+            "column_names() is deprecated; use tide_columns()",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return self.tide_columns()
 
     # --- data ---------------------------------------------------------------------------------
 
@@ -191,7 +205,7 @@ class Meter(SourcedModel):
             self._data = None
             return
         frame = ensure_time_index(frame)
-        names = self.column_names()
+        names = self.tide_columns()
         renamed = frame.rename(columns=names)
         expected = list(names.values())
         missing = [c for c in expected if c not in renamed.columns]
@@ -216,7 +230,7 @@ class Meter(SourcedModel):
         if self.data_source is None:
             raise DataSourceError(f"meter {self.id!r} has no data source")
         raw = self.data_source.load()
-        tide_names = list(self.column_names().values())
+        tide_names = list(self.tide_columns().values())
         if all(name in raw.columns for name in tide_names):
             selected = raw[tide_names]
         elif len(self.channels) == 1 and raw.shape[1] == 1:

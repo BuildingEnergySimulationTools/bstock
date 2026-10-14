@@ -73,7 +73,11 @@ class DataSource(BaseModel):
     __hash__ = None  # type: ignore[assignment]
 
     def read(self) -> pd.DataFrame:
-        """Read the raw data; implemented by subclasses."""
+        """Read the raw data; implemented by subclasses, called by :meth:`load`.
+
+        Users call :meth:`load` (or ``meter.load_data()``), which also checks and localises the
+        index.
+        """
         raise NotImplementedError
 
     def load(self) -> pd.DataFrame:

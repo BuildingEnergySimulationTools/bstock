@@ -140,7 +140,7 @@ def main(output: Path) -> BuildingPark:
         ),
         owner="site-ecole-A",
     )
-    print(f"A heating systems: {[s.id for s in a.systems('heating')]}")
+    print(f"A heating systems: {[s.id for s in a.serving_systems('heating')]}")
     park.add_meter(
         Meter(
             id="PDL_123",

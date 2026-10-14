@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import warnings
 from collections.abc import Iterator
 from typing import TYPE_CHECKING, Any
 
@@ -205,13 +206,23 @@ class DescribedEntity(SourcedModel):
                 f"'serves' only applies to systems owned by a site, not {self.id!r}"
             )
 
-    def meters(self) -> list[Any]:
+    def find_meters(self) -> list[Any]:
         """Return the park meters whose scope contains this entity or one of its own systems.
 
-        A query, unlike ``park.meters`` (every meter of the park); see ``park.meters_for``.
+        Same as ``park.meters_for(entity)``; ``park.meters`` is the list of every meter of the park.
+        Outside a park, the list is empty.
         """
         park = self.park
         return [] if park is None else park.meters_for(self)
+
+    def meters(self) -> list[Any]:
+        """Return the same as :meth:`find_meters` (deprecated alias)."""
+        warnings.warn(
+            "meters() is deprecated; use find_meters()",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return self.find_meters()
 
     def _notify_park(self, method: str, entity: SourcedModel) -> None:
         """Let the park check references and maintain its index (no-op outside a park)."""

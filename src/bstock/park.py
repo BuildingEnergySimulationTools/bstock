@@ -288,7 +288,7 @@ class BuildingPark(BaseModel):
         """Return the meters whose scope contains ``entity`` or one of its own systems.
 
         Unlike :attr:`meters`, the list of every meter of the park, this is a query; it is also
-        available as ``entity.meters()``.
+        available as ``entity.find_meters()``.
         """
         target = self._resolve(entity, (Site, Building))
         ids = {target.id, *(s.id for s in target.iter_systems())}
@@ -299,8 +299,8 @@ class BuildingPark(BaseModel):
     def new_site(
         self,
         id: str,
-        parent: Site | str | None = None,
         *,
+        parent: Site | str | None = None,
         source: str | None = None,
         **attrs: Any,
     ) -> Site:
@@ -323,9 +323,9 @@ class BuildingPark(BaseModel):
     def new_building(
         self,
         rnb_id: str | None = None,
+        *,
         id: str | None = None,
         parent: Site | str | None = None,
-        *,
         source: str | None = None,
         **attrs: Any,
     ) -> Building:

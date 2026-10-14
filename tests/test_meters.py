@@ -46,16 +46,16 @@ def test_tide_column():
         tide_column("a__b", "W", "x", "y")
 
 
-def test_column_names_follow_convention():
+def test_tide_columns_follow_convention():
     meter = Meter(
         id="PDL_123", scope=["site-A"], end_use="total", channels=[Channel(name="power", unit="W")]
     )
-    assert meter.column_names() == {"power": "PDL_123_power__W__site-A__total"}
+    assert meter.tide_columns() == {"power": "PDL_123_power__W__site-A__total"}
 
 
 def test_bloc_is_meter_id_for_several_entities_and_sub_bloc_defaults_to_other():
     meter = Meter(id="m", scope=[RNB_A, RNB_B], channels=[Channel(name="energy", unit="kWh")])
-    assert meter.column_names()["energy"] == "m_energy__kWh__m__other"
+    assert meter.tide_columns()["energy"] == "m_energy__kWh__m__other"
 
 
 def test_explicit_bloc_and_sub_bloc_override_derived_tags():
@@ -67,7 +67,7 @@ def test_explicit_bloc_and_sub_bloc_override_derived_tags():
         sub_bloc="gas",
         channels=[Channel(name="energy", unit="kWh")],
     )
-    assert meter.column_names()["energy"] == "m_energy__kWh__chaufferie__gas"
+    assert meter.tide_columns()["energy"] == "m_energy__kWh__chaufferie__gas"
     assert meter.tide_tags() == ("chaufferie", "gas")
     meter.bloc = None
     assert meter.tide_tags() == (RNB_A, "gas")
@@ -338,9 +338,9 @@ def test_entity_meters(park):
     site_meter = park.add_meter(make_meter("site-meter", ["site-A"]))
     boiler_meter = park.add_meter(make_meter("boiler-meter", ["boiler"], end_use="heating"))
     a_meter = park.add_meter(make_meter("a-meter", [RNB_A]))
-    assert park["site-A"].meters() == [site_meter, boiler_meter]  # boiler is a site system
-    assert park[RNB_A].meters() == [a_meter]
-    assert Building().meters() == []
+    assert park["site-A"].find_meters() == [site_meter, boiler_meter]  # boiler is a site system
+    assert park[RNB_A].find_meters() == [a_meter]
+    assert Building().find_meters() == []
 
 
 def test_remove_meter(park):

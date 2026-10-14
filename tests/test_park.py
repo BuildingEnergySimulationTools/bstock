@@ -103,6 +103,31 @@ def test_duplicate_id_anywhere_in_park_is_rejected(park):
         park.new_site(RNB_C)  # a site cannot reuse a building id
 
 
+@pytest.mark.parametrize(
+    ("method", "args"),
+    [("new_site", ("s2", "site-ecole-A")), ("new_building", (None, "b2", "site-ecole-A"))],
+)
+def test_new_entity_takes_parent_and_id_by_keyword_only(park, method, args):
+    with pytest.raises(TypeError):
+        getattr(park, method)(*args)
+
+
+@pytest.mark.parametrize(
+    ("old", "new", "target"),
+    [
+        ("meters", "find_meters", lambda park: park[RNB_A]),
+        ("systems", "serving_systems", lambda park: park[RNB_A]),
+        ("column_names", "tide_columns", lambda park: park["m"]),
+    ],
+)
+def test_deprecated_aliases_warn_and_delegate(park, old, new, target):
+    park.add_meter(Meter(id="m", scope=[RNB_A], channels=[Channel(name="e", unit="kWh")]))
+    entity = target(park)
+    with pytest.warns(DeprecationWarning, match=new):
+        result = getattr(entity, old)()
+    assert result == getattr(entity, new)()
+
+
 def test_duplicate_rnb_id_is_rejected(park):
     with pytest.raises(DuplicateIdError, match="RNB"):
         park.new_building(RNB_A, id="other-id")
@@ -230,8 +255,8 @@ def test_invalid_class_is_rejected():
 
 def test_add_shared_system_checks_served_buildings(park):
     plant = park.add_system(HeatingGenerator(id="plant", serves=[RNB_A, RNB_C]), "site-ecole-A")
-    assert park[RNB_A].systems("heating") == [plant]
-    assert park["bldg-isolated"].systems("heating") == []
+    assert park[RNB_A].serving_systems("heating") == [plant]
+    assert park["bldg-isolated"].serving_systems("heating") == []
     with pytest.raises(UnknownIdError):
         park.add_system(HeatingGenerator(serves=["bldg-isolated"]), "site-ecole-A")
     with pytest.raises(HierarchyError, match="serves"):
@@ -315,7 +340,7 @@ def test_move_inside_serving_site_keeps_references(park):
     plant = park.add_system(HeatingGenerator(id="plant", serves=[RNB_A]), "site-ecole-A")
     park.move(RNB_A, "site-ecole-A")
     assert plant.serves == [RNB_A]
-    assert park[RNB_A].systems("heating") == [plant]
+    assert park[RNB_A].serving_systems("heating") == [plant]
     park.move(RNB_A, GROUP)
     group_boiler = park.add_system(HeatingGenerator(id="group-boiler", serves=[RNB_A]), GROUP)
     park.move(GROUP, None, force=True)  # the group boiler moves with its buildings

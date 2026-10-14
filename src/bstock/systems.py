@@ -80,7 +80,7 @@ class System(SourcedModel):
 
     kind: ClassVar[str] = "system"
     """Kind of system (a :class:`SystemKind` on concrete classes), used as id prefix and by
-    ``building.systems(kind=...)``."""
+    ``building.serving_systems(kind=...)``."""
 
     id: str = Field(frozen=True)
     serves: list[str] | None = None

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import warnings
 from typing import Any
 
 from pydantic import field_validator, model_validator
@@ -70,10 +71,12 @@ class Building(DescribedEntity):
                 park._change_rnb(self, value)
         super().__setattr__(name, value)
 
-    def systems(
+    def serving_systems(
         self, kind: SystemKind | str | None = None, *, include_shared: bool = True
     ) -> list[System]:
-        """Return the systems serving this building.
+        """Return the systems serving this building: its own, then those shared by its sites.
+
+        Unlike :meth:`iter_systems`, which yields the systems owned by the building only.
 
         Parameters
         ----------
@@ -91,3 +94,14 @@ class Building(DescribedEntity):
                     s for s in site.iter_systems(kind) if s.serves is None or self.id in s.serves
                 )
         return found
+
+    def systems(
+        self, kind: SystemKind | str | None = None, *, include_shared: bool = True
+    ) -> list[System]:
+        """Return the same as :meth:`serving_systems` (deprecated alias)."""
+        warnings.warn(
+            "systems() is deprecated; use serving_systems()",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return self.serving_systems(kind, include_shared=include_shared)

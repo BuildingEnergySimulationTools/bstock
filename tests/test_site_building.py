@@ -290,16 +290,16 @@ def test_shared_systems_serve_buildings(tree):
     plant = client.add_system(HeatingGenerator(id="heating-chaufferie"))  # serves everything
     group_boiler = group.add_system(HeatingGenerator(id="heating-group", serves=[RNB_A]))
     own = b.add_system(HeatingGenerator(id="heating-b"))
-    assert a.systems("heating") == [group_boiler, plant]
-    assert b.systems("heating") == [own, plant]
-    assert c.systems("heating") == [plant]
-    assert b.systems("heating", include_shared=False) == [own]
-    assert a.systems("pv") == []
+    assert a.serving_systems("heating") == [group_boiler, plant]
+    assert b.serving_systems("heating") == [own, plant]
+    assert c.serving_systems("heating") == [plant]
+    assert b.serving_systems("heating", include_shared=False) == [own]
+    assert a.serving_systems("pv") == []
 
 
 def test_unknown_system_kind_is_rejected():
     with pytest.raises(UnknownKindError, match="unknown system kind"):
-        Building().systems("geothermal")
+        Building().serving_systems("geothermal")
 
 
 def test_duplicate_system_ids_rejected_at_construction():
@@ -321,7 +321,7 @@ def test_json_round_trip_rebuilds_tree(tree):
     loaded_a = next(x for x in loaded.iter_buildings() if x.id == RNB_A)
     assert loaded_a.construction_year == 1972
     assert loaded_a.envelope.u_bat == 1.1
-    assert [s.id for s in loaded_a.systems("heating")] == ["heating-group"]
+    assert [s.id for s in loaded_a.serving_systems("heating")] == ["heating-group"]
     assert loaded_a.usage is BuildingUsage.TERTIARY
 
 

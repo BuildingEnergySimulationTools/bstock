@@ -131,8 +131,8 @@ Méthodes principales :
 
 | Méthode | Rôle |
 |---|---|
-| `new_site(id, parent=None, source=None, **attrs)` | Crée un site (instance de `site_cls`) au premier niveau ou sous `parent` |
-| `new_building(rnb_id=None, id=None, parent=None, source=None, **attrs)` | Crée un bâtiment (instance de `building_cls`) |
+| `new_site(id, *, parent=None, source=None, **attrs)` | Crée un site (instance de `site_cls`) au premier niveau ou sous `parent` |
+| `new_building(rnb_id=None, *, id=None, parent=None, source=None, **attrs)` | Crée un bâtiment (instance de `building_cls`) |
 | `add_site(site, parent=None)`, `add_building(building, parent=None)` | Ajoute un objet déjà construit (contrôle de classe et d'unicité des ids) |
 | `add_system(system, owner)` | Ajoute un système à un bâtiment ou à un site (`owner` = objet ou id) |
 | `add_meter(meter)` | Ajoute un compteur ; les ids du `scope` doivent exister |
@@ -234,9 +234,9 @@ et la priorité des sources arbitre avec la valeur de la BDNB.
 Accès dérivés du bâtiment (non sérialisés) :
 - `building.parent` : le site parent direct ou `None` ;
 - `building.park` : le parc ;
-- `building.systems(kind="heating", include_shared=True)` : systèmes propres, plus systèmes des sites
-  ancêtres qui le desservent ;
-- `building.meters()` : compteurs dont le `scope` contient ce bâtiment ou un de ses systèmes.
+- `building.serving_systems(kind="heating", include_shared=True)` : systèmes propres, plus systèmes des sites
+  ancêtres qui le desservent (`iter_systems()` ne donne que les systèmes propres) ;
+- `building.find_meters()` : compteurs dont le `scope` contient ce bâtiment ou un de ses systèmes.
 
 ### 3.7 Envelope
 
@@ -337,7 +337,7 @@ technologies génériques suivent leur famille : `BOILER` et `WATER_HEATER` comm
 `HEAT_PUMP` comme une PAC. Les PAC hybrides et le solaire thermique ne sont pas contrôlés.
 
 Chaque classe de système a un `kind` (`SystemKind` : `heating`, `cooling`, `dhw`, `ventilation`, `pv`) qui sert de préfixe
-aux ids générés et de filtre dans `building.systems(kind=...)`.
+aux ids générés et de filtre dans `building.serving_systems(kind=...)`.
 
 `DHWGenerator` ajoute `storage_volume` (sourcé `float`, L) : volume de stockage, `None` = production
 instantanée ou inconnue (open data DPE : `volume_stockage_generateur_n*_ecs_n1`).
@@ -665,7 +665,7 @@ Les colonnes suivent le format tide `name__unit__bloc__sub_bloc` :
 | `bloc` | id de l'entité du `scope` s'il n'y en a qu'une ; sinon `meter.id` |
 | `sub_bloc` | `end_use` (ex. `heating`), `other` si inconnu |
 
-`Meter(bloc=..., sub_bloc=...)` surcharge ces valeurs ; `meter.tide_tags()` renvoie le couple effectif. Exemple : `PDL_123_power__W__site-ecole-A__total`.
+`Meter(bloc=..., sub_bloc=...)` surcharge ces valeurs ; `meter.tide_tags()` renvoie le couple effectif et `meter.tide_columns()` les noms de colonnes par canal. Exemple : `PDL_123_power__W__site-ecole-A__total`.
 
 `park.timeseries(...)` assemble un DataFrame unique à partir de plusieurs compteurs, directement utilisable
 par tide :
@@ -684,7 +684,7 @@ Plumber(df).show()
 - Les noms de colonnes commencent par l'id du compteur : ils sont donc uniques dans le parc.
 - Un compteur sélectionné sans données en mémoire (et sans `load_data=True`) est ignoré avec un
   `NoDataWarning`.
-- `park.meters_for(entité)` et `entité.meters()` renvoient les compteurs dont le `scope` contient l'entité
+- `park.meters_for(entité)` et `entité.find_meters()` renvoient les compteurs dont le `scope` contient l'entité
   ou un de ses systèmes propres.
 
 ---
@@ -1102,6 +1102,15 @@ scripts/               # outils de maintenance (régénération de dpe_generator
 | **v1** | Modèle (Park, Site, Building, Envelope, systèmes, Meter), provenance multi-sources, extension par héritage, sources CSV/Parquet, `timeseries()` au format tide, save/load JSON + Parquet, JSON Schema |
 | **v2** | Connecteurs API RNB, BDNB, DPE (§8) avec suggestions d'appariement RNB ; exports `to_dataframe()`, `to_geodataframe()`, GeoPackage, GeoParquet (§9) ; emprise au sol `footprint` et `compute_footprint_area()` (§3.6) |
 | v3 | Filtrage (`park.buildings.filter(...)`), agrégations par site ou par parc (grandeurs extensives), rapport de complétude et de provenance |
+
+Noms dépréciés (ils émettent un `DeprecationWarning` et seront retirés en v3) :
+
+| Ancien nom | Remplacé par |
+|---|---|
+| `entity.candidates(name, inherited=True)` | `entity.inherited_candidates(name)` |
+| `entity.meters()` | `entity.find_meters()` |
+| `building.systems(...)` | `building.serving_systems(...)` |
+| `meter.column_names()` | `meter.tide_columns()` |
 
 ---
 
