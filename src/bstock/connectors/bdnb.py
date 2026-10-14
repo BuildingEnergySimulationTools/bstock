@@ -119,7 +119,8 @@ class BdnbClient:
     """Raw access to the BDNB API (PostgREST): rows of the tables as JSON dicts.
 
     Requests are grouped by batches of ids (``col=in.(…)``), as large as the page size of the offer,
-    and paginated with ``offset``.
+    and paginated with ``offset``. The methods raise :class:`~bstock.exceptions.ConnectorError`
+    when the API fails persistently.
 
     Parameters
     ----------

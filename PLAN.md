@@ -6,7 +6,7 @@ Règles (voir `CLAUDE.md`) :
 - un écart avec la SPEC passe d'abord par une mise à jour de `SPEC.md`.
 
 Sommaire : [v1](#v1--terminée) (terminée, 0.1.0 puis ajustements d'API en 0.2.0) ·
-[v2](#v2--connecteurs-emprise-et-exports) (en cours) · [v3](#v3--rappel-de-la-feuille-de-route)
+[v2](#v2--connecteurs-emprise-et-exports) (terminée, 0.3.0) · [v3](#v3--rappel-de-la-feuille-de-route)
 
 ---
 
@@ -258,11 +258,11 @@ inconnus, `ImportReport`, erreurs, pas de cache, format JSON inchangé).
       `tmp_path`, erreur claire sans l'extra
 
 ## Étape 20 — Finalisation v0.3.0
-- [ ] Exemple de bout en bout `examples/connectors.py` : RNB → BDNB → DPE → export, exécuté dans les
+- [x] Exemple de bout en bout `examples/connectors.py` : RNB → BDNB → DPE → export, exécuté dans les
       tests avec le faux client
-- [ ] Revue de l'API publique (`__all__`, `bstock.connectors`) et des docstrings NumPy
-- [ ] README (installation des extras, exemple court) ; statut de la SPEC passé en v2
-- [ ] Version `0.3.0` et tag git
+- [x] Revue de l'API publique (`__all__`, `bstock.connectors`) et des docstrings NumPy
+- [x] README (installation des extras, exemple court) ; statut de la SPEC passé en v2
+- [x] Version `0.3.0` et tag git
 
 ---
 

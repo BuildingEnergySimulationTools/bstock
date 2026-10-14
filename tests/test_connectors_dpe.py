@@ -15,75 +15,27 @@ from bstock.enums import (
 )
 from bstock.exceptions import ConnectorError
 from bstock.park import BuildingPark
+from fakes import (
+    APARTMENT_RNB,
+    BUILDING_DPE,
+    FROM_BUILDING_RNB,
+    IMMEUBLE,
+    IMMEUBLE_RNB,
+    MAISON_RNB,
+    REPLACED,
+    TERTIARY_RNB,
+    FakeDpeClient,
+    dpe_lines,
+)
 
 T, E = GeneratorTechnology, EnergyType
-FILES = {
-    "dpe03existant": [
-        "lines_dpe03existant_bayonne_immeuble.json",
-        "lines_dpe03existant_bayonne_maison.json",
-        "lines_dpe03existant_bayonne_appartement.json",
-        "lines_dpe03existant_bayonne_appartement_from_immeuble.json",
-    ],
-    "dpe02neuf": ["lines_dpe02neuf_bayonne_immeuble.json", "lines_dpe02neuf_bayonne_maison.json"],
-    "dpe01tertiaire": [
-        "lines_dpe01tertiaire_bayonne.json",
-        "lines_dpe01tertiaire_bayonne_facture.json",
-    ],
-}
-IMMEUBLE, IMMEUBLE_RNB = "2664E2519948T", "2E1X4DY5AY9T"  # replaces 2664E2519887K
-REPLACED = "2664E2519887K"
-MAISON_RNB = "1SZPEQZ91AE6"
-APARTMENT_RNB = "2PH4SW4PVQQ9"
-FROM_BUILDING_RNB, BUILDING_DPE = "PEH1TASYDBYE", "2664E0578892T"
-TERTIARY_RNB = "WWZHWSD72AAJ"
+
+T, E = GeneratorTechnology, EnergyType
 
 
 @pytest.fixture
 def lines(recorded):
-    """Every recorded line, tagged with its dataset, plus two crafted ones."""
-    found = [
-        {**line, DATASET_KEY: dataset}
-        for dataset, files in FILES.items()
-        for name in files
-        for line in recorded(f"dpe/{name}")["results"]
-    ]
-    immeuble = next(line for line in found if line["numero_dpe"] == IMMEUBLE)
-    # the replaced DPE, more recent on purpose: it must still be set aside
-    found.append(
-        {
-            **immeuble,
-            "numero_dpe": REPLACED,
-            "numero_dpe_remplace": None,
-            "date_etablissement_dpe": "2026-10-10",
-        }
-    )
-    # the building DPE the apartment DPE of FROM_BUILDING_RNB were generated from
-    other = next(line for line in found if line["numero_dpe"] == "2664E2513521O")
-    found.append(
-        {
-            **other,
-            "numero_dpe": BUILDING_DPE,
-            "id_rnb": None,
-            "date_etablissement_dpe": "2026-02-27",
-        }
-    )
-    return found
-
-
-class FakeDpeClient:
-    def __init__(self, lines):
-        self.all_lines = lines
-        self.calls = []
-
-    def by_rnb(self, rnb_ids):
-        rnb_ids = set(rnb_ids)
-        self.calls.append(("rnb", sorted(rnb_ids)))
-        return [line for line in self.all_lines if line.get("id_rnb") in rnb_ids]
-
-    def by_numbers(self, numbers):
-        numbers = set(numbers)
-        self.calls.append(("numbers", sorted(numbers)))
-        return [line for line in self.all_lines if line["numero_dpe"] in numbers]
+    return dpe_lines(recorded)
 
 
 @pytest.fixture

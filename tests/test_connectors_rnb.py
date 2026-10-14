@@ -5,58 +5,16 @@ from bstock.connectors import rnb
 from bstock.exceptions import UnknownIdError
 from bstock.park import BuildingPark
 from bstock.provenance import sourced
-
-GABARRE = "6X3K8HHY9FFC"  # 4 rue de la Gabarre, Bayonne
-NEIGHBOUR = "GTV1GBN4PVR4"
-DEMOLISHED = "B1D95Z9H5X53"
-MERGED = "2HE8HF5AVVRS"
-SPLIT = "3PK8K5FN1BBV"
-DEACTIVATED = "5TFX3VFYXTCZ"
-INACTIVE_FILES = {
-    MERGED: "merged",
-    SPLIT: "split",
-    DEACTIVATED: "deactivated",
-}
-
-
-class FakeRnbClient:
-    """Serve the recorded responses of tests/data/rnb and record the calls."""
-
-    def __init__(self, recorded, closest=None, address=None):
-        self.recorded = recorded
-        self.closest_response = closest
-        self.address_response = address
-        self.calls = []
-
-    def building(self, rnb_id):
-        self.calls.append(("building", rnb_id))
-        if rnb_id == GABARRE:
-            return self.recorded(f"rnb/building_{GABARRE}.json")
-        if rnb_id == DEMOLISHED:
-            return self.recorded(f"rnb/building_demolished_{DEMOLISHED}.json")
-        if rnb_id == NEIGHBOUR:
-            return next(
-                r
-                for r in self.recorded("rnb/closest_bayonne.json")["results"]
-                if r["rnb_id"] == rnb_id
-            )
-        if rnb_id in INACTIVE_FILES:
-            return self.recorded(f"rnb/building_inactive_{INACTIVE_FILES[rnb_id]}_{rnb_id}.json")
-        return None
-
-    def history(self, rnb_id):
-        self.calls.append(("history", rnb_id))
-        return self.recorded(f"rnb/history_{INACTIVE_FILES[rnb_id]}_{rnb_id}.json")
-
-    def closest(self, lat, lon, radius):
-        self.calls.append(("closest", lat, lon, radius))
-        if self.closest_response is not None:
-            return self.closest_response
-        return self.recorded("rnb/closest_bayonne.json")["results"]
-
-    def search_address(self, address):
-        self.calls.append(("address", address))
-        return self.address_response or self.recorded("rnb/address_search_ok.json")
+from fakes import (
+    DEACTIVATED,
+    DEMOLISHED,
+    GABARRE,
+    INACTIVE_FILES,
+    MERGED,
+    NEIGHBOUR,
+    SPLIT,
+    FakeRnbClient,
+)
 
 
 class ProjectBuilding(Building):

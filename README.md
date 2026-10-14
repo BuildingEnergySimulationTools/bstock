@@ -12,6 +12,10 @@ Common data structure for building stocks: sites, buildings, envelopes, systems 
   `name__unit__bloc__sub_bloc`, read from CSV, Parquet or your own sources.
 - **Persistence**: JSON park file, optional Parquet export making a park directory self-contained,
   JSON Schema.
+- **Connectors** to the French public APIs: RNB (building register), BDNB (building database) and DPE
+  (energy performance certificates, ADEME), with RNB match suggestions for buildings without RNB id.
+- **Exports**: DataFrame with provenance, GeoDataFrame, GeoPackage and GeoParquet; footprints as
+  GeoJSON with a dependency-free area computation.
 
 The design reference is [`SPEC.md`](SPEC.md) (in French).
 
@@ -21,6 +25,8 @@ The design reference is [`SPEC.md`](SPEC.md) (in French).
 python -m pip install -e .            # library
 python -m pip install -e ".[dev]"     # + pytest, ruff
 python -m pip install -e ".[plot]"    # + plotly
+python -m pip install -e ".[connectors]"  # + requests: RNB, BDNB and DPE connectors
+python -m pip install -e ".[geo]"     # + shapely, geopandas, pyproj: BDNB geometries, geo exports
 ```
 
 Requires Python ≥ 3.11.
@@ -64,10 +70,35 @@ A complete, runnable walk-through is in [`examples/bayonne.py`](examples/bayonne
 python examples/bayonne.py
 ```
 
+## Connectors and exports
+
+```python
+from bstock import BuildingPark
+from bstock.connectors import bdnb, dpe, rnb
+
+park = BuildingPark(name="Bayonne")
+park.new_site("district", name="Saint-Esprit")
+rnb.add_buildings(park, ["5CWS74SZZ7EW", "BWB9SNCJHWVT"], parent="district")  # point, footprint, address
+bdnb.enrich(park)        # year, usage, dwellings, height, generators; BDNB groups become sub-sites
+report = dpe.enrich(park)  # most recent building DPE: areas, envelope, generators
+report.to_dataframe()      # what was created, enriched, not found, and why
+
+rnb.suggest_matches(park, by="address")   # RNB candidates for buildings without rnb_id
+
+park.to_dataframe(provenance=True)        # effective values with their source and provider
+park.to_geopackage("bayonne.gpkg")        # "sites" and "buildings" layers
+```
+
+Each value keeps its source (`"rnb"`, `"bdnb"`, `"dpe"`), date and reference; running a connector
+again updates its values without duplicating anything. The BDNB open offer serves 10 rows per call:
+pass `bdnb.BdnbClient(api_key=...)` as `client=` for larger parks. The full workflow is in
+[`examples/connectors.py`](examples/connectors.py) (it calls the real APIs).
+
 ## Development
 
 ```bash
-python -m pytest
+python -m pytest                      # offline tests (recorded API responses)
+python -m pytest -m network           # tests calling the real APIs
 python -m ruff check --fix .
 python -m ruff format .
 ```

@@ -117,7 +117,8 @@ class DpeClient:
     """Raw access to the DPE datasets of the ADEME data-fair API: lines as JSON dicts.
 
     Each line receives a ``_dataset`` key naming its dataset. Only the columns used by bstock are
-    requested, without total count, to spare the processing budget of the API.
+    requested, without total count, to spare the processing budget of the API. The methods raise
+    :class:`~bstock.exceptions.ConnectorError` when the API fails persistently.
 
     Parameters
     ----------

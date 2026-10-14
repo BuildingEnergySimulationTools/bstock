@@ -11,50 +11,17 @@ from bstock.exceptions import BstockWarning, ConnectorError
 from bstock.park import BuildingPark
 from bstock.provenance import sourced
 from bstock.site import Site
+from fakes import (
+    MULTI_GROUP,
+    MULTI_RNB,
+    OTHER_CONSTRUCTION,
+    OTHER_RNB,
+    SINGLE_GROUP,
+    SINGLE_RNB,
+    FakeBdnbClient,
+)
 
-SINGLE_GROUP, SINGLE_RNB = "bdnb-bg-6SCZ-8433-AMV8", "5CWS74SZZ7EW"
-MULTI_GROUP, MULTI_RNB = "bdnb-bg-F317-Z6BT-TLT8", "BWB9SNCJHWVT"
-OTHER_RNB = "A1B2C3D4E5F6"  # given to another construction of the multi group in some tests
-OTHER_CONSTRUCTION = "bdnb-bc-2FBM-2CXY-L2SE"
 T, E = GeneratorTechnology, EnergyType
-
-
-class FakeBdnbClient:
-    """Serve the recorded rows of tests/data/bdnb and record the calls."""
-
-    def __init__(self, recorded, rnb_of=None):
-        single = recorded(f"bdnb/batiment_construction_single_{SINGLE_GROUP}.json")
-        multi = recorded(f"bdnb/batiment_construction_multi_{MULTI_GROUP}.json")
-        self.constructions = [
-            {**row, "rnb_id": (rnb_of or {}).get(row["batiment_construction_id"], row["rnb_id"])}
-            for row in [*single, *multi]
-        ]
-        self.group_rows = [
-            *recorded(f"bdnb/batiment_groupe_complet_single_{SINGLE_GROUP}.json"),
-            *recorded(f"bdnb/batiment_groupe_complet_multi_{MULTI_GROUP}.json"),
-        ]
-        self.dpe_rows = recorded(
-            f"bdnb/batiment_groupe_dpe_representatif_logement_{MULTI_GROUP}.json"
-        )
-        self.calls = []
-
-    def constructions_by_rnb(self, rnb_ids):
-        rnb_ids = set(rnb_ids)
-        self.calls.append(("constructions", sorted(rnb_ids)))
-        return [r for r in self.constructions if r["rnb_id"] in rnb_ids]
-
-    def groups(self, group_ids):
-        group_ids = set(group_ids)
-        self.calls.append(("groups", sorted(group_ids)))
-        return [r for r in self.group_rows if r["batiment_groupe_id"] in group_ids]
-
-    def representative_dpe(self, group_ids):
-        group_ids = set(group_ids)
-        return [r for r in self.dpe_rows if r["batiment_groupe_id"] in group_ids]
-
-    def count_constructions(self, group_id):
-        self.calls.append(("count", group_id))
-        return sum(r["batiment_groupe_id"] == group_id for r in self.constructions)
 
 
 class ProjectSite(Site):

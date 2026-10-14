@@ -28,6 +28,7 @@ __all__ = [
     "SOURCE",
     "RnbClient",
     "add_buildings",
+    "bdnb_construction_id",
     "building_candidates",
     "enrich",
     "format_address",
@@ -56,6 +57,8 @@ SUGGESTION_COLUMNS = [
 
 class RnbClient:
     """Raw access to the RNB API: one method per endpoint, JSON dicts out.
+
+    The methods raise :class:`~bstock.exceptions.ConnectorError` when the API fails persistently.
 
     Parameters
     ----------

@@ -1,8 +1,8 @@
 # bstock — Spécification
 
-> Statut : **v1.0**, implémentée par bstock 0.2.0 (périmètre v1 du §12). **v2 spécifiée** (§3.6
-> emprise, §8 connecteurs, §9 exports, annexe A), en cours d'implémentation : voir `PLAN.md`. Issue des
-> interviews de conception du 2026-10-13 et ajustée pendant l'implémentation. Points ouverts : §13.
+> Statut : **v2.0**, implémentée par bstock 0.3.0 (périmètres v1 et v2 du §12 : modèle, provenance,
+> compteurs, persistance ; emprise §3.6, connecteurs §8, exports §9, annexe A). Issue des interviews de
+> conception du 2026-10-13 et ajustée pendant l'implémentation. Points ouverts : §13.
 
 ---
 
@@ -1089,7 +1089,7 @@ scripts/               # outils de maintenance (régénération de dpe_generator
 | Version | Contenu |
 |---|---|
 | **v1** | Modèle (Park, Site, Building, Envelope, systèmes, Meter), provenance multi-sources, extension par héritage, sources CSV/Parquet, `timeseries()` au format tide, save/load JSON + Parquet, JSON Schema |
-| v2 | Connecteurs API RNB, BDNB, DPE (§8) avec suggestions d'appariement RNB ; exports `to_dataframe()`, `to_geodataframe()`, GeoPackage, GeoParquet (§9) ; emprise au sol `footprint` et `compute_footprint_area()` (§3.6) |
+| **v2** | Connecteurs API RNB, BDNB, DPE (§8) avec suggestions d'appariement RNB ; exports `to_dataframe()`, `to_geodataframe()`, GeoPackage, GeoParquet (§9) ; emprise au sol `footprint` et `compute_footprint_area()` (§3.6) |
 | v3 | Filtrage (`park.buildings.filter(...)`), agrégations par site ou par parc (grandeurs extensives), rapport de complétude et de provenance |
 
 ---
