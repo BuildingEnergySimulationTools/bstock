@@ -24,9 +24,10 @@ INACTIVE_FILES = {
 class FakeRnbClient:
     """Serve the recorded responses of tests/data/rnb and record the calls."""
 
-    def __init__(self, recorded, closest=None, address=None, aliases=()):
+    def __init__(self, recorded, closest=None, address=None, aliases=(), addresses=None):
         self.recorded = recorded
         self.aliases = set(aliases)
+        self.addresses = addresses or {}  # address -> recorded search response
         self.closest_response = closest
         self.address_response = address
         self.calls = []
@@ -47,7 +48,10 @@ class FakeRnbClient:
             )
         if rnb_id in INACTIVE_FILES:
             return self.recorded(f"rnb/building_inactive_{INACTIVE_FILES[rnb_id]}_{rnb_id}.json")
-        return None
+        try:
+            return self.recorded(f"rnb/building_{rnb_id}.json")
+        except FileNotFoundError:
+            return None
 
     def history(self, rnb_id):
         self.calls.append(("history", rnb_id))
@@ -61,6 +65,8 @@ class FakeRnbClient:
 
     def search_address(self, address):
         self.calls.append(("address", address))
+        if address in self.addresses:
+            return self.recorded(self.addresses[address])
         return self.address_response or self.recorded("rnb/address_search_ok.json")
 
 
@@ -80,15 +86,17 @@ class FakeBdnbClient:
         multi = recorded(f"bdnb/batiment_construction_multi_{MULTI_GROUP}.json")
         self.constructions = [
             {**row, "rnb_id": (rnb_of or {}).get(row["batiment_construction_id"], row["rnb_id"])}
-            for row in [*single, *multi]
+            for row in [*single, *multi, *recorded("bdnb/batiment_construction_nobatek.json")]
         ]
         self.group_rows = [
             *recorded(f"bdnb/batiment_groupe_complet_single_{SINGLE_GROUP}.json"),
             *recorded(f"bdnb/batiment_groupe_complet_multi_{MULTI_GROUP}.json"),
+            *recorded("bdnb/batiment_groupe_complet_nobatek.json"),
         ]
-        self.dpe_rows = recorded(
-            f"bdnb/batiment_groupe_dpe_representatif_logement_{MULTI_GROUP}.json"
-        )
+        self.dpe_rows = [
+            *recorded(f"bdnb/batiment_groupe_dpe_representatif_logement_{MULTI_GROUP}.json"),
+            *recorded("bdnb/batiment_groupe_dpe_representatif_logement_nobatek.json"),
+        ]
         self.calls = []
 
     def constructions_by_rnb(self, rnb_ids):

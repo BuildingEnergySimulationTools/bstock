@@ -1,16 +1,18 @@
-"""End-to-end example of the bstock connectors (SPEC §8, §9), on real Bayonne buildings.
+"""End-to-end example of the bstock connectors (SPEC §8, §9): the Nobatek park.
 
-It shows the v2 workflow:
+Nobatek owns two sites, known by their address only. The example:
 
-1. RNB: create the buildings of a client site from their RNB ids (point, footprint, address);
-2. BDNB: enrich them; a BDNB group of several constructions becomes a sub-site;
-3. DPE: add the DPE values (description, envelope, generators);
-4. derived values and provenance in a DataFrame;
-5. exports: GeoPackage (``[geo]`` extra) and a park directory.
+1. creates the park and its two sites, with their address;
+2. RNB: finds the buildings at each site address and adds them to the site (point, footprint,
+   address);
+3. BDNB: enriches them; a BDNB group of several constructions becomes a sub-site of the site;
+4. DPE: adds the values of the DPE linked to the buildings, if any;
+5. computes the footprint areas and shows the effective values with their provenance;
+6. exports a GeoPackage (``[geo]`` extra) and saves the park directory.
 
 It calls the public APIs and needs the ``[connectors]`` and ``[geo]`` extras. Run it with
 ``python examples/connectors.py [output_directory]``. The tests run it with fake clients serving
-recorded responses.
+responses recorded on 2026-10-14.
 """
 
 from __future__ import annotations
@@ -20,14 +22,16 @@ import tempfile
 from pathlib import Path
 from typing import Any
 
+import pandas as pd
+
 from bstock import BuildingPark, MissingDependencyError
 from bstock.connectors import bdnb, dpe, rnb
 
-RNB_IDS = [
-    "5CWS74SZZ7EW",  # residential building, alone in its BDNB group
-    "BWB9SNCJHWVT",  # one of the 7 constructions of a BDNB group
-    "2E1X4DY5AY9T",  # residential building with a building DPE
-]
+OWNER_SOURCE = "nobatek"
+SITES = {
+    "nobatek-anglet": ("Nobatek Anglet", "67 rue de Mirambeau 64600 Anglet"),
+    "nobatek-bordeaux": ("Nobatek Bordeaux", "9 rue Jean-Paul Alaux, 33100 Bordeaux"),
+}
 
 
 def main(
@@ -41,32 +45,41 @@ def main(
 
     The clients default to the real APIs; tests pass fake ones.
     """
-    park = BuildingPark(name="Bayonne, connecteurs")
-    park.new_site("quartier-saint-esprit", name="Quartier Saint-Esprit")
+    rnb_client = rnb_client or rnb.RnbClient()
 
-    # 1. RNB: one request per building
-    report = rnb.add_buildings(park, RNB_IDS, parent="quartier-saint-esprit", client=rnb_client)
-    print(f"RNB: {len(report.created)} buildings created")
+    # 1. the park and its sites, as given by the owner
+    park = BuildingPark(name="Nobatek")
+    for site_id, (name, address) in SITES.items():
+        park.new_site(site_id, name=name, address=address, source=OWNER_SOURCE)
 
-    # 2. BDNB: construction values on the buildings, group values on the building or on a sub-site
+    # 2. RNB: the buildings at each site address (the RNB geocodes the address with the BAN)
+    for site in list(park.iter_sites()):
+        response = rnb_client.search_address(site.address)
+        rnb_ids = [building["rnb_id"] for building in response.get("results") or []]
+        report = rnb.add_buildings(park, rnb_ids, parent=site, client=rnb_client)
+        print(f"{site.name}: {len(report.created)} RNB building(s) at {site.address!r}")
+
+    # 3. BDNB: construction values on the buildings, group values on the building or a sub-site
     report = bdnb.enrich(park, client=bdnb_client)
-    print(f"BDNB: {len(report.enriched)} entities enriched, group sites created: {report.created}")
-
-    # 3. DPE: the most recent building-scale DPE of each building
-    report = dpe.enrich(park, client=dpe_client)
+    print(f"BDNB: group sites created: {report.created}")
     print(report.to_dataframe()[["enriched", "not_found", "message"]].to_string())
 
-    # 4. a computed value next to the BDNB one; the source priority picks the effective value
+    # 4. DPE: the most recent building-scale DPE of each building, when the open data has one
+    report = dpe.enrich(park, client=dpe_client)
+    print(f"DPE: {len(report.enriched)} entities enriched, {len(report.not_found)} without DPE")
+
+    # 5. a computed footprint area next to the BDNB one; the source priority picks the effective one
     for building in park.iter_buildings():
         if building.footprint is not None:
             building.compute_footprint_area()
-    columns = ["parent_id", "usage", "construction_year", "construction_year_source"]
-    columns += ["construction_year_provider", "footprint_area", "footprint_area_source"]
-    print(park.to_dataframe(provenance=True)[columns].to_string())
+    columns = ["parent_id", "address", "usage", "construction_year", "construction_year_provider"]
+    columns += ["height", "footprint_area", "footprint_area_source"]
+    with pd.option_context("display.width", 200):
+        print(park.to_dataframe(provenance=True)[columns].to_string())
 
-    # 5. exports
+    # 6. exports
     try:
-        park.to_geopackage(output / "bayonne.gpkg")
+        park.to_geopackage(output / "nobatek.gpkg")
     except MissingDependencyError as error:
         print(f"GeoPackage skipped: {error}")
     park.save(output / "park")
