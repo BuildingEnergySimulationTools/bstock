@@ -7,7 +7,7 @@ import types
 import warnings
 from collections.abc import Callable, Iterable, Iterator
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any, Literal, TypeVar, overload
 
 import pandas as pd
 from pydantic import BaseModel, ConfigDict, Field, PrivateAttr, ValidationInfo, model_validator
@@ -33,6 +33,7 @@ from bstock.systems import System
 __all__ = ["BuildingPark"]
 
 Entity = Site | Building | System | Meter
+E = TypeVar("E", bound=Site | Building | System | Meter)
 
 
 class _class_or_instance_method:  # noqa: N801 - used as a decorator, like classmethod
@@ -247,9 +248,37 @@ class BuildingPark(BaseModel):
 
     # --- lookup -------------------------------------------------------------------------------
 
-    def get(self, entity_id: str) -> Entity | None:
-        """Return the site, building, system or meter with id ``entity_id``, or ``None``."""
-        return self._index.get(entity_id)
+    @overload
+    def get(self, entity_id: str) -> Entity | None: ...
+
+    @overload
+    def get(self, entity_id: str, cls: type[E]) -> E | None: ...
+
+    def get(self, entity_id: str, cls: type[Entity] | None = None) -> Entity | None:
+        """Return the site, building, system or meter with id ``entity_id``, or ``None``.
+
+        Parameters
+        ----------
+        entity_id
+            Id of the entity.
+        cls
+            Expected class, e.g. ``Building`` or a project subclass; the return type is narrowed
+            to it.
+
+        Returns
+        -------
+        Site, Building, System, Meter or None
+            The entity, or ``None`` if no entity has this id.
+
+        Raises
+        ------
+        UnknownIdError
+            If the entity is not an instance of ``cls``.
+        """
+        entity = self._index.get(entity_id)
+        if entity is None or cls is None or isinstance(entity, cls):
+            return entity
+        raise UnknownIdError(f"{entity_id!r} is a {type(entity).__name__}, not a {cls.__name__}")
 
     def __getitem__(self, entity_id: str) -> Entity:
         """Return the entity ``entity_id``; raise :class:`UnknownIdError` if there is none."""
@@ -395,7 +424,7 @@ class BuildingPark(BaseModel):
         ------
         UnknownIdError
             If ``owner`` is unknown, or ``serves`` names a building outside the owner site.
-        ValueError
+        HierarchyError
             If ``serves`` is set on a system owned by a building.
         DuplicateIdError
             If the system id is already used in the park.

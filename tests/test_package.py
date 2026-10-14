@@ -26,7 +26,8 @@ def test_errors_derive_from_bstock_error(error):
     ("error", "builtin"),
     [
         (bstock.InvalidTagError, ValueError),
-        (bstock.UnknownKindError, ValueError),
+        (bstock.InvalidArgumentError, ValueError),
+        (bstock.UnknownKindError, bstock.InvalidArgumentError),
         (bstock.HierarchyError, ValueError),
         (bstock.ProjectClassError, TypeError),
         (bstock.MissingDependencyError, ImportError),

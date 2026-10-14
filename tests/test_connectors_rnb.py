@@ -2,7 +2,7 @@ import pytest
 
 from bstock.building import Building
 from bstock.connectors import rnb
-from bstock.exceptions import UnknownIdError
+from bstock.exceptions import InvalidArgumentError, UnknownIdError
 from bstock.park import BuildingPark
 from bstock.provenance import sourced
 from fakes import (
@@ -284,7 +284,7 @@ def test_low_geocoding_score_gives_no_candidate(park, recorded, unmatched):
     [{"radius": 0}, {"radius": 1500}, {"by": "cadastre"}, {"assign": "all"}],
 )
 def test_invalid_suggestion_options_are_rejected(park, client, kwargs):
-    with pytest.raises(ValueError, match=r"^(by|radius|assign) must"):
+    with pytest.raises(InvalidArgumentError, match=r"^(by|radius|assign) must"):
         rnb.suggest_matches(park, client=client, **kwargs)
 
 

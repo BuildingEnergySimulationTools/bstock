@@ -4,6 +4,7 @@ import pytest
 
 gpd = pytest.importorskip("geopandas")  # the [geo] extra
 
+from bstock.exceptions import InvalidArgumentError  # noqa: E402
 from bstock.park import BuildingPark  # noqa: E402
 
 FOOTPRINT = {
@@ -57,7 +58,7 @@ def test_site_geodataframe(park):
 
 
 def test_invalid_geometry_kind_is_rejected(park):
-    with pytest.raises(ValueError, match="geometry"):
+    with pytest.raises(InvalidArgumentError, match="geometry"):
         park.to_geodataframe(geometry="centroid")
 
 

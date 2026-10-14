@@ -19,7 +19,7 @@ from bstock.building import Building
 from bstock.connectors._http import HttpClient
 from bstock.connectors._report import ImportReport
 from bstock.connectors._sync import put, select_buildings
-from bstock.exceptions import ConnectorError
+from bstock.exceptions import ConnectorError, InvalidArgumentError
 from bstock.provenance import SourcedValue
 
 if TYPE_CHECKING:
@@ -336,7 +336,7 @@ def suggest_matches(
 
     Raises
     ------
-    ValueError
+    InvalidArgumentError
         If ``by``, ``radius`` or ``assign`` is invalid.
     UnknownIdError
         If a building id is not in the park.
@@ -344,11 +344,11 @@ def suggest_matches(
         If the API fails persistently.
     """
     if by not in ("point", "address"):
-        raise ValueError(f"by must be 'point' or 'address', not {by!r}")
+        raise InvalidArgumentError(f"by must be 'point' or 'address', not {by!r}")
     if not 0 < radius <= MAX_RADIUS:
-        raise ValueError(f"radius must be in ]0, {MAX_RADIUS:g}] m, not {radius!r}")
+        raise InvalidArgumentError(f"radius must be in ]0, {MAX_RADIUS:g}] m, not {radius!r}")
     if assign not in (None, "unique"):
-        raise ValueError(f"assign must be None or 'unique', not {assign!r}")
+        raise InvalidArgumentError(f"assign must be None or 'unique', not {assign!r}")
     client = client or RnbClient()
     targets = (
         [b for b in park.iter_buildings() if not b.rnb_id]

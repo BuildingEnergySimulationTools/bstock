@@ -149,7 +149,8 @@ def test_footprint_is_a_sourced_geojson_geometry(cls):
     entity = cls(id="e", footprint=FOOTPRINT, source="rnb")
     assert entity.footprint == FOOTPRINT
     assert entity.effective("footprint").source == "rnb"
-    assert cls.footprint.unit == "°"
+    assert cls.footprint.unit is None
+    assert "WGS84 degrees" in cls.footprint.description
 
 
 @pytest.mark.parametrize(

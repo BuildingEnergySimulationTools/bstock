@@ -66,7 +66,8 @@ class DescribedEntity(SourcedModel):
     height = sourced(float, unit="m", ge=0, inherit=True)
     dwelling_count = sourced(int, ge=0, description="Number of dwellings")
     footprint = sourced(
-        Footprint, unit="°", description="Footprint: GeoJSON Polygon or MultiPolygon in WGS84"
+        Footprint,
+        description="Footprint: GeoJSON Polygon or MultiPolygon, coordinates in WGS84 degrees",
     )
     footprint_area = sourced(float, unit="m²", ge=0, description="Footprint area")
     floor_area = sourced(float, unit="m²", ge=0, description="Gross floor area")

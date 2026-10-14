@@ -56,6 +56,14 @@ def test_lookup(park):
     assert park.get_by_rnb("ZZZZZZZZZZZZ") is None
 
 
+def test_get_with_class_narrows_the_entity(park):
+    assert park.get(RNB_A, Building) is park[RNB_A]
+    assert park.get(GROUP, Site) is park[GROUP]
+    assert park.get("nope", Building) is None
+    with pytest.raises(UnknownIdError, match="is a Site, not a Building"):
+        park.get(GROUP, Building)
+
+
 def test_iteration(park):
     assert [s.id for s in park.iter_sites()] == ["site-ecole-A", GROUP]
     assert [b.id for b in park.iter_buildings()] == ["bldg-isolated", RNB_C, RNB_A, RNB_B]

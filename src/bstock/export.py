@@ -11,7 +11,7 @@ import pandas as pd
 
 from bstock._deps import require
 from bstock.description import DescribedEntity
-from bstock.exceptions import UnknownKindError
+from bstock.exceptions import InvalidArgumentError, UnknownKindError
 
 if TYPE_CHECKING:
     from geopandas import GeoDataFrame
@@ -169,11 +169,11 @@ def to_geodataframe(
         If the ``[geo]`` extra is not installed.
     UnknownKindError
         If ``kind`` is invalid.
-    ValueError
+    InvalidArgumentError
         If ``geometry`` is neither ``"footprint"`` nor ``"point"``.
     """
     if geometry not in ("footprint", "point"):
-        raise ValueError(f"geometry must be 'footprint' or 'point', not {geometry!r}")
+        raise InvalidArgumentError(f"geometry must be 'footprint' or 'point', not {geometry!r}")
     geopandas = require("geopandas", "geo")
     shapely_geometry = require("shapely.geometry", "geo")
     frame = to_dataframe(park, kind, provenance=provenance)

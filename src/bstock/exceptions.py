@@ -25,7 +25,14 @@ class InvalidTagError(BstockError, ValueError):
     """A tide tag is empty or contains the separator ``__``."""
 
 
-class UnknownKindError(BstockError, ValueError):
+class InvalidArgumentError(BstockError, ValueError):
+    """An argument of a bstock function has a value outside the accepted ones.
+
+    For example ``geometry="centroid"`` in an export, or a search radius out of range.
+    """
+
+
+class UnknownKindError(InvalidArgumentError):
     """A kind argument is not one of the accepted values.
 
     For example a system kind outside :class:`~bstock.enums.SystemKind`, or an export kind other

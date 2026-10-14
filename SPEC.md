@@ -136,7 +136,7 @@ Méthodes principales :
 | `add_site(site, parent=None)`, `add_building(building, parent=None)` | Ajoute un objet déjà construit (contrôle de classe et d'unicité des ids) |
 | `add_system(system, owner)` | Ajoute un système à un bâtiment ou à un site (`owner` = objet ou id) |
 | `add_meter(meter)` | Ajoute un compteur ; les ids du `scope` doivent exister |
-| `get(id)`, `get_by_rnb(rnb_id)` | Recherche (sites, bâtiments, systèmes et compteurs) ; renvoie `None` si absent. `park[id]` lève `UnknownIdError`, `id in park` teste la présence |
+| `get(id, cls=None)`, `get_by_rnb(rnb_id)` | Recherche (sites, bâtiments, systèmes et compteurs) ; renvoie `None` si absent. Avec `cls` (ex. `Building`), le type renvoyé est restreint et une entité d'une autre classe lève `UnknownIdError`. `park[id]` lève `UnknownIdError`, `id in park` teste la présence |
 | `iter_sites(recursive=True)`, `iter_buildings(recursive=True)`, `iter_systems()` | Parcours de tout l'arbre, ou du premier niveau seulement avec `recursive=False` |
 | `move(entity, new_parent, force=False)` | Déplace un site ou un bâtiment (objet ou id ; `new_parent` = site, ou `None` pour le premier niveau). Lève `EntityInUseError` si un système d'un site quitté dessert un bâtiment déplacé (`serves`), sauf avec `force=True`, qui retire ces bâtiments du `serves` |
 | `remove(entity, force=False)` | Supprime une entité, objet ou id (un site avec tout son contenu). Lève une erreur si elle est référencée (`scope` d'un Meter, `serves` d'un système), sauf avec `force=True`, qui retire aussi les références |
@@ -211,7 +211,7 @@ un sous-site, reprend la valeur de son site parent quand il n'a pas la sienne (�
 | `level_count` | sourcé `int` | | oui | Nombre de niveaux, RDC = 1 (fusion de `floor_number` et `nb_level`) |
 | `height` | sourcé `float` | m | oui | |
 | `dwelling_count` | sourcé `int` | | **non** | Nombre de logements |
-| `footprint` | sourcé `dict` (géométrie GeoJSON) | ° (WGS84) | **non** | Emprise au sol : `Polygon` ou `MultiPolygon` |
+| `footprint` | sourcé `dict` (géométrie GeoJSON) | | **non** | Emprise au sol : `Polygon` ou `MultiPolygon`, coordonnées en degrés WGS84 (pas une grandeur : pas d'unité déclarée) |
 | `footprint_area` | sourcé `float` | m² | **non** | Surface de l'emprise au sol |
 | `floor_area` | sourcé `float` | m² | **non** | Surface de plancher (`floor_surface` du draw.io) ; jamais alimentée par le DPE |
 | `heated_area` | sourcé `float` | m² | **non** | Surface chauffée. Le connecteur DPE y range la surface de référence du DPE (habitable ou utile) et la nomme dans `comment` (§8.5) |
@@ -869,7 +869,7 @@ couple (bâtiment, candidat) : id du bâtiment, `rnb_id` candidat, distance (m, 
 l'emprise) ou score de géocodage de l'adresse, adresse RNB. L'utilisateur valide puis pose
 `building.rnb_id`. Aucune affectation automatique, sauf `assign="unique"` : le `rnb_id` est posé quand il
 n'y a qu'un candidat (dans le rayon, ou à l'adresse). Un `rnb_id` déjà utilisé dans le parc est signalé
-mais jamais affecté.
+mais jamais affecté. Une valeur invalide de `by`, `radius` ou `assign` lève `InvalidArgumentError`.
 
 Précisions d'implémentation :
 - les candidats RNB n'ont pas de `date` (la réponse ne date pas l'information) ; `ref` = `rnb_id`, et le
@@ -1008,12 +1008,12 @@ park.to_geoparquet("batiments.parquet", kind="building", geometry="footprint")
   attributs ajoutés par une sous-classe projet. Les enums sont rendues par leur valeur (chaîne), les
   listes restent des listes, les attributs entiers sont en `Int64` (nullable) et une valeur absente est
   manquante au sens de pandas (`pd.isna`). `footprint` est exclu de `to_dataframe`. Un autre `kind`
-  lève `UnknownKindError`.
+  lève `UnknownKindError` (sous-classe d'`InvalidArgumentError`, elle-même sous-classe de `ValueError`).
 - `provenance=True` ajoute pour chaque attribut `<attr>_source` (source de la valeur retenue) et
   `<attr>_provider` (id de l'entité qui la fournit, différent de la ligne si elle est héritée).
 - `to_geodataframe` utilise `footprint` (`geometry="footprint"`) ou le point `lat` / `lon` effectif, donc
   hérité du site au besoin (`geometry="point"`), en EPSG:4326. Une entité sans géométrie est conservée
-  avec une géométrie manquante (`None`). Une autre valeur de `geometry` lève `ValueError`.
+  avec une géométrie manquante (`None`). Une autre valeur de `geometry` lève `InvalidArgumentError`.
 - GeoPackage et GeoParquet sont écrits avec geopandas (pyogrio). Le GeoPackage a deux couches, `sites`
   et `buildings` (vides s'il n'y a pas d'entité), avec `id` en colonne ; il n'accepte pas les listes ni
   les dicts, qui sont écrits en chaîne JSON, et ses couches sont remplacées si le fichier existe. Le
