@@ -34,6 +34,8 @@ def no_warning():
     [
         (m.bdnb_usage, "Résidentiel collectif", BuildingUsage.RESIDENTIAL_COLLECTIVE),
         (m.bdnb_usage, "Dépendance", BuildingUsage.OUTBUILDING),
+        (m.bdnb_usage, "Secondaire", BuildingUsage.INDUSTRY),
+        (m.bdnb_usage, "Primaire", BuildingUsage.AGRICULTURE),
         (m.bdnb_energy_type, "gpl/butane/propane", E.LPG),
         (m.bdnb_energy_type, "reseau de chaleur", E.DISTRICT_HEATING),
         (m.dpe_energy_type, "Bois – Plaquettes d’industrie", E.WOOD_CHIPS),

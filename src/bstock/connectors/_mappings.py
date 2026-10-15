@@ -79,8 +79,8 @@ BDNB_USAGES: dict[str, BuildingUsage] = {
     "Résidentiel individuel": BuildingUsage.RESIDENTIAL_INDIVIDUAL,
     "Résidentiel collectif": BuildingUsage.RESIDENTIAL_COLLECTIVE,
     "Tertiaire": BuildingUsage.TERTIARY,
-    "Secondaire": BuildingUsage.SECONDARY,
-    "Primaire": BuildingUsage.PRIMARY,
+    "Secondaire": BuildingUsage.INDUSTRY,
+    "Primaire": BuildingUsage.AGRICULTURE,
     "Dépendance": BuildingUsage.OUTBUILDING,
     "Indifférencié": BuildingUsage.UNDETERMINED,
 }

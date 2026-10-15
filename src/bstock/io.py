@@ -38,7 +38,7 @@ __all__ = [
     "to_json",
 ]
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 """Version of the park file format."""
 
 PARK_FILE = "park.json"

@@ -471,7 +471,7 @@ class SelectionPlot:
         _stacked_bars(go, fig, table, "%{y:,.0f} kWh")
         subtitle = _coverage_subtitle(frame)
         _style(fig, f"Consumption per {by.replace('_', ' ')}", subtitle, y_title="Energy (kWh)")
-        fig.update_layout(barmode="stack")
+        fig.update_layout(barmode="relative")
         return fig
 
     def intensity(
@@ -540,7 +540,7 @@ class SelectionPlot:
         located = frame["entity"].nunique()
         subtitle = f"{located} entities with a {area} · {_coverage_subtitle(frame)}"
         _style(fig, f"Consumption per {area}", subtitle, y_title=f"Intensity (kWh/{unit})")
-        fig.update_layout(barmode="stack")
+        fig.update_layout(barmode="relative")
         return fig
 
 

@@ -31,7 +31,7 @@ Predicate = Callable[[Any], object]
 """Function called with each entity; the entity is kept when it returns a true value."""
 _Test = Callable[[DescribedEntity], bool]
 
-OPERATORS = ("in", "lt", "le", "gt", "ge", "isnull", "contains")
+OPERATORS = ("in", "family", "lt", "le", "gt", "ge", "isnull", "contains")
 """Suffixes of the value criteria, as in ``construction_year__lt=1975``."""
 STRUCTURE_CRITERIA = ("within", "parent", "has_rnb_id", "has_meter", "has_system")
 """Criteria on the position of the entity in the park and on what it is linked to."""
@@ -326,7 +326,9 @@ class Selection:
         """Return the measured final energy per entity, energy and end use (SPEC §6.5).
 
         Only head meters (``parent_meter=None``) are added up, so that a meter and its
-        sub-meters are not counted twice. An ``energy`` channel is summed over the period, an
+        sub-meters are not counted twice. A PV production meter (``end_use="pv_production"``),
+        head or sub-meter, gives its own lines with a **negative** energy: the sums are energy
+        balances. An ``energy`` channel is summed over the period, an
         ``index`` channel gives its last reading minus the first one; power channels are not
         integrated (convert them with tide first). Nothing is extrapolated: ``coverage`` gives
         the share of the period covered by data.
@@ -355,7 +357,8 @@ class Selection:
         pandas.DataFrame
             One row per entity, period, energy type and end use, with ``entity`` (id, or ids
             joined by ``+`` for a meter covering several entities), ``period`` (start of the
-            period, only with ``freq``), ``energy_type``, ``end_use``, ``energy`` (kWh),
+            period, only with ``freq``), ``energy_type``, ``end_use``, ``energy`` (kWh, negative
+            for a production),
             ``coverage`` (0 to 1, the lowest of the row meters), ``estimated`` and ``meters``.
             In a selection of buildings, a meter appears at the level of its scope: a site
             meter on the site row. In a selection of sites, each row adds up the head meters of
@@ -603,6 +606,11 @@ def _value_test(park: BuildingPark, entity_type: str, key: str, value: Any) -> _
         return lambda entity: get(entity) is not None and get(entity) in allowed
     if operator == "contains":
         return lambda entity: _contains(get(entity), value, key)
+    if operator == "family":
+        if enum is None:
+            raise InvalidArgumentError(f"{key} only applies to enum fields")
+        variants = _coerce(enum, value, key).variants()
+        return lambda entity: get(entity) in variants
     target = _coerce(enum, value, key)
     if operator == "eq":
         return lambda entity: get(entity) is not None and get(entity) == target

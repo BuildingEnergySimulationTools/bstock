@@ -532,3 +532,13 @@ def test_loading_checks_parent_meters_after_every_meter(metered):
     data["meters"][0]["parent_meter"] = "nope"
     with pytest.raises(UnknownIdError, match="nope"):
         BuildingPark.from_json(json.dumps(data))
+
+
+def test_timeseries_accepts_the_variants_of_a_family(park):
+    from bstock.enums import EnergyType
+
+    for meter_id, energy in (("logs", "wood_logs"), ("gas", "natural_gas")):
+        meter = park.add_meter(make_meter(meter_id, [RNB_A], channel="energy", energy_type=energy))
+        meter.data = hourly(energy=[1.0, 2.0, 3.0])
+    frame = park.timeseries(energy_type=EnergyType.WOOD.variants())
+    assert [c.split("__")[0] for c in frame.columns] == ["logs_energy"]

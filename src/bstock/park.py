@@ -388,8 +388,10 @@ class BuildingPark(BaseModel):
         **criteria
             Value criteria on a sourced field (project ones included), ``rnb_id``, the BDNB
             ids or ``dpe_ids``: ``attr=v`` (equality; an enum accepts its value), ``attr__in``,
-            ``attr__lt``, ``attr__le``, ``attr__gt``, ``attr__ge``, ``attr__isnull=True/False``
-            and ``attr__contains`` (list fields). Structure criteria: ``within=site`` (in
+            ``attr__family`` (an enum value or its more precise variants, see
+            :meth:`~bstock.enums.GeneratorTechnology.variants`), ``attr__lt``, ``attr__le``,
+            ``attr__gt``, ``attr__ge``, ``attr__isnull=True/False`` and ``attr__contains`` (list
+            fields). Structure criteria: ``within=site`` (in
             the subtree of the site, object or id), ``parent=site`` (``None``: top level),
             ``has_rnb_id`` (buildings), ``has_meter``, and ``has_system=True/False`` or a system
             kind (for a building, shared systems serving it count).

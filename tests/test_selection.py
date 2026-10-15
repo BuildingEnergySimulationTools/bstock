@@ -1,7 +1,7 @@
 import pytest
 
 from bstock.building import Building
-from bstock.enums import BuildingUsage
+from bstock.enums import BuildingUsage, GeneratorTechnology
 from bstock.exceptions import (
     InvalidArgumentError,
     UnknownFieldError,
@@ -255,3 +255,33 @@ def test_repr_is_one_line_and_html_is_the_tree(park):
     selection = park.select(has_rnb_id=True)
     assert repr(selection) == "Selection(entity='building', 1 entity)"
     assert "[building] b1" in selection._repr_html_()
+
+
+# --- family criterion ---------------------------------------------------------------------------
+
+
+class _HeatedBuilding(Building):
+    heating_technology = sourced(GeneratorTechnology)
+
+
+@pytest.fixture
+def heated_park():
+    park = BuildingPark(name="P", building_cls=_HeatedBuilding)
+    park.new_building(id="pac", heating_technology="heat_pump_air_water")
+    park.new_building(id="pac-inconnue", heating_technology="heat_pump")
+    park.new_building(id="chaudiere", heating_technology="boiler_condensing")
+    park.new_building(id="vide")
+    return park
+
+
+def test_family_criterion_matches_the_generic_value_and_its_variants(heated_park):
+    assert heated_park.select(heating_technology__family="heat_pump").ids == ("pac", "pac-inconnue")
+
+
+def test_equality_stays_strict(heated_park):
+    assert heated_park.select(heating_technology="heat_pump").ids == ("pac-inconnue",)
+
+
+def test_family_criterion_needs_an_enum_field(heated_park):
+    with pytest.raises(InvalidArgumentError, match="enum fields"):
+        heated_park.select(construction_year__family=1970)

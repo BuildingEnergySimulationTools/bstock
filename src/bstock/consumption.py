@@ -2,6 +2,7 @@
 
 bstock only adds energies up: an ``energy`` channel is summed, an ``index`` channel gives its last
 reading minus the first one. Power is never integrated, and nothing is resampled or estimated.
+PV production counts negatively, so that the sums are energy balances.
 """
 
 from __future__ import annotations
@@ -18,6 +19,7 @@ from typing import TYPE_CHECKING, Any, Literal
 import pandas as pd
 
 from bstock.building import Building
+from bstock.enums import EndUse
 from bstock.exceptions import (
     InvalidArgumentError,
     NoDataWarning,
@@ -40,6 +42,8 @@ FREQUENCIES = ("YS", "MS")
 """Calendar periods accepted by ``freq``: years and months."""
 OTHER_END_USE = "other"
 """End use of the meters without one, and of the remainder of a breakdown."""
+PRODUCTION_END_USE = EndUse.PV_PRODUCTION
+"""End use of the production meters, whose energy counts negatively."""
 
 TimeLike = str | date | datetime | pd.Timestamp
 Owner = Site | Building
@@ -178,9 +182,9 @@ def _owners(park: BuildingPark, meter: Meter) -> list[Owner]:
 
 
 def _rows(selection: Selection) -> Iterable[tuple[str, list[Owner], Meter]]:
-    """Yield ``(entity label, entities covered, head meter)`` for each retained head meter."""
+    """Yield ``(entity label, entities covered, meter)`` for each head or production meter."""
     park = selection.park
-    heads = [m for m in park.meters if m.parent_meter is None and m.scope]
+    heads = [m for m in park.meters if (m.parent_meter is None or _produces(m)) and m.scope]
     entities = selection._entities()
     if selection.entity == "building":
         relevant = {b.id for b in entities} | {s.id for b in entities for s in b._ancestor_sites()}
@@ -221,7 +225,14 @@ class _Calculator:
         energies = self.energies(meter)
         if energies is None:
             return []
-        subs = [m for m in self.park.meters if m.parent_meter == meter.id] if breakdown else []
+        if _produces(meter):  # produced energy counts negatively, never broken down
+            produced = [(-energy, coverage) for energy, coverage in energies]
+            return self._lines(meter, produced, PRODUCTION_END_USE, [meter.id])
+        subs = (
+            [m for m in self.park.meters if m.parent_meter == meter.id and not _produces(m)]
+            if breakdown
+            else []
+        )
         if not subs:
             return self._lines(meter, energies, _end_use(meter), [meter.id])
         lines: list[_Line] = []
@@ -301,6 +312,11 @@ class _Calculator:
             self.notes.append(f"meter {meter.id!r}: index going down from {start} (reset?)")
             return math.nan, 0.0
         return energy, (window.index[-1] - window.index[0]) / (end - start)
+
+
+def _produces(meter: Meter) -> bool:
+    """Whether ``meter`` measures a production (PV), counted negatively."""
+    return meter.end_use == PRODUCTION_END_USE
 
 
 def _energy_channel(meter: Meter) -> Channel | None:

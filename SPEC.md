@@ -419,7 +419,7 @@ tenir compte de la casse (`Orientation("N") is Orientation.N`).
 
 | Enum | Valeurs |
 |---|---|
-| `BuildingUsage` | `RESIDENTIAL_INDIVIDUAL`, `RESIDENTIAL_COLLECTIVE`, `TERTIARY`, `SECONDARY`, `PRIMARY`, `OUTBUILDING`, `UNDETERMINED` (les 7 valeurs de `usage_principal_bdnb_open` ; `PRIMARY`, `SECONDARY`, `TERTIARY` sont les secteurs économiques : agriculture, industrie, services) |
+| `BuildingUsage` | `RESIDENTIAL_INDIVIDUAL`, `RESIDENTIAL_COLLECTIVE`, `TERTIARY`, `INDUSTRY`, `AGRICULTURE`, `OUTBUILDING`, `UNDETERMINED` (les 7 valeurs de `usage_principal_bdnb_open` ; `TERTIARY`, `INDUSTRY` et `AGRICULTURE` sont les secteurs tertiaire, secondaire et primaire de la BDNB. Les deux derniers s'appelaient `SECONDARY` et `PRIMARY` avant 0.10.0, qu'un lecteur anglophone prenait pour « résidence secondaire ») |
 | `EnergyType` | `ELECTRICITY`, `NATURAL_GAS`, `FUEL_OIL`, `LPG` (GPL, propane, butane), `WOOD`, `WOOD_LOGS`, `WOOD_PELLETS`, `WOOD_CHIPS`, `COAL`, `DISTRICT_HEATING`, `DISTRICT_COOLING`, `SOLAR`, `OTHER_FOSSIL`, `OTHER` |
 | `GeneratorTechnology` | `BOILER` (type inconnu), `BOILER_STANDARD`, `BOILER_LOW_TEMPERATURE`, `BOILER_CONDENSING`, `ELECTRIC_BOILER`, `ELECTRIC_RESISTANCE` (effet Joule), `ELECTRIC_STORAGE_HEATER`, `HEAT_PUMP` (type inconnu), `HEAT_PUMP_AIR_AIR`, `HEAT_PUMP_AIR_WATER`, `HEAT_PUMP_WATER_WATER`, `HEAT_PUMP_GROUND`, `HEAT_PUMP_GAS`, `HEAT_PUMP_HYBRID`, `STOVE_INSERT`, `GAS_RADIATOR`, `WARM_AIR_GENERATOR`, `DISTRICT_SUBSTATION`, `SOLAR_THERMAL`, `WATER_HEATER` (chauffe-eau non thermodynamique, type inconnu), `ELECTRIC_WATER_TANK`, `INSTANT_WATER_HEATER`, `THERMODYNAMIC_WATER_HEATER`, `CHILLER`, `OTHER` |
 | `Inertia` | `LIGHT`, `MEDIUM`, `HEAVY`, `VERY_HEAVY` (classes du DPE) |
@@ -430,7 +430,23 @@ tenir compte de la casse (`Orientation("N") is Orientation.N`).
 | `Orientation` | `N`, `NE`, `E`, `SE`, `S`, `SW`, `W`, `NW`, `HORIZONTAL` (le DPE n'utilise que N, E, S, O, horizontal) |
 | `Adjacency` | `EXTERIOR`, `UNHEATED_SPACE`, `GROUND`, `ADJACENT_BUILDING` |
 | `SystemKind` | `HEATING`, `COOLING`, `DHW`, `VENTILATION`, `PV` (nom de la liste correspondante sur Site et Building) |
-| `EndUse` (Meters) | `HEATING`, `COOLING`, `DHW`, `VENTILATION`, `LIGHTING`, `APPLIANCES`, `PV_PRODUCTION`, `TOTAL`, `OTHER` |
+| `EndUse` (Meters) | `HEATING`, `COOLING`, `DHW`, `VENTILATION`, `LIGHTING`, `APPLIANCES`, `PV_PRODUCTION`, `TOTAL`, `OTHER`. `PV_PRODUCTION` n'est pas un usage mais une production : elle compte négativement dans les bilans (§6.5), d'où un nom distinct de `SystemKind.PV` |
+
+**Familles.** Certaines valeurs sont **génériques** : elles gardent la famille d'un équipement ou d'une
+énergie dont la source ne donne pas le détail (annexe A.5). Elles ont des **variantes** plus précises :
+
+| Valeur générique | Variantes |
+|---|---|
+| `GeneratorTechnology.HEAT_PUMP` | `HEAT_PUMP_AIR_AIR`, `_AIR_WATER`, `_WATER_WATER`, `_GROUND`, `_GAS`, `_HYBRID` |
+| `GeneratorTechnology.BOILER` (chaudières à combustion) | `BOILER_STANDARD`, `BOILER_LOW_TEMPERATURE`, `BOILER_CONDENSING` |
+| `GeneratorTechnology.WATER_HEATER` (non thermodynamiques) | `ELECTRIC_WATER_TANK`, `INSTANT_WATER_HEATER` |
+| `EnergyType.WOOD` | `WOOD_LOGS`, `WOOD_PELLETS`, `WOOD_CHIPS` |
+
+Tout membre a `.family` (la valeur générique de sa famille, ou lui-même) et `.variants()` (lui-même et,
+pour une valeur générique, ses variantes). L'égalité reste stricte, comme `==` : `technology="heat_pump"`
+ne trouve que les PAC de type inconnu. Pour toute la famille : le critère `attr__family="heat_pump"` d'une
+sélection (§14.2), ou `variants()` là où une liste est acceptée
+(`park.timeseries(energy_type=EnergyType.WOOD.variants())`).
 
 Dans la BDNB, l'énergie est souvent intégrée au libellé du générateur (« chaudiere gaz condensation »). Le
 connecteur découpe ce libellé en `technology` + `energy_type`.
@@ -782,6 +798,10 @@ index, la couverture va du premier au dernier relevé. Il n'y a **jamais d'extra
 **Compteurs retenus.**
 - Seuls les compteurs de tête (`parent_meter=None`) sont additionnés, ce qui évite de compter deux fois
   un compteur général et ses sous-compteurs.
+- **Production PV** : un compteur `end_use="pv_production"` donne ses propres lignes, avec une énergie
+  **négative**, qu'il soit compteur de tête ou sous-compteur ; `breakdown` ne le retire jamais de son
+  compteur de tête. Les sommes sont ainsi des bilans nets, et `intensity` un kWh/m² net. Les graphiques
+  de consommation empilent les barres en mode relatif : la production apparaît sous l'axe.
 - Chaque id du `scope` est ramené à son **porteur** : un système à son bâtiment ou à son site.
 - Sélection de bâtiments : on retient les compteurs dont un porteur est un bâtiment sélectionné, ou un
   site ancêtre d'un bâtiment sélectionné.
@@ -873,7 +893,8 @@ park.json_schema()                        # classes du parc par défaut
   sauvegardé avec `include_data=True` peut être déplacé.
 - Un fichier écrit avec une autre version du format (`schema_version`) lève `UnsupportedSchemaError`.
   Le format est en version 2 depuis les renommages `data_source` → `reader` et `per_attribute` →
-  `per_field` ; les fichiers v1 ne sont pas migrés.
+  `per_field` (0.9.0), en version 3 depuis le renommage des valeurs `secondary` / `primary` de
+  `BuildingUsage` (0.10.0) ; les fichiers des versions précédentes ne sont pas migrés.
   Des classes différentes de celles de la sauvegarde émettent un `ClassMismatchWarning`.
 - Les attributs sourcés n'étant pas des champs Pydantic, le JSON Schema les décrit à part, dans
   `x-bstock-sourced-fields` : type, unité, héritage et description par classe.
@@ -897,7 +918,7 @@ traçabilité. Le parc sauvegardé est alors **autonome**.
 ```json
 {
   "bstock_version": "0.2.0",
-  "schema_version": 2,
+  "schema_version": 3,
   "site_cls": "projet_bayonne.model.BayonneSite",
   "building_cls": "projet_bayonne.model.BayonneBuilding",
   "name": "Ville de Bayonne",
@@ -1348,7 +1369,7 @@ Changements **incompatibles de 0.9.0**, sans alias ni migration :
 Ajouts compatibles : `fields` accepte un nom seul ; `site.remove_site` / `remove_building` ; la copie
 profonde d'une entité seule est détachée de son propriétaire.
 
-Changements **incompatibles de 0.10.0** (en préparation : connecteurs, §8) :
+Changements **incompatibles de 0.10.0** (en préparation : connecteurs §8, énumérations §3.9) :
 
 | Avant 0.10.0 | Depuis 0.10.0 |
 |---|---|
@@ -1358,8 +1379,13 @@ Changements **incompatibles de 0.10.0** (en préparation : connecteurs, §8) :
 | `rnb.suggest_matches(..., assign="unique")`, colonne `assigned` | `suggest_matches` ne modifie rien ; `rnb.assign_matches(park, matches, strategy="unique")` |
 | correspondances publiques (`rnb.building_candidates`, `bdnb.group_candidates`, `dpe.select_dpe`…) | internes (`_building_candidates`…) |
 
+| `BuildingUsage.SECONDARY`, `BuildingUsage.PRIMARY` | `INDUSTRY`, `AGRICULTURE` |
+| fichier de parc `schema_version` 2 | `UnsupportedSchemaError` ; format v3 (§7) |
+| production PV additionnée à la consommation | lignes `pv_production` négatives : bilans nets (§6.5) |
+
 Ajouts compatibles : `rnb.add_buildings_at_address` ; `bdnb.enrich` signale chaque bâtiment déplacé
-dans un sous-site de groupe.
+dans un sous-site de groupe ; familles d'enums, `.family`, `.variants()` et critère `attr__family`
+(§3.9).
 
 ---
 
@@ -1475,6 +1501,7 @@ effective**, héritage compris : un bâtiment qui hérite `usage="tertiary"` de 
 |---|---|
 | `attr=v` | Valeur effective égale à `v`. Une enum accepte sa chaîne |
 | `attr__in=[...]` | Valeur dans la liste |
+| `attr__family=v` | Enum : `v` ou une de ses variantes (§3.9) |
 | `attr__lt`, `__le`, `__gt`, `__ge` | Comparaison |
 | `attr__isnull=True / False` | Valeur absente / présente |
 | `attr__contains=v` | Attribut liste (`sub_usages`, `dpe_ids`) qui contient `v` |
@@ -1679,8 +1706,8 @@ Sources consultées le 2026-10-13 :
 | `Résidentiel individuel` | `RESIDENTIAL_INDIVIDUAL` |
 | `Résidentiel collectif` | `RESIDENTIAL_COLLECTIVE` |
 | `Tertiaire` | `TERTIARY` |
-| `Secondaire` | `SECONDARY` |
-| `Primaire` | `PRIMARY` |
+| `Secondaire` | `INDUSTRY` |
+| `Primaire` | `AGRICULTURE` |
 | `Dépendance` | `OUTBUILDING` |
 | `Indifférencié` | `UNDETERMINED` |
 

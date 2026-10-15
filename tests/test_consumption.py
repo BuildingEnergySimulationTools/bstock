@@ -315,3 +315,30 @@ def test_consumption_does_not_modify_the_park(park):
     before = park.to_json()
     park.select().intensity(**YEAR, split="heated_area", breakdown=True, freq="MS")
     assert park.to_json() == before
+
+
+# --- PV production ------------------------------------------------------------------------------
+
+
+def test_pv_production_counts_negatively(park):
+    add_meter(park, "grid", ["b1"], 10.0, energy_type="electricity", end_use="total")
+    add_meter(park, "pv", ["b1"], 4.0, energy_type="electricity", end_use="pv_production")
+    frame = park.select().consumption(**YEAR)
+    assert rows(frame) == {("b1", "total"): 3660, ("b1", "pv_production"): -1464}
+    assert frame["energy"].sum() == 2196  # net balance
+
+
+def test_pv_sub_meter_is_neither_skipped_nor_subtracted(park):
+    add_meter(park, "grid", ["b1"], 10.0, energy_type="electricity", end_use="total")
+    add_meter(
+        park, "pv", ["b1"], 4.0, energy_type="electricity", end_use="pv_production", parent="grid"
+    )
+    frame = park.select().consumption(**YEAR, breakdown=True)
+    assert rows(frame) == {("b1", "total"): 3660, ("b1", "pv_production"): -1464}
+
+
+def test_intensity_is_a_net_balance(park):
+    add_meter(park, "grid", ["b1"], 10.0, energy_type="electricity", end_use="total")
+    add_meter(park, "pv", ["b1"], 4.0, energy_type="electricity", end_use="pv_production")
+    frame = park.select(within="s").intensity(**YEAR).set_index("end_use")
+    assert frame.loc["pv_production", "intensity"] == pytest.approx(-1.464)

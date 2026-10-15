@@ -63,3 +63,50 @@ def test_unknown_value_is_rejected():
 )
 def test_enums_aligned_on_sources_have_expected_size(enum_cls, expected):
     assert len(enum_cls) == expected
+
+
+# --- families -----------------------------------------------------------------------------------
+
+E, T = enums.EnergyType, enums.GeneratorTechnology
+
+
+@pytest.mark.parametrize(
+    ("member", "family"),
+    [
+        (T.HEAT_PUMP_AIR_WATER, T.HEAT_PUMP),
+        (T.HEAT_PUMP, T.HEAT_PUMP),
+        (T.BOILER_CONDENSING, T.BOILER),
+        (T.ELECTRIC_WATER_TANK, T.WATER_HEATER),
+        (T.ELECTRIC_BOILER, T.ELECTRIC_BOILER),  # not a combustion boiler
+        (E.WOOD_PELLETS, E.WOOD),
+        (E.NATURAL_GAS, E.NATURAL_GAS),
+    ],
+)
+def test_family_is_the_generic_member(member, family):
+    assert member.family is family
+
+
+def test_variants_of_a_generic_member():
+    assert E.WOOD.variants() == {E.WOOD, E.WOOD_LOGS, E.WOOD_PELLETS, E.WOOD_CHIPS}
+    assert T.BOILER.variants() == {
+        T.BOILER,
+        T.BOILER_STANDARD,
+        T.BOILER_LOW_TEMPERATURE,
+        T.BOILER_CONDENSING,
+    }
+
+
+def test_variants_of_a_precise_member_are_itself():
+    assert E.WOOD_LOGS.variants() == {E.WOOD_LOGS}
+
+
+def test_family_of_a_member_sharing_a_value_with_another_enum():
+    # FrameType.WOOD == EnergyType.WOOD as strings: families must not mix enums
+    assert enums.FrameType.WOOD.family is enums.FrameType.WOOD
+    assert enums.FrameType.WOOD.variants() == {enums.FrameType.WOOD}
+
+
+def test_economic_sectors_have_explicit_names():
+    assert enums.BuildingUsage("industry") is enums.BuildingUsage.INDUSTRY
+    with pytest.raises(ValueError, match="secondary"):
+        enums.BuildingUsage("secondary")

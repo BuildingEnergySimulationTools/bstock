@@ -78,7 +78,7 @@ def park():
 
 def test_json_contains_metadata_and_candidates_only(park):
     data = json.loads(park.to_json())
-    assert data["schema_version"] == 2
+    assert data["schema_version"] == 3
     assert data["site_cls"] == class_path(BayonneSite)
     assert data["building_cls"] == class_path(BayonneBuilding)
     group = data["sites"][0]["sites"][0]
@@ -141,7 +141,7 @@ def test_matching_classes_do_not_warn(park):
         BuildingPark.from_json(park.to_json(), site_cls=BayonneSite, building_cls=BayonneBuilding)
 
 
-@pytest.mark.parametrize("version", [1, 99])  # 1: before the readers (data_source) renaming
+@pytest.mark.parametrize("version", [1, 2, 99])  # 1, 2: before the renamings of 0.9.0, 0.10.0
 def test_unsupported_schema_version(park, version):
     data = json.loads(park.to_json())
     data["schema_version"] = version

@@ -14,7 +14,7 @@ requires_plotly = pytest.mark.skipif(
     importlib.util.find_spec("plotly") is None, reason="needs the [plot] extra"
 )
 YEAR = {"start": "2024-01-01", "end": "2025-01-01"}
-USAGES = ["tertiary", "tertiary", "tertiary", "residential_collective", "primary", "secondary"]
+USAGES = ["tertiary", "tertiary", "tertiary", "residential_collective", "agriculture", "industry"]
 
 
 def square(lat, lon, size=0.001):
@@ -136,9 +136,9 @@ def test_aggregate_bars_per_site_with_park_total(park):
 @requires_plotly
 def test_aggregate_by_attribute(park):
     fig = park.select().plot.aggregate("heated_area", by="usage")
-    assert list(fig.data[0].x) == ["tertiary", "residential_collective", "primary"]
+    assert list(fig.data[0].x) == ["tertiary", "residential_collective", "agriculture"]
     assert list(fig.data[0].customdata) == [100, 100, 100]
-    assert subtitle(fig) == "3 / 4 groups drawn"  # secondary (b5) has no area
+    assert subtitle(fig) == "3 / 4 groups drawn"  # industry (b5) has no area
 
 
 @requires_plotly
@@ -172,7 +172,7 @@ def test_map_of_points_keeps_three_colours_then_other(park):
     park["b5"].lat, park["b5"].lon = 43.6, -1.4  # b5 has no site to inherit a location from
     fig = park.select().plot.map(color="usage")
     # the most frequent first, ties in the order of the selection (b5 comes first)
-    assert trace_names(fig) == ["tertiary", "secondary", "residential_collective", OTHER]
+    assert trace_names(fig) == ["tertiary", "industry", "residential_collective", OTHER]
     assert list(fig.data[-1].text) == ["b4"]
     assert fig.data[-1].marker.color == OTHER_COLOR
     assert fig.layout.map.style == "open-street-map"
