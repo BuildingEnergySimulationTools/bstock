@@ -9,6 +9,7 @@ from bstock.enums import EndUse
 from bstock.exceptions import (
     DataSourceError,
     EntityInUseError,
+    HierarchyError,
     InvalidTagError,
     NoDataWarning,
     TimeSeriesError,
@@ -412,3 +413,87 @@ def test_source_equality_ignores_base_dir(tmp_path):
     first._base_dir = tmp_path
     assert first == second
     assert first != ParquetSource(path="other.parquet")
+
+
+# --- sub-meters -------------------------------------------------------------------------------
+
+
+def meter(meter_id, parent=None):
+    return Meter(
+        id=meter_id,
+        scope=["site-A"],
+        parent_meter=parent,
+        channels=[Channel(name="energy", unit="kWh")],
+    )
+
+
+@pytest.fixture
+def metered(park):
+    park.add_meter(meter("head"))
+    park.add_meter(meter("sub", parent="head"))
+    park.add_meter(meter("subsub", parent="sub"))
+    return park
+
+
+def test_meter_is_a_head_meter_by_default():
+    assert meter("m").parent_meter is None
+
+
+def test_parent_meter_must_be_a_meter_of_the_park(park):
+    with pytest.raises(UnknownIdError, match="parent meter 'nope'"):
+        park.add_meter(meter("m", parent="nope"))
+    with pytest.raises(UnknownIdError, match="parent meter 'site-A'"):
+        park.add_meter(meter("m", parent="site-A"))
+    assert "m" not in park
+
+
+def test_meter_cannot_be_its_own_parent(park):
+    with pytest.raises(HierarchyError, match="cycle"):
+        park.add_meter(meter("m", parent="m"))
+
+
+def test_parent_meter_assignment_is_checked(metered):
+    with pytest.raises(HierarchyError, match="cycle"):
+        metered["head"].parent_meter = "subsub"
+    with pytest.raises(UnknownIdError):
+        metered["sub"].parent_meter = "nope"
+    assert metered["head"].parent_meter is None
+    metered["subsub"].parent_meter = "head"
+    assert metered["subsub"].parent_meter == "head"
+
+
+def test_parent_meter_is_not_checked_outside_a_park():
+    assert meter("m", parent="anything").parent_meter == "anything"
+
+
+def test_parent_meter_id_cannot_contain_the_tide_separator():
+    with pytest.raises(ValidationError):
+        meter("m", parent="a__b")
+
+
+def test_removing_a_parent_meter_needs_force(metered):
+    with pytest.raises(EntityInUseError, match="sub"):
+        metered.remove("head")
+    metered.remove("head", force=True)
+    assert metered["sub"].parent_meter is None
+    assert metered["subsub"].parent_meter == "sub"
+
+
+def test_parent_meter_round_trips_through_json(metered):
+    reloaded = BuildingPark.from_json(metered.to_json())
+    assert reloaded["subsub"].parent_meter == "sub"
+    assert reloaded == metered
+
+
+def test_head_meter_json_has_no_parent_meter_key(metered):
+    meters = json.loads(metered.to_json())["meters"]
+    assert "parent_meter" not in meters[0]
+
+
+def test_loading_checks_parent_meters_after_every_meter(metered):
+    data = json.loads(metered.to_json())
+    data["meters"].reverse()
+    assert BuildingPark.from_json(json.dumps(data))["sub"].parent_meter == "head"
+    data["meters"][0]["parent_meter"] = "nope"
+    with pytest.raises(UnknownIdError, match="nope"):
+        BuildingPark.from_json(json.dumps(data))

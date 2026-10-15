@@ -101,6 +101,11 @@ class Meter(SourcedModel):
     scope
         Ids of the measured entities: sites, buildings or systems. In a park, they must exist;
         this is checked when the meter is added and on assignment.
+    parent_meter
+        Id of the meter this one is a sub-meter of; ``None`` for a head meter. Consumption totals
+        only add up head meters, sub-meters split them by end use (SPEC §6.5). In a park, it must
+        be another meter of the park and must not create a cycle; this is checked when the meter
+        is added and on assignment.
     channels
         Measured quantities, one column each.
     data_source
@@ -113,6 +118,7 @@ class Meter(SourcedModel):
 
     id: str = Field(default_factory=lambda: new_id("meter"), frozen=True)
     scope: list[str] = Field(default_factory=list)
+    parent_meter: str | None = None
     channels: list[Channel] = Field(min_length=1)
     data_source: AnySource | None = None
     original_data_source: AnySource | None = None
@@ -144,6 +150,11 @@ class Meter(SourcedModel):
     def _check_scope(cls, value: list[str]) -> list[str]:
         return [check_id(v) for v in value]
 
+    @field_validator("parent_meter")
+    @classmethod
+    def _check_parent_meter(cls, value: str | None) -> str | None:
+        return None if value is None else check_id(value)
+
     @field_validator("bloc", "sub_bloc")
     @classmethod
     def _check_tag(cls, value: str | None) -> str | None:
@@ -161,6 +172,8 @@ class Meter(SourcedModel):
     def __setattr__(self, name: str, value: Any) -> None:
         if name == "scope" and self._container is not None:
             self._container._check_scope(self.id, value)
+        if name == "parent_meter" and self._container is not None:
+            self._container._check_parent_meter(self.id, value)
         super().__setattr__(name, value)
 
     # --- tide naming --------------------------------------------------------------------------

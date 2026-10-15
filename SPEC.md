@@ -782,10 +782,15 @@ c'est sa valeur effective. Pour un site, c'est la valeur retenue par l'agrégati
 surfaces manque, `area` et `intensity` sont manquants. `area` doit être un champ extensif
 (`InvalidArgumentError` sinon).
 
-**Contrôles de `parent_meter`.** L'id doit exister dans le parc. Il ne peut désigner ni le compteur
-lui-même, ni un de ses descendants (pas de cycle). Ces contrôles ont lieu à `add_meter` et à
-l'affectation, avec les mêmes erreurs que pour `scope`. `park.remove` d'un compteur qui en a d'autres
-pour parent lève `EntityInUseError`, sauf avec `force=True`, qui remet leur `parent_meter` à `None`.
+**Contrôles de `parent_meter`** (implémentés en 0.7.0). L'id doit désigner un autre compteur du parc
+(`UnknownIdError` sinon, y compris pour l'id d'un site ou d'un bâtiment). Il ne peut désigner ni le
+compteur lui-même, ni un de ses descendants (`HierarchyError`, cycle). Ces contrôles ont lieu à
+`add_meter`, à l'affectation de `meter.parent_meter` et au chargement (après lecture de tous les
+compteurs, dans n'importe quel ordre). Hors parc, la valeur n'est pas contrôlée, comme `scope`. `park.remove`
+d'un compteur qui en a d'autres pour parent lève `EntityInUseError`, sauf avec `force=True`, qui remet
+leur `parent_meter` à `None` (ils deviennent compteurs de tête). Dans le JSON, la clé est absente pour un
+compteur de tête : un parc sans sous-compteur s'écrit comme en 0.6.0, et le format reste en
+`schema_version` 1. Un parc qui utilise `parent_meter` n'est pas lisible par une version antérieure.
 
 ---
 

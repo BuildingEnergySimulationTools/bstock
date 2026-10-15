@@ -366,9 +366,9 @@ Reportées dans `SPEC.md` (§3.3, §3.6, §3.7, §6.1, §6.5, §11 à §14) à l
 ## v3.d — Consommations (0.7.0)
 
 ### Étape 28 — `parent_meter`
-- [ ] Champ `Meter.parent_meter` ; contrôles (existence, pas de cycle) à `add_meter` et à l'affectation ;
+- [x] Champ `Meter.parent_meter` ; contrôles (existence, pas de cycle) à `add_meter` et à l'affectation ;
       `remove` avec `force` ; aller-retour JSON, lecture d'un JSON v2
-- [ ] Tests des contrôles et de la suppression
+- [x] Tests des contrôles et de la suppression
 
 ### Étape 29 — Consommations et kWh/m²
 - [ ] Module `consumption.py` : énergie par canal (`energy` sommé, `index` dernier − premier, unités

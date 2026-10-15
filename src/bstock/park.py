@@ -109,6 +109,8 @@ class BuildingPark(BaseModel):
             self._check_scope(meter.id, meter.scope)
             self._register(meter)
             meter._container = self
+        for meter in self.meters:
+            self._check_parent_meter(meter.id, meter.parent_meter)
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, BaseModel):
@@ -545,11 +547,15 @@ class BuildingPark(BaseModel):
         Raises
         ------
         UnknownIdError
-            If an id of ``meter.scope`` is not a site, building or system of the park.
+            If an id of ``meter.scope`` is not a site, building or system of the park, or
+            ``meter.parent_meter`` is not a meter of the park.
+        HierarchyError
+            If ``meter.parent_meter`` is the meter itself.
         DuplicateIdError
             If the meter id is already used in the park.
         """
         self._check_scope(meter.id, meter.scope)
+        self._check_parent_meter(meter.id, meter.parent_meter)
         self._register(meter)
         meter._container = self
         self.meters.append(meter)
@@ -560,6 +566,19 @@ class BuildingPark(BaseModel):
         unknown = [i for i in scope if not isinstance(self._index.get(i), Site | Building | System)]
         if unknown:
             raise UnknownIdError(f"meter {meter_id!r}: unknown scope ids {unknown}")
+
+    def _check_parent_meter(self, meter_id: str, parent_id: str | None) -> None:
+        """Check that ``parent_id`` is another meter of the park and creates no cycle."""
+        node = parent_id
+        while node is not None:
+            if node == meter_id:
+                raise HierarchyError(
+                    f"meter {meter_id!r}: parent meter {parent_id!r} makes a cycle"
+                )
+            parent = self._index.get(node)
+            if not isinstance(parent, Meter):
+                raise UnknownIdError(f"meter {meter_id!r}: unknown parent meter {node!r}")
+            node = parent.parent_meter
 
     # --- time series --------------------------------------------------------------------------
 
@@ -689,7 +708,7 @@ class BuildingPark(BaseModel):
         return entity
 
     def remove(self, entity: Entity | str, *, force: bool = False) -> Entity:
-        """Remove a site (with its content), a building or a system and return it.
+        """Remove a site (with its content), a building, a system or a meter and return it.
 
         Parameters
         ----------
@@ -703,7 +722,9 @@ class BuildingPark(BaseModel):
         UnknownIdError
             If ``entity`` is not in the park.
         EntityInUseError
-            If the entity is referenced (e.g. in the ``serves`` of a system) and ``force`` is False.
+            If the entity is referenced (in the ``serves`` of a system, the ``scope`` of a meter
+            or the ``parent_meter`` of a sub-meter) and ``force`` is False. With ``force``, a
+            sub-meter of a removed meter becomes a head meter.
         """
         entity = self._resolve(entity, (Site, Building, System, Meter))
         self._release(entity, force=force)
@@ -752,6 +773,10 @@ class BuildingPark(BaseModel):
         for meter in self.meters:
             if ids & set(meter.scope):
                 references.append((meter.id, _dropper(meter, "scope", ids)))
+            if meter.parent_meter in ids:
+                references.append(
+                    (meter.id, functools.partial(setattr, meter, "parent_meter", None))
+                )
         return references
 
     # --- index maintenance (also called by the entities) --------------------------------------
