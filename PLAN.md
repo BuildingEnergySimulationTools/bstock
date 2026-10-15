@@ -371,12 +371,12 @@ Reportées dans `SPEC.md` (§3.3, §3.6, §3.7, §6.1, §6.5, §11 à §14) à l
 - [x] Tests des contrôles et de la suppression
 
 ### Étape 29 — Consommations et kWh/m²
-- [ ] Module `consumption.py` : énergie par canal (`energy` sommé, `index` dernier − premier, unités
+- [x] Module `consumption.py` : énergie par canal (`energy` sommé, `index` dernier − premier, unités
       converties en kWh), période et fuseau, `freq`, couverture temporelle
-- [ ] Compteurs retenus (tête seulement, porteurs) et lignes selon le `kind` de la sélection
-- [ ] `breakdown=True` (reste `other`), `split=` (lignes `estimated`), `load_data=`
-- [ ] `sel.intensity(area=, prefer=)`
-- [ ] Tests : sous-compteurs sans double compte, index remis à zéro, unité refusée, puissance ignorée,
+- [x] Compteurs retenus (tête seulement, porteurs) et lignes selon le `kind` de la sélection
+- [x] `breakdown=True` (reste `other`), `split=` (lignes `estimated`), `load_data=`
+- [x] `sel.intensity(area=, prefer=)`
+- [x] Tests : sous-compteurs sans double compte, index remis à zéro, unité refusée, puissance ignorée,
       couverture partielle, découpage annuel autour du changement d'heure, compteur multi-bâtiments,
       répartition avec une surface manquante, kWh/m² d'un site
 - [ ] Finalisation 0.7.0 (exemple de bout en bout avec des compteurs et des sous-compteurs)

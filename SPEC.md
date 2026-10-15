@@ -782,6 +782,21 @@ c'est sa valeur effective. Pour un site, c'est la valeur retenue par l'agrégati
 surfaces manque, `area` et `intensity` sont manquants. `area` doit être un champ extensif
 (`InvalidArgumentError` sinon).
 
+**Précisions** (implémentation 0.7.0) :
+- `start` et `end` sont obligatoires et passés par mot-clé ; `start >= end` ou un `freq` autre que `"YS"`
+  / `"MS"` lève `InvalidArgumentError`.
+- Plusieurs compteurs sur une même ligne (même entité, période, énergie, usage et estimation) sont
+  additionnés ; la ligne prend la **couverture la plus faible** de ses compteurs, et `meters` les liste
+  tous. Une période sans aucun échantillon donne une énergie manquante et une couverture nulle.
+- Un compteur sans `end_use` est rangé en `"other"` (comme le `sub_bloc` de tide) ; un compteur sans
+  `energy_type` donne une `energy_type` manquante. Un compteur au `scope` vide est ignoré.
+- Avec `breakdown=True`, un sous-compteur sans données est ignoré (avertissement) et sa part reste dans
+  le reste `"other"`, dont `meters` liste la tête et ses sous-compteurs.
+- `split` ne s'applique qu'à une sélection de bâtiments (`InvalidArgumentError` sinon) ; une ligne dont
+  la somme du champ vaut zéro n'est pas répartie, comme une ligne à surface manquante.
+- Une surface nulle donne une `intensity` manquante.
+- Les lignes sont rangées par entité (ordre de première apparition), puis par période.
+
 **Contrôles de `parent_meter`** (implémentés en 0.7.0). L'id doit désigner un autre compteur du parc
 (`UnknownIdError` sinon, y compris pour l'id d'un site ou d'un bâtiment). Il ne peut désigner ni le
 compteur lui-même, ni un de ses descendants (`HierarchyError`, cycle). Ces contrôles ont lieu à

@@ -3,8 +3,11 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Iterator, Sequence
+from datetime import date, datetime
 from enum import Enum
 from typing import TYPE_CHECKING, Any, Literal
+
+import pandas as pd
 
 from bstock.building import Building
 from bstock.description import DescribedEntity, _check_kind
@@ -18,13 +21,12 @@ from bstock.exceptions import (
 from bstock.site import Site
 
 if TYPE_CHECKING:
-    import pandas as pd
-
     from bstock.park import BuildingPark
 
 __all__ = ["Selection"]
 
 SelectionKind = Literal["building", "site"]
+TimeLike = str | date | datetime | pd.Timestamp
 Predicate = Callable[[Any], object]
 """Function called with each entity; the entity is kept when it returns a true value."""
 _Test = Callable[[DescribedEntity], bool]
@@ -301,6 +303,139 @@ class Selection:
         from bstock.analysis import conflicts  # circular import
 
         return conflicts(self, fields=fields, rtol=rtol)
+
+    # --- measured consumption -----------------------------------------------------------------
+
+    def consumption(
+        self,
+        *,
+        start: TimeLike,
+        end: TimeLike,
+        freq: Literal["YS", "MS"] | None = None,
+        tz: str = "Europe/Paris",
+        breakdown: bool = False,
+        split: str | None = None,
+        load_data: bool = False,
+    ) -> pd.DataFrame:
+        """Return the measured final energy per entity, energy and end use (SPEC §6.5).
+
+        Only head meters (``parent_meter=None``) are added up, so that a meter and its
+        sub-meters are not counted twice. An ``energy`` channel is summed over the period, an
+        ``index`` channel gives its last reading minus the first one; power channels are not
+        integrated (convert them with tide first). Nothing is extrapolated: ``coverage`` gives
+        the share of the period covered by data.
+
+        Parameters
+        ----------
+        start, end
+            Period ``[start, end)``; a time without time zone is read in ``tz``.
+        freq
+            ``"YS"`` (calendar years) or ``"MS"`` (calendar months) to cut the period, in
+            ``tz``; ``None`` for one period.
+        tz
+            Time zone of the calendar periods and of naive ``start`` / ``end``.
+        breakdown
+            Replace a head meter having direct sub-meters by one line per end use of its
+            sub-meters, plus an ``"other"`` line for the rest (head minus sub-meters).
+        split
+            Extensive attribute (e.g. ``"heated_area"``) used to share the lines of a site or of
+            several buildings between the selected buildings they cover; these lines have
+            ``estimated=True``. Selections of buildings only.
+        load_data
+            Load the data of the meters that have none in memory.
+
+        Returns
+        -------
+        pandas.DataFrame
+            One row per entity, period, energy type and end use, with ``entity`` (id, or ids
+            joined by ``+`` for a meter covering several entities), ``period`` (start of the
+            period, only with ``freq``), ``energy_type``, ``end_use``, ``energy`` (kWh),
+            ``coverage`` (0 to 1, the lowest of the row meters), ``estimated`` and ``meters``.
+            In a selection of buildings, a meter appears at the level of its scope: a site
+            meter on the site row. In a selection of sites, each row adds up the head meters of
+            the subtree of a selected site.
+
+        Raises
+        ------
+        InvalidArgumentError
+            If the period or ``freq`` is invalid, ``split`` is not extensive or is used on a
+            selection of sites.
+        TimeSeriesError
+            If an energy channel has another unit than Wh, kWh, MWh or GWh, or a sub-meter
+            measures another energy than its head meter.
+
+        Warns
+        -----
+        NoDataWarning
+            For a meter without data or without energy channel (ignored), an index going down,
+            sub-meters measuring more than their head meter, or a line that cannot be split.
+        """
+        from bstock.consumption import consumption  # circular import
+
+        return consumption(
+            self,
+            start=start,
+            end=end,
+            freq=freq,
+            tz=tz,
+            breakdown=breakdown,
+            split=split,
+            load_data=load_data,
+        )
+
+    def intensity(
+        self,
+        *,
+        start: TimeLike,
+        end: TimeLike,
+        area: str = "heated_area",
+        prefer: Literal["buildings", "site"] = "buildings",
+        freq: Literal["YS", "MS"] | None = None,
+        tz: str = "Europe/Paris",
+        breakdown: bool = False,
+        split: str | None = None,
+        load_data: bool = False,
+    ) -> pd.DataFrame:
+        """Return :meth:`consumption` with the area and the energy per unit of area (SPEC §6.5).
+
+        Parameters
+        ----------
+        area
+            Extensive attribute giving the reference area, ``"heated_area"`` by default.
+        prefer
+            For a site row, the area retained by :meth:`aggregate` with this rule.
+        start, end, freq, tz, breakdown, split, load_data
+            As :meth:`consumption`.
+
+        Returns
+        -------
+        pandas.DataFrame
+            The columns of :meth:`consumption`, plus ``area`` (in the unit of the attribute, m²
+            for the core areas) and ``intensity`` (kWh per unit of area). The area of a row
+            covering several entities is the sum of their areas; it is missing if one of them
+            is, and ``intensity`` is then missing too.
+
+        Raises
+        ------
+        UnknownFieldError
+            If ``area`` is not an attribute of the buildings.
+        InvalidArgumentError
+            If ``area`` is not extensive, ``prefer`` is invalid, or as :meth:`consumption`.
+        """
+        from bstock.consumption import intensity  # circular import
+
+        return intensity(
+            self,
+            area=area,
+            prefer=prefer,
+            start=start,
+            end=end,
+            freq=freq,
+            tz=tz,
+            breakdown=breakdown,
+            split=split,
+            load_data=load_data,
+        )
 
     # --- exports and display ------------------------------------------------------------------
 
