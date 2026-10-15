@@ -7,7 +7,8 @@ Règles (voir `CLAUDE.md`) :
 
 Sommaire : [v1](#v1--terminée) (terminée, 0.1.0 puis ajustements d'API en 0.2.0) ·
 [v2](#v2--connecteurs-emprise-et-exports) (terminée, 0.3.0) ·
-[v3](#v3--lisibilité-sélection-analyse-consommations-graphiques) (terminée, 0.8.0)
+[v3](#v3--lisibilité-sélection-analyse-consommations-graphiques) (terminée, 0.8.0) ·
+[relecture de l'API](#relecture-de-lapi-090) (0.9.0)
 
 ---
 
@@ -393,3 +394,24 @@ Reportées dans `SPEC.md` (§3.3, §3.6, §3.7, §6.1, §6.5, §11 à §14) à l
       titre, erreur claire sans plotly
 - [x] Finalisation 0.8.0 : exemple de graphiques dans `examples/` (`plots.py` et sa version
       interactive), README, statut de la SPEC passé en v3, version et tag
+
+---
+
+# Relecture de l'API (0.9.0)
+
+Relecture de l'API publique du point de vue d'un nouvel utilisateur, puis corrections une par une, chacune
+avec sa mise à jour de la SPEC (§12 : liste des renommages). Rupture nette : ni alias ni migration.
+
+- [x] Hiérarchie protégée : listes d'enfants non modifiables en place (`HierarchyError`), affectation de
+      l'enveloppe rattachée, copie profonde qui garde les liens internes (§3.3, §3.7)
+- [x] Sources de données renommées en readers ; `read()` contrôlé, `read_raw()` à implémenter ; format v2
+      (§6.2, §7)
+- [x] Verbes : `new_building` en arguments nommés, `remove_site` / `remove_building`, objet ou id,
+      `find_serving_systems`, retrait de `park.meters_for` (§3.3)
+- [x] Vocabulaire : `entity=` pour le type d'entité, `per=` et `method=` au lieu de `by=`, « field »
+      partout dans le code (§3.3)
+- [x] Signatures des rapports : `fields` seul positionnel et accepté seul, graphiques sans `**kwargs`,
+      rôles de `tz` (§3.3)
+- [x] `None` refusé comme valeur sourcée, règle des `compute_*`, `heat_loss_coefficient_or_ua` (§3.3, §4.2)
+- [x] Finalisation 0.9.0 : statut et note de version dans la SPEC, version et tag
+- [ ] Suite de la relecture : connecteurs, énumérations, typage et noms internes

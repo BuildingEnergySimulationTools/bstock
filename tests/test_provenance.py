@@ -267,7 +267,7 @@ def test_unlisted_source_without_wildcard_comes_last():
     assert chosen.source == "bdnb"
 
 
-def test_per_attribute_override():
+def test_per_field_override():
     priority = SourcePriority(per_field={"area": ["bayonne_xlsx", "audit"]})
     specs = (("audit", None), ("bayonne_xlsx", None))
     assert priority.select("area", candidates(*specs)).source == "bayonne_xlsx"

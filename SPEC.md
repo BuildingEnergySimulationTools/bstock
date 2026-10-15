@@ -6,6 +6,10 @@
 >
 > **v3** (interview du 2026-10-15), implémentée par bstock 0.4.0 à 0.8.0 (§12) : lisibilité, sélection,
 > analyse et graphiques (§14), consommations mesurées (§6.5), métadonnée `extensive` (§3.3).
+>
+> **0.9.0** : relecture de l'API publique (règles de nommage du §3.3, renommages listés au §12), format
+> de fichier v2 (§7). Version incompatible : pas d'alias pour les anciens noms, pas de migration des
+> fichiers v1.
 
 ---
 
@@ -1278,6 +1282,7 @@ scripts/               # outils de maintenance (régénération de dpe_generator
 | v3.c (0.6.0) | Analyse : métadonnée `extensive` (§3.3), agrégations (§14.3), complétude et provenance (§14.4) |
 | v3.d (0.7.0) | Consommations mesurées et kWh/m², `Meter.parent_meter` (§6.5) |
 | v3.e (0.8.0) | Graphiques plotly : `sel.plot.*` (§14.5) |
+| API (0.9.0) | Relecture de l'API publique : hiérarchie protégée, readers, verbes, vocabulaire, signatures des rapports, `None` refusé (renommages ci-dessous) ; format de fichier v2 |
 
 Noms dépréciés en 0.2.0, **retirés en 0.4.0** (v3.a) :
 
@@ -1285,8 +1290,39 @@ Noms dépréciés en 0.2.0, **retirés en 0.4.0** (v3.a) :
 |---|---|
 | `entity.candidates(name, inherited=True)` | `entity.inherited_candidates(name)` |
 | `entity.meters()` | `entity.find_meters()` |
-| `building.systems(...)` | `building.serving_systems(...)` |
+| `building.systems(...)` | `building.serving_systems(...)`, devenu `find_serving_systems` en 0.9.0 |
 | `meter.column_names()` | `meter.tide_columns()` |
+
+Changements **incompatibles de 0.9.0**, sans alias ni migration :
+
+| Avant 0.9.0 | Depuis 0.9.0 |
+|---|---|
+| `park.sites.append(...)`, `site.buildings = [...]`… | `HierarchyError` : passer par `new_*`, `add_*`, `remove*`, `move` (§3.3) |
+| `entity.envelope = other.envelope` | `HierarchyError` ; affecter une copie, `other.envelope.model_copy(deep=True)` (§3.7) |
+| `DataSource`, `CsvSource`, `ParquetSource`, `UnknownSource` | `DataReader`, `CsvReader`, `ParquetReader`, `UnregisteredReader` (§6.2) |
+| `DataSourceError` | `DataReadError` |
+| `meter.data_source`, `meter.original_data_source` | `meter.reader`, `meter.original_reader` |
+| `source.load()` ; sous-classe : `read()` | `reader.read()` ; sous-classe : `read_raw()` |
+| `Channel.source_column` | `Channel.raw_column` |
+| `park.new_building("RNB…")` (positionnel) | `park.new_building(rnb_id="RNB…")` : arguments nommés uniquement |
+| `site.detach(id)` | `site.remove_site(s)`, `site.remove_building(b)` (objet ou id) |
+| `remove_system(id)`, `remove_component(id)` | idem, objet ou id |
+| `building.serving_systems(...)` | `building.find_serving_systems(...)` |
+| `park.meters_for(entity)` | `entity.find_meters()` |
+| `select(kind=)`, `Selection.kind`, `to_dataframe(kind=)`, `to_geodataframe(kind=)`, `to_geoparquet(kind=)` | `entity=`, `Selection.entity` ; valeur invalide : `InvalidArgumentError` |
+| `completeness(by="attribute" \| "entity", *, fields=)` | `completeness(fields=None, *, per="field" \| "entity")` |
+| `rnb.suggest_matches(by=)` | `rnb.suggest_matches(method=)` |
+| `SourcePriority.per_attribute` | `SourcePriority.per_field` |
+| `UnknownAttributeWarning` | `UnknownFieldWarning` |
+| colonne ou index `attribute` des rapports et de `describe()` | `field` |
+| `x-bstock-sourced-attributes` (JSON Schema) | `x-bstock-sourced-fields` |
+| `plot.consumption(**kwargs)`, `plot.intensity(**kwargs)` | paramètres explicites |
+| `b.x = None`, `set(x, None, source=s)` | `InvalidArgumentError` ; `unset(x, source=s)` ou `unset(x)` (§4.2) |
+| `component.resolved_heat_loss_coefficient()` | `component.heat_loss_coefficient_or_ua()` |
+| fichier de parc `schema_version` 1 | `UnsupportedSchemaError` ; format v2 (§7) |
+
+Ajouts compatibles : `fields` accepte un nom seul ; `site.remove_site` / `remove_building` ; la copie
+profonde d'une entité seule est détachée de son propriétaire.
 
 ---
 
