@@ -348,13 +348,13 @@ Reportées dans `SPEC.md` (§3.3, §3.6, §3.7, §6.1, §6.5, §11 à §14) à l
 ## v3.c — Analyse (0.6.0)
 
 ### Étape 26 — Métadonnée `extensive` et agrégations
-- [ ] `sourced(extensive=True)` ; interdit avec `inherit=True` ; posé sur les champs du §3.6 et de
+- [x] `sourced(extensive=True)` ; interdit avec `inherit=True` ; posé sur les champs du §3.6 et de
       l'enveloppe ; visible dans `sourced_fields()` et dans le JSON Schema
-- [ ] Module `analysis.py` : `sel.aggregate` en mode hiérarchique (mesures `buildings`, `site`, `delta`,
+- [x] Module `analysis.py` : `sel.aggregate` en mode hiérarchique (mesures `buildings`, `site`, `delta`,
       `coverage`, `total` ; règle `prefer` de bas en haut ; ligne `park`) et comptages
-- [ ] Puissances des systèmes (systèmes partagés comptés une fois, sur leur porteur)
-- [ ] `by="<attr>"`, avec un avertissement quand des valeurs propres de site sont ignorées
-- [ ] Tests : exemple « Résidence X » (pas de double compte, `prefer` dans les deux sens), sites
+- [x] Puissances des systèmes (systèmes partagés comptés une fois, sur leur porteur)
+- [x] `by="<attr>"`, avec un avertissement quand des valeurs propres de site sont ignorées
+- [x] Tests : exemple « Résidence X » (pas de double compte, `prefer` dans les deux sens), sites
       imbriqués, couverture partielle, champ projet extensif, sélection de sites, `by`
 
 ### Étape 27 — Complétude et provenance

@@ -31,7 +31,12 @@ from pydantic import (
 )
 
 from bstock import display
-from bstock.exceptions import HierarchyError, UnknownAttributeWarning, UnknownFieldError
+from bstock.exceptions import (
+    HierarchyError,
+    InvalidArgumentError,
+    UnknownAttributeWarning,
+    UnknownFieldError,
+)
 
 if TYPE_CHECKING:
     import pandas as pd
@@ -188,12 +193,16 @@ class SourcedField(Generic[T]):
         *,
         unit: str | None = None,
         inherit: bool = False,
+        extensive: bool = False,
         description: str | None = None,
         **constraints: Any,
     ) -> None:
+        if extensive and inherit:
+            raise InvalidArgumentError("an extensive attribute cannot be inherited")
         self.type_ = type_
         self.unit = unit
         self.inherit = inherit
+        self.extensive = extensive
         self.description = description
         self.constraints = constraints
         self.name = ""
@@ -232,7 +241,8 @@ class SourcedField(Generic[T]):
     def __repr__(self) -> str:
         type_name = getattr(self.type_, "__name__", repr(self.type_))
         return (
-            f"SourcedField({self.name!r}, {type_name}, unit={self.unit!r}, inherit={self.inherit})"
+            f"SourcedField({self.name!r}, {type_name}, unit={self.unit!r}, inherit={self.inherit}, "
+            f"extensive={self.extensive})"
         )
 
 
@@ -241,6 +251,7 @@ def sourced(
     *,
     unit: str | None = None,
     inherit: bool = False,
+    extensive: bool = False,
     description: str | None = None,
     **constraints: Any,
 ) -> SourcedField[T]:
@@ -256,6 +267,9 @@ def sourced(
     inherit
         Whether an entity without own value takes the value of its parent site (intensive quantities
         only, SPEC §4.4).
+    extensive
+        Whether the quantity adds up from one entity to another (count, area, power): such
+        attributes are summed by the aggregations (SPEC §3.3, §14.3).
     description
         Human readable description.
     **constraints
@@ -265,8 +279,20 @@ def sourced(
     -------
     SourcedField
         The descriptor, to assign to a class attribute without annotation.
+
+    Raises
+    ------
+    InvalidArgumentError
+        If ``extensive`` and ``inherit`` are both true.
     """
-    return SourcedField(type_, unit=unit, inherit=inherit, description=description, **constraints)
+    return SourcedField(
+        type_,
+        unit=unit,
+        inherit=inherit,
+        extensive=extensive,
+        description=description,
+        **constraints,
+    )
 
 
 class SourcedModel(BaseModel):

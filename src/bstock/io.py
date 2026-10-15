@@ -207,7 +207,7 @@ def json_schema(
 
     Sourced attributes are stored in the ``values`` object of each entity, so the schema lists
     them separately in ``x-bstock-sourced-attributes``: for each class, the attribute type (as a
-    JSON Schema), unit, inheritance flag and description.
+    JSON Schema), unit, inheritance and extensive flags and description.
     """
     from bstock.park import BuildingPark  # circular import
 
@@ -227,6 +227,7 @@ def json_schema(
                 "schema": TypeAdapter(field.type_).json_schema(),
                 "unit": field.unit,
                 "inherit": field.inherit,
+                "extensive": field.extensive,
                 "description": field.description,
             }
             for name, field in cls.sourced_fields().items()

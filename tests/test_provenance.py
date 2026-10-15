@@ -7,8 +7,9 @@ import warnings
 import pytest
 from pydantic import BaseModel, ValidationError
 
+import bstock
 from bstock.enums import EnergyType
-from bstock.exceptions import UnknownAttributeWarning, UnknownFieldError
+from bstock.exceptions import InvalidArgumentError, UnknownAttributeWarning, UnknownFieldError
 from bstock.provenance import (
     COMPUTED_SOURCE,
     DEFAULT_SOURCE_PRIORITY,
@@ -331,3 +332,29 @@ def test_equality_ignores_container():
     first, second = Thing(area=1.0), Thing(area=1.0)
     first._container = Holder()
     assert first == second
+
+
+def test_extensive_attribute_cannot_be_inherited():
+    with pytest.raises(InvalidArgumentError, match="extensive"):
+        sourced(float, extensive=True, inherit=True)
+
+
+@pytest.mark.parametrize(
+    ("cls", "name", "extensive"),
+    [
+        ("Building", "heated_area", True),
+        ("Building", "dwelling_count", True),
+        ("Building", "footprint_area", True),
+        ("Building", "floor_area", True),
+        ("Building", "footprint", False),
+        ("Building", "name", False),
+        ("Building", "construction_year", False),
+        ("Envelope", "loss_area", True),
+        ("Envelope", "heat_loss_coefficient", True),
+        ("Envelope", "u_bat", False),
+        ("HeatingGenerator", "nominal_power", True),
+        ("SolarPV", "peak_power", True),
+    ],
+)
+def test_extensive_flag_of_core_attributes(cls, name, extensive):
+    assert getattr(bstock, cls).sourced_fields()[name].extensive is extensive

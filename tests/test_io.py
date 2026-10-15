@@ -243,6 +243,8 @@ def test_json_schema_lists_sourced_attributes_with_units():
     assert sourced_attributes["BayonneBuilding"]["construction_year"]["inherit"] is True
     assert sourced_attributes["Envelope"]["inertia"]["schema"]["enum"] == [i.value for i in Inertia]
     assert sourced_attributes["HeatingGenerator"]["nominal_power"]["unit"] == "kW"
+    assert sourced_attributes["BayonneBuilding"]["heated_area"]["extensive"] is True
+    assert sourced_attributes["BayonneBuilding"]["construction_year"]["extensive"] is False
     footprint = sourced_attributes["BayonneBuilding"]["footprint"]
     assert footprint["schema"]["properties"]["type"]["enum"] == ["Polygon", "MultiPolygon"]
     assert footprint["inherit"] is False

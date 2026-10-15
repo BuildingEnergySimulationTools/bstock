@@ -100,9 +100,13 @@ class Envelope(SourcedModel):
     levels are not synchronised: the ``compute_*`` methods add ``"computed"`` candidates explicitly.
     """
 
-    loss_area = sourced(float, unit="m²", ge=0, description="Heat loss area")
+    loss_area = sourced(float, unit="m²", ge=0, extensive=True, description="Heat loss area")
     heat_loss_coefficient = sourced(
-        float, unit="W/K", ge=0, description="Transmission heat losses (DPE GV, no air renewal)"
+        float,
+        unit="W/K",
+        ge=0,
+        extensive=True,
+        description="Transmission heat losses (DPE GV, no air renewal)",
     )
     u_bat = sourced(float, unit="W/(m².K)", ge=0, inherit=True, description="Mean transmittance")
     inertia = sourced(Inertia, inherit=True)

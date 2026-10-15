@@ -1,0 +1,308 @@
+"""Aggregations of extensive quantities over a selection (SPEC §14.3)."""
+
+from __future__ import annotations
+
+import math
+import warnings
+from collections.abc import Iterable, Sequence
+from enum import Enum
+from typing import TYPE_CHECKING, Any, Literal
+
+import pandas as pd
+
+from bstock.enums import SystemKind
+from bstock.exceptions import InvalidArgumentError, NoDataWarning, UnknownFieldError
+
+if TYPE_CHECKING:
+    from bstock.building import Building
+    from bstock.park import BuildingPark
+    from bstock.provenance import SourcedField
+    from bstock.selection import Selection
+    from bstock.site import Site
+    from bstock.systems import System
+
+__all__: list[str] = []
+
+PARK_ROW = "__park__"
+"""Index of the park total row; ids cannot contain ``__``, so it never clashes with a site id."""
+FIELD_MEASURES = ("buildings", "site", "delta", "coverage", "total")
+"""Measures of an extensive attribute in the hierarchical aggregation."""
+POWERS: dict[str, tuple[SystemKind, str]] = {
+    "heating_power": (SystemKind.HEATING, "nominal_power"),
+    "cooling_power": (SystemKind.COOLING, "nominal_power"),
+    "dhw_power": (SystemKind.DHW, "nominal_power"),
+    "pv_peak_power": (SystemKind.PV, "peak_power"),
+}
+"""Power columns: system kind and summed attribute (kW, or kWp for PV)."""
+
+Prefer = Literal["buildings", "site"]
+Container = Any  # BuildingPark or Site
+
+
+def aggregate(
+    selection: Selection,
+    fields: Sequence[str] | None = None,
+    *,
+    by: str | None = None,
+    prefer: Prefer = "buildings",
+) -> pd.DataFrame:
+    """Aggregate the extensive attributes of a selection; see :meth:`Selection.aggregate`."""
+    if prefer not in ("buildings", "site"):
+        raise InvalidArgumentError(f"prefer must be 'buildings' or 'site', not {prefer!r}")
+    names = _extensive_fields(selection.park, fields)
+    if by is not None:
+        if selection.kind != "building":
+            raise InvalidArgumentError("by= only applies to a selection of buildings")
+        return _aggregate_by(selection, names, by)
+    scope = _Scope(selection)
+    rows = {site.id: _site_row(scope, site, names, prefer) for site in scope.row_sites()}
+    rows[PARK_ROW] = _park_row(scope, names, prefer)
+    frame = pd.DataFrame.from_dict(rows, orient="index")
+    frame.columns = pd.MultiIndex.from_tuples(frame.columns, names=["quantity", "measure"])
+    frame.index.name = "id"
+    return frame
+
+
+def _extensive_fields(park: BuildingPark, fields: Sequence[str] | None) -> list[str]:
+    available = park.building_cls.sourced_fields()
+    if fields is None:
+        return [name for name, field in available.items() if field.extensive]
+    for name in fields:
+        if name not in available:
+            raise UnknownFieldError(f"{name!r} is not an attribute of the buildings of this park")
+        if not available[name].extensive:
+            raise InvalidArgumentError(f"{name!r} is not extensive: it cannot be summed")
+    return list(fields)
+
+
+class _Scope:
+    """Which sites and buildings count for a selection.
+
+    For a selection of buildings: the selected buildings, and the sites containing them. For a
+    selection of sites: every site and building of their subtrees.
+    """
+
+    def __init__(self, selection: Selection) -> None:
+        self.park = selection.park
+        self.kind = selection.kind
+        entities = selection._entities()
+        if self.kind == "building":
+            self.roots: list[Any] = []
+            self.buildings = {b.id for b in entities}
+            self.sites = {s.id for b in entities for s in b._ancestor_sites()}
+        else:
+            selected = {s.id for s in entities}
+            self.roots = [
+                s for s in entities if not any(a.id in selected for a in s._ancestor_sites())
+            ]
+            subtree_sites = [x for s in entities for x in s.iter_sites()]
+            self.sites = selected | {s.id for s in subtree_sites}
+            self.buildings = {b.id for s in entities for b in s.iter_buildings()}
+        self._selected_sites = entities if self.kind == "site" else []
+
+    def row_sites(self) -> list[Site]:
+        """Return the sites that get a row."""
+        if self.kind == "site":
+            return list(self._selected_sites)
+        return [s for s in self.park.iter_sites() if s.id in self.sites]
+
+    def top_items(self) -> list[Any]:
+        """Return the counted sites and buildings that have no counted ancestor."""
+        if self.kind == "site":
+            return list(self.roots)
+        return [*self.child_sites(self.park), *self.child_buildings(self.park)]
+
+    def child_sites(self, container: Container) -> list[Site]:
+        return [s for s in container.sites if s.id in self.sites]
+
+    def child_buildings(self, container: Container) -> list[Building]:
+        return [b for b in container.buildings if b.id in self.buildings]
+
+    def walk(self, items: Iterable[Any]) -> tuple[list[Site], list[Building]]:
+        """Return the counted sites and buildings in and below ``items``."""
+        from bstock.site import Site
+
+        sites: list[Site] = []
+        buildings: list[Building] = []
+        stack = list(items)
+        while stack:
+            item = stack.pop(0)
+            if isinstance(item, Site):
+                sites.append(item)
+                stack.extend([*self.child_sites(item), *self.child_buildings(item)])
+            else:
+                buildings.append(item)
+        return sites, buildings
+
+    def site_value_counts(self, site: Site) -> bool:
+        """Whether the own value of ``site`` may enter a total: it covers counted buildings only."""
+        return self.kind == "site" or all(b.id in self.buildings for b in site.iter_buildings())
+
+    def systems(self, sites: list[Site], buildings: list[Building]) -> list[System]:
+        """Return the systems owned by ``sites`` and ``buildings`` that serve counted buildings."""
+        found: list[System] = [s for b in buildings for s in b.iter_systems()]
+        for site in sites:
+            found.extend(s for s in site.iter_systems() if self._serves_counted(site, s))
+        return found
+
+    def _serves_counted(self, site: Site, system: System) -> bool:
+        if self.kind == "site":
+            return True
+        if system.serves is None:
+            return any(b.id in self.buildings for b in site.iter_buildings())
+        return any(building_id in self.buildings for building_id in system.serves)
+
+
+# --- hierarchical rows ---------------------------------------------------------------------------
+
+
+def _site_row(scope: _Scope, site: Site, names: list[str], prefer: Prefer) -> dict[Any, Any]:
+    sites, buildings = scope.walk([site])
+    row: dict[Any, Any] = {}
+    for name in names:
+        summed, coverage = _sum(_value(b, name) for b in buildings)
+        own = _value(site, name)
+        row.update(
+            {
+                (name, "buildings"): summed,
+                (name, "site"): own,
+                (name, "delta"): own - summed,
+                (name, "coverage"): coverage,
+                (name, "total"): _total(scope, site, name, prefer),
+            }
+        )
+    row.update(_system_columns(scope, sites, buildings))
+    return row
+
+
+def _park_row(scope: _Scope, names: list[str], prefer: Prefer) -> dict[Any, Any]:
+    top = scope.top_items()
+    sites, buildings = scope.walk(top)
+    row: dict[Any, Any] = {}
+    for name in names:
+        summed, coverage = _sum(_value(b, name) for b in buildings)
+        total, _ = _sum(_total(scope, item, name, prefer) for item in top)
+        row.update(
+            {
+                (name, "buildings"): summed,
+                (name, "site"): math.nan,
+                (name, "delta"): math.nan,
+                (name, "coverage"): coverage,
+                (name, "total"): total,
+            }
+        )
+    row.update(_system_columns(scope, sites, buildings))
+    return row
+
+
+def _total(scope: _Scope, item: Any, name: str, prefer: Prefer) -> float:
+    """Return the value retained for ``item``, computed bottom-up (SPEC §14.3, ``prefer``)."""
+    from bstock.site import Site
+
+    if not isinstance(item, Site):
+        return _value(item, name)
+    own = _value(item, name) if scope.site_value_counts(item) else math.nan
+    children = [*scope.child_sites(item), *scope.child_buildings(item)]
+    summed, _ = _sum(_total(scope, child, name, prefer) for child in children)
+    if prefer == "site":
+        return summed if math.isnan(own) else own
+    return own if math.isnan(summed) else summed
+
+
+def _system_columns(scope: _Scope, sites: list[Site], buildings: list[Building]) -> dict[Any, Any]:
+    systems = scope.systems(sites, buildings)
+    columns: dict[Any, Any] = {}
+    for column, (kind, attribute) in POWERS.items():
+        values = [getattr(s, attribute) for s in systems if s.kind == kind]
+        summed, coverage = _sum(math.nan if v is None else float(v) for v in values)
+        columns[(column, "value")] = summed
+        columns[(column, "coverage")] = coverage
+    counted_ids = {*(s.id for s in sites), *(b.id for b in buildings), *(s.id for s in systems)}
+    columns[("building_count", "value")] = len(buildings)
+    for kind in SystemKind:
+        columns[(f"{kind}_count", "value")] = sum(1 for s in systems if s.kind == kind)
+    columns[("meter_count", "value")] = sum(
+        1 for m in scope.park.meters if counted_ids & set(m.scope)
+    )
+    return columns
+
+
+def _value(entity: Any, name: str) -> float:
+    """Return the effective value of ``name`` as a float, NaN when missing or not declared."""
+    if name not in entity.sourced_fields():
+        return math.nan
+    value = getattr(entity, name)
+    return math.nan if value is None else float(value)
+
+
+def _sum(values: Iterable[float]) -> tuple[float, float]:
+    """Return the sum of the known values (NaN if none) and the share of known values."""
+    values = list(values)
+    known = [v for v in values if not math.isnan(v)]
+    total = math.fsum(known) if known else math.nan
+    coverage = len(known) / len(values) if values else math.nan
+    return total, coverage
+
+
+# --- grouping by attribute -----------------------------------------------------------------------
+
+
+def _aggregate_by(selection: Selection, names: list[str], by: str) -> pd.DataFrame:
+    park = selection.park
+    field: SourcedField[Any] | None = park.building_cls.sourced_fields().get(by)
+    if field is None:
+        raise UnknownFieldError(f"{by!r} is not an attribute of the buildings of this park")
+    buildings = selection._entities()
+    groups: dict[Any, list[Building]] = {}
+    for building in buildings:
+        groups.setdefault(_group_key(building, by), []).append(building)
+    _warn_ignored_site_values(buildings, names)
+    keys = [k for k in groups if k is not pd.NA]
+    if pd.NA in groups:
+        keys.append(pd.NA)
+    rows = {}
+    for key in keys:
+        row: dict[Any, Any] = {}
+        for name in names:
+            summed, coverage = _sum(_value(b, name) for b in groups[key])
+            row[(name, "buildings")] = summed
+            row[(name, "coverage")] = coverage
+        row[("building_count", "value")] = len(groups[key])
+        rows[key] = row
+    frame = pd.DataFrame.from_dict(rows, orient="index")
+    if not rows:
+        frame = pd.DataFrame(columns=_by_columns(names))
+    frame.columns = pd.MultiIndex.from_tuples(frame.columns, names=["quantity", "measure"])
+    frame.index = pd.Index(keys, name=by, dtype=object)
+    return frame
+
+
+def _by_columns(names: list[str]) -> list[tuple[str, str]]:
+    columns = [(name, measure) for name in names for measure in ("buildings", "coverage")]
+    return [*columns, ("building_count", "value")]
+
+
+def _group_key(building: Building, by: str) -> Any:
+    value = getattr(building, by)
+    if value is None:
+        return pd.NA
+    if isinstance(value, Enum):
+        return value.value
+    if isinstance(value, list | dict):
+        raise InvalidArgumentError(f"cannot group by {by!r}: its values are not single values")
+    return value
+
+
+def _warn_ignored_site_values(buildings: list[Building], names: list[str]) -> None:
+    sites = {s.id: s for b in buildings for s in b._ancestor_sites()}
+    ignored = sorted(
+        site_id
+        for site_id, site in sites.items()
+        if any(not math.isnan(_value(site, name)) for name in names)
+    )
+    if ignored:
+        warnings.warn(
+            f"own values of sites {ignored} are ignored when grouping buildings by attribute",
+            NoDataWarning,
+            stacklevel=5,
+        )

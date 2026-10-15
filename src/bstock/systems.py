@@ -127,7 +127,7 @@ class Generator(System):
 
     technology = sourced(GeneratorTechnology, description="How to read the performance ratios")
     energy_type = sourced(EnergyType, description="Final energy consumed")
-    nominal_power = sourced(float, unit="kW", ge=0)
+    nominal_power = sourced(float, unit="kW", ge=0, extensive=True)
     nominal_performance_ratio = sourced(
         float, gt=0, description="Rated COP, EER or efficiency (data sheet)"
     )
@@ -212,7 +212,7 @@ class SolarPV(System):
 
     kind: ClassVar[str] = SystemKind.PV
 
-    peak_power = sourced(float, unit="kWp", ge=0)
+    peak_power = sourced(float, unit="kWp", ge=0, extensive=True)
     area = sourced(float, unit="m²", ge=0)
     azimuth = sourced(float, unit="°", ge=0, le=360, description="0 = north, 180 = south")
     tilt = sourced(float, unit="°", ge=0, le=90, description="0 = horizontal")

@@ -63,14 +63,14 @@ class DescribedEntity(SourcedModel):
     construction_year = sourced(int, ge=1000, le=2100, inherit=True)
     level_count = sourced(int, ge=1, inherit=True, description="Number of levels, ground floor = 1")
     height = sourced(float, unit="m", ge=0, inherit=True)
-    dwelling_count = sourced(int, ge=0, description="Number of dwellings")
+    dwelling_count = sourced(int, ge=0, extensive=True, description="Number of dwellings")
     footprint = sourced(
         Footprint,
         description="Footprint: GeoJSON Polygon or MultiPolygon, coordinates in WGS84 degrees",
     )
-    footprint_area = sourced(float, unit="m²", ge=0, description="Footprint area")
-    floor_area = sourced(float, unit="m²", ge=0, description="Gross floor area")
-    heated_area = sourced(float, unit="m²", ge=0, description="Heated area")
+    footprint_area = sourced(float, unit="m²", ge=0, extensive=True, description="Footprint area")
+    floor_area = sourced(float, unit="m²", ge=0, extensive=True, description="Gross floor area")
+    heated_area = sourced(float, unit="m²", ge=0, extensive=True, description="Heated area")
 
     @field_validator("id")
     @classmethod

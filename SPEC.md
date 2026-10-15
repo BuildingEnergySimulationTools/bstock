@@ -119,7 +119,9 @@ Toutes les entités (`Site`, `Building`, `Envelope`, systèmes, `Meter`) hérite
   métadonnée qu'utilisent les agrégations (§14.3) et l'indicateur kWh/m² (§6.5). Elle est distincte de
   `inherit=False` : `name` et `footprint` ne s'héritent pas non plus, mais ne s'additionnent pas. Un champ
   ne peut pas être à la fois `extensive=True` et `inherit=True` (`InvalidArgumentError` à la définition
-  de la classe). Une sous-classe projet déclare ses propres champs extensifs de la même façon.
+  de la classe). Dans le socle, sont extensifs : les surfaces et `dwelling_count` (§3.6), `loss_area` et
+  `heat_loss_coefficient` de l'enveloppe (§3.7), `nominal_power` des générateurs et `peak_power` du PV
+  (§3.8). La métadonnée figure dans `sourced_fields()` et dans le JSON Schema (`"extensive"`). Une sous-classe projet déclare ses propres champs extensifs de la même façon.
 - **Les collections (sites, bâtiments, systèmes, parois, compteurs) se modifient uniquement via les
   méthodes du parc ou des entités** (`new_*`, `add_*`, `remove`, `move`). Ces méthodes maintiennent l'index
   des ids, les liens vers le parent et les contrôles de cohérence. La modification directe des listes
@@ -1385,7 +1387,9 @@ extensifs (§3.3) de `building_cls`. Un champ non extensif lève `InvalidArgumen
 ses 3 bâtiments qui ont leurs propres valeurs : 1 000 + 1 200 + 700 = 2 900 m². Additionner les deux
 donnerait 5 900 m², ce qui est faux. bstock ne choisit pas silencieusement : il montre les deux valeurs.
 
-**Mode hiérarchique** (`by=None`). On a une ligne par site concerné, puis une ligne `park` pour le total.
+**Mode hiérarchique** (`by=None`). On a une ligne par site concerné, dans l'ordre de `iter_sites()`, puis
+une ligne de total indexée `"__park__"` (un id ne peut pas contenir `__`, donc ce libellé ne se confond
+jamais avec un site).
 - Pour une sélection de bâtiments, les sites concernés sont les ancêtres d'au moins un bâtiment
   sélectionné, et seuls les bâtiments sélectionnés sont comptés.
 - Pour une sélection de sites, ce sont les sites sélectionnés, avec tous les bâtiments de leur
@@ -1401,8 +1405,10 @@ Les colonnes forment un `MultiIndex` (champ, mesure) :
 | `coverage` | Part des bâtiments comptés qui ont une valeur (0 à 1) |
 | `total` | Valeur retenue selon `prefer` (voir ci-dessous) |
 
-Plus des colonnes de comptage : `building_count` (bâtiments comptés), et pour chaque `kind` de système
-`<kind>_count`, puis `meter_count`.
+Plus des colonnes de comptage, de mesure `value` : `building_count` (bâtiments comptés), `<kind>_count`
+pour chaque `kind` de système (systèmes comptés, voir ci-dessous) et `meter_count` (compteurs dont le
+`scope` touche un site, un bâtiment ou un système compté de la ligne). Une somme sans aucune valeur
+connue est manquante (NaN), pas nulle.
 
 **Règle `prefer`** pour `total`. Elle se calcule de bas en haut. Pour un bâtiment, `total` est sa valeur.
 Pour un site :
@@ -1411,7 +1417,12 @@ Pour un site :
 - `prefer="site"` : `total` est la valeur propre du site si elle existe, sinon la somme des `total` de ses
   enfants.
 
-La ligne `park` additionne les `total` du premier niveau. Un même bâtiment n'est donc jamais compté deux
+Dans une sélection de bâtiments, la valeur propre d'un site n'entre dans un `total` que si **tous** ses
+bâtiments sont sélectionnés : sinon elle couvrirait aussi des bâtiments hors sélection. Elle reste
+affichée dans la mesure `site`.
+
+La ligne `"__park__"` additionne les `total` du premier niveau compté : sites et bâtiments sans ancêtre
+compté, ou sites sélectionnés sans ancêtre sélectionné. Un même bâtiment n'est donc jamais compté deux
 fois dans un `total`. **Pas d'extrapolation** : une valeur manquante n'est pas estimée, et `coverage`
 montre ce qui manque.
 
@@ -1422,8 +1433,9 @@ compté une fois, sur son porteur, et remonte dans les sites ancêtres. Il n'y a
 site / bâtiments. Pour une sélection de bâtiments, un système de site est compté s'il dessert au moins un
 bâtiment sélectionné.
 
-**Regroupement par attribut** (`by="usage"`, ou tout attribut sourcé). On a une ligne par valeur effective
-des bâtiments sélectionnés, plus une ligne `<NA>` pour les bâtiments sans valeur. Les mesures sont
+**Regroupement par attribut** (`by="usage"`, ou tout attribut sourcé à valeur simple ; un attribut liste
+lève `InvalidArgumentError`). On a une ligne par valeur effective des bâtiments sélectionnés, dans l'ordre
+d'apparition (une enum par sa valeur), plus une dernière ligne `<NA>` pour les bâtiments sans valeur. Les mesures sont
 `buildings`, `coverage` et `building_count`. Les valeurs propres des sites sont ignorées, parce qu'elles
 ne se rattachent à aucun groupe. Si un site concerné en a une pour un champ agrégé, un `NoDataWarning` le
 signale. `by` n'est accepté que pour une sélection de bâtiments.

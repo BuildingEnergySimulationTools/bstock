@@ -149,6 +149,61 @@ class Selection:
         ids = operation(set(self._ids), set(other._ids))
         return Selection(self._park, self._kind, _tree_order(self._park, self._kind, ids))
 
+    # --- analysis -----------------------------------------------------------------------------
+
+    def aggregate(
+        self,
+        fields: Sequence[str] | None = None,
+        *,
+        by: str | None = None,
+        prefer: Literal["buildings", "site"] = "buildings",
+    ) -> pd.DataFrame:
+        """Sum the extensive attributes of the selected buildings, per site (SPEC §14.3).
+
+        The model is not modified. A missing value is never estimated: ``coverage`` shows the
+        share of buildings having a value.
+
+        Parameters
+        ----------
+        fields
+            Extensive attributes of the buildings (``sourced(extensive=True)``); all of them by
+            default.
+        by
+            Without it, one row per site concerned (the sites containing selected buildings, or
+            the selected sites) and a total row indexed ``"__park__"``. With an attribute name,
+            one row per effective value of that attribute among the selected buildings, the
+            buildings without value last (``<NA>``); the own values of sites are then ignored
+            (``NoDataWarning``). Selections of buildings only.
+        prefer
+            Value retained in ``total`` when a site has its own value and its buildings theirs:
+            ``"buildings"`` (the sum of the children, the site value when no child has one) or
+            ``"site"`` (the site value when it has one). The own value of a site enters a total
+            only if all its buildings are selected.
+
+        Returns
+        -------
+        pandas.DataFrame
+            Columns are a ``MultiIndex`` (quantity, measure). Per attribute: ``buildings`` (sum
+            of the known building values), ``site`` (own value of the site), ``delta``
+            (``site - buildings``), ``coverage`` (0 to 1) and ``total``; with ``by``, only
+            ``buildings`` and ``coverage``. Then ``heating_power``, ``cooling_power``,
+            ``dhw_power`` (kW) and ``pv_peak_power`` (kWp) with ``value`` and ``coverage`` (a
+            system counts once, on its owner, and a site system counts if it serves a selected
+            building), and the counts ``building_count``, ``<system kind>_count`` and
+            ``meter_count`` (measure ``value``). Values are in the unit of the attribute.
+
+        Raises
+        ------
+        UnknownFieldError
+            If an attribute is unknown.
+        InvalidArgumentError
+            If an attribute is not extensive, ``prefer`` is invalid, ``by`` is used on a
+            selection of sites or names an attribute with list values.
+        """
+        from bstock.analysis import aggregate  # circular import
+
+        return aggregate(self, fields, by=by, prefer=prefer)
+
     # --- exports and display ------------------------------------------------------------------
 
     def to_dataframe(self, *, provenance: bool = False) -> pd.DataFrame:
