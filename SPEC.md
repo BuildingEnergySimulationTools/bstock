@@ -6,8 +6,8 @@
 >
 > **v3 en cours** (interview du 2026-10-15) : lisibilité, sélection, analyse et graphiques (§14),
 > consommations mesurées (§6.5), métadonnée `extensive` (§3.3). Découpage et versions : §12. La
-> lisibilité (v3.a, §14.1) est implémentée par bstock 0.4.0, la sélection (v3.b, §14.2) par 0.5.0 ; le
-> reste est spécifié, pas encore implémenté.
+> lisibilité (v3.a, §14.1) est implémentée par bstock 0.4.0, la sélection (v3.b, §14.2) par 0.5.0,
+> l'analyse (v3.c, §3.3, §14.3, §14.4) par 0.6.0 ; le reste est spécifié, pas encore implémenté.
 
 ---
 

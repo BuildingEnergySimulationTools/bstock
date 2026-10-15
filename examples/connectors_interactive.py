@@ -101,6 +101,17 @@ undated = park.select(construction_year__isnull=True)
 undated.tree()
 
 
+# %% what the sources filled, and where the values come from
+report_fields = ["construction_year", "usage", "height", "footprint_area", "heated_area"]
+buildings = park.select()
+print(buildings.completeness(fields=report_fields))
+buildings.provenance(report_fields)
+
+
+# %% where the sources disagree (own candidates only; floats within 5 %)
+buildings.conflicts()
+
+
 # %% all candidates of one value, e.g. the footprint area of the first building
 first = next(park.iter_buildings())
 print(first)

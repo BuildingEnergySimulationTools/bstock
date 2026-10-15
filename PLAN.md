@@ -7,7 +7,7 @@ Règles (voir `CLAUDE.md`) :
 
 Sommaire : [v1](#v1--terminée) (terminée, 0.1.0 puis ajustements d'API en 0.2.0) ·
 [v2](#v2--connecteurs-emprise-et-exports) (terminée, 0.3.0) ·
-[v3](#v3--lisibilité-sélection-analyse-consommations-graphiques) (en cours ; v3.a et v3.b terminées, 0.5.0)
+[v3](#v3--lisibilité-sélection-analyse-consommations-graphiques) (en cours ; v3.a à v3.c terminées, 0.6.0)
 
 ---
 
@@ -361,7 +361,7 @@ Reportées dans `SPEC.md` (§3.3, §3.6, §3.7, §6.1, §6.5, §11 à §14) à l
 - [x] `completeness(by="attribute" | "entity")`, `provenance(normalize=)`, `conflicts(rtol=)`
 - [x] Tests : valeur héritée comptée, part héritée, conflits (entier strict, flottant dans et hors
       tolérance, enum), candidats hérités non comparés
-- [ ] Finalisation 0.6.0
+- [x] Finalisation 0.6.0 (README, exemples, version et tag)
 
 ## v3.d — Consommations (0.7.0)
 

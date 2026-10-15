@@ -19,6 +19,9 @@ Common data structure for building stocks: sites, buildings, envelopes, systems 
 - **Selections**: `park.select(usage="tertiary", construction_year__lt=1975, within="school-A")`
   filters buildings or sites on their effective values, with operators, structure criteria and set
   operations.
+- **Analysis**: sums of extensive quantities (areas, dwellings, system powers) per site without
+  double counting a site value and its buildings', completeness and provenance reports, conflicts
+  between sources.
 - **Readable in a console or a notebook**: a park or a site displays as a tree (foldable HTML in
   Jupyter), other entities on one line, and `describe()` lists the effective values with their
   source.
@@ -104,6 +107,23 @@ sel.tree(fields=["construction_year"]) # the selected buildings and their sites
 Operators: `__in`, `__lt`, `__le`, `__gt`, `__ge`, `__isnull`, `__contains`. Structure criteria:
 `within`, `parent`, `has_rnb_id`, `has_meter`, `has_system`. A selection is a snapshot of ids: select
 again after changing the park.
+
+## Analysing a selection
+
+```python
+sel = park.select()
+sel.aggregate(["heated_area"])         # per site: sum of the buildings, site value, delta, coverage,
+                                       # total (prefer="buildings" or "site"), then a "__park__" row
+sel.aggregate(by="usage")              # extensive attributes summed per usage
+sel.completeness()                     # per attribute: filled, inherited, total, rate
+sel.completeness("entity")             # per building: what is missing
+sel.provenance(normalize=True)         # share of each source in the effective values
+sel.conflicts(rtol=0.05)               # own candidates that disagree (floats within 5 %)
+```
+
+A site may have its own value (a DPE of the whole block) and its buildings theirs: the aggregation
+shows both and never adds them up. Missing values are never estimated, the `coverage` shows them.
+Project attributes declared `sourced(..., extensive=True)` are aggregated too.
 
 ## Examples
 

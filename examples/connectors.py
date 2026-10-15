@@ -81,6 +81,14 @@ def main(
     # buildings the sources left without construction year, and where they are
     print(park.select(construction_year__isnull=True).tree())
 
+    # what the sources filled, where the values come from, and where the sources disagree
+    report_fields = ["construction_year", "usage", "height", "footprint_area", "heated_area"]
+    buildings = park.select()
+    print(buildings.completeness(fields=report_fields).to_string())
+    print(buildings.provenance(report_fields).to_string())
+    conflicts = buildings.conflicts()
+    print(conflicts.to_string() if len(conflicts) else "No conflict between the sources")
+
     # 6. exports
     try:
         park.to_geopackage(output / "nobatek.gpkg")

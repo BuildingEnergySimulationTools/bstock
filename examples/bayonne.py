@@ -46,7 +46,7 @@ class BayonneBuilding(Building):
     """Building with the Bayonne asset code and usable area."""
 
     code_patrimoine = sourced(str)
-    surface_utile_client = sourced(float, unit="m²", ge=0)
+    surface_utile_client = sourced(float, unit="m²", ge=0, extensive=True)
 
 
 def new_park() -> BuildingPark:
@@ -147,6 +147,12 @@ def main(output: Path) -> BuildingPark:
         owner="site-ecole-A",
     )
     print(f"A heating systems: {[s.id for s in a.serving_systems('heating')]}")
+
+    # Areas per site: client usable area and heated area, with the boiler power, no double count.
+    totals = park.select().aggregate(["surface_utile_client", "heated_area"])
+    columns = [("surface_utile_client", "total"), ("heated_area", "total")]
+    columns += [("heated_area", "coverage"), ("heating_power", "value")]
+    print(totals[columns].to_string())
     park.add_meter(
         Meter(
             id="PDL_123",

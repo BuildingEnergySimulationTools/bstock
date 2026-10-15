@@ -60,7 +60,7 @@ class BayonneBuilding(Building):
     """Building with the Bayonne asset code and usable area."""
 
     code_patrimoine = sourced(str)
-    surface_utile_client = sourced(float, unit="m²", ge=0)
+    surface_utile_client = sourced(float, unit="m²", ge=0, extensive=True)
 
 
 # %% made-up input files: client inventory and electricity load curve
@@ -165,6 +165,13 @@ park.add_system(
 )
 print(a.serving_systems("heating"))
 park.tree(systems=True)
+
+
+# %% areas per site (client usable area, heated area) and boiler power, without double count
+totals = park.select().aggregate(["surface_utile_client", "heated_area"])
+columns = [("surface_utile_client", "total"), ("heated_area", "total")]
+columns += [("heated_area", "coverage"), ("heating_power", "value")]
+totals[columns]
 
 
 # %% 5. the site electricity meter, read from the CSV load curve
