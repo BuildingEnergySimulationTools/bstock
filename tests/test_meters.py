@@ -1,4 +1,5 @@
 import json
+import warnings
 
 import pandas as pd
 import pytest
@@ -368,6 +369,20 @@ def test_timeseries_assembles_meters(park):
     assert list(df.columns) == ["elec_power__W__site-A__total", "gas_energy__kWh__boiler__heating"]
     assert str(df.index.tz) == "UTC"
     assert len(df) == 4  # 00:00-02:00 UTC and 01:00-03:00 UTC: union of 4 hours
+    assert df.index.is_monotonic_increasing
+
+
+def test_timeseries_interleaves_meters_of_different_time_steps(park):
+    # Regression: pandas warned (deprecation) when concatenating interleaved indexes.
+    hourly_meter = park.add_meter(make_meter("elec", ["site-A"], channel="power", unit="W"))
+    daily_meter = park.add_meter(make_meter("gas", ["boiler"], end_use="heating"))
+    hourly_meter.data = hourly(start="2024-01-02 10:00", periods=3, power=[1.0, 2.0, 3.0])
+    index = pd.date_range("2024-01-01", periods=4, freq="D", tz="UTC")
+    daily_meter.data = pd.DataFrame({"energy": [1.0, 2.0, 3.0, 4.0]}, index=index)
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        df = park.timeseries()
+    assert len(df) == 7
     assert df.index.is_monotonic_increasing
 
 

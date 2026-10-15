@@ -627,7 +627,7 @@ class BuildingPark(BaseModel):
         if not frames:
             return pd.DataFrame(index=pd.DatetimeIndex([], tz=tz))
         # column names start with the meter id, so they are unique across meters
-        return pd.concat(frames, axis=1, join="outer").sort_index()
+        return pd.concat(frames, axis=1, join="outer", sort=True)
 
     def _select_meters(
         self,
