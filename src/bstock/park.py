@@ -182,9 +182,9 @@ class BuildingPark(BaseModel):
 
         Warnings
         --------
-        The park in memory is modified, so that it describes what was saved: relative paths of data
-        sources become absolute and, with ``include_data``, the meters read their data from the
-        saved Parquet files (the former source is kept in ``original_data_source``). See
+        The park in memory is modified, so that it describes what was saved: relative paths of the
+        readers become absolute and, with ``include_data``, the meters read their data from the
+        saved Parquet files (the former reader is kept in ``original_reader``). See
         :func:`bstock.io.save`.
         """
         from bstock import io  # circular import

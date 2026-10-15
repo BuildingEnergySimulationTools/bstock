@@ -12,7 +12,7 @@ from bstock.exceptions import (
 )
 from bstock.meters import Channel, Meter
 from bstock.park import BuildingPark
-from bstock.sources import CsvSource
+from bstock.readers import CsvReader
 from bstock.systems import HeatingGenerator
 
 YEAR = {"start": "2024-01-01", "end": "2025-01-01"}
@@ -248,11 +248,9 @@ def test_load_data_reads_the_meter_source(park, tmp_path):
     pd.DataFrame({"date": pd.date_range("2024-01-01", periods=10, freq="D"), "energy": 1.0}).to_csv(
         path, index=False
     )
-    source = CsvSource(path=str(path), index_col="date", tz="Europe/Paris")
+    source = CsvReader(path=str(path), index_col="date", tz="Europe/Paris")
     park.add_meter(
-        Meter(
-            id="m", scope=["b1"], data_source=source, channels=[Channel(name="energy", unit="kWh")]
-        )
+        Meter(id="m", scope=["b1"], reader=source, channels=[Channel(name="energy", unit="kWh")])
     )
     with warnings.catch_warnings():
         warnings.simplefilter("error")

@@ -9,7 +9,7 @@ Common data structure for building stocks: sites, buildings, envelopes, systems 
 - **Project extensions**: subclass `Site` and `Building` to add client attributes; the park creates
   and reloads them with your classes.
 - **Metered data** in the [tide](https://github.com/BuildingEnergySimulationTools/tide) column format
-  `name__unit__bloc__sub_bloc`, read from CSV, Parquet or your own sources.
+  `name__unit__bloc__sub_bloc`, read from CSV, Parquet or your own readers.
 - **Persistence**: JSON park file, optional Parquet export making a park directory self-contained,
   JSON Schema.
 - **Connectors** to the French public APIs: RNB (building register), BDNB (building database) and DPE
@@ -48,7 +48,7 @@ Requires Python ≥ 3.11.
 ## Quick start
 
 ```python
-from bstock import Building, BuildingPark, Channel, CsvSource, Meter, Site, sourced
+from bstock import Building, BuildingPark, Channel, CsvReader, Meter, Site, sourced
 
 
 class MyBuilding(Building):            # client attributes, with provenance too
@@ -71,7 +71,7 @@ b.inherited_candidates("construction_year")
 park.add_meter(Meter(
     id="PDL_123", scope=["school-A"], end_use="total",
     channels=[Channel(name="power", unit="W", column="valeur")],
-    data_source=CsvSource(path="enedis.csv", index_col="horodate", sep=";", tz="Europe/Paris"),
+    reader=CsvReader(path="enedis.csv", index_col="horodate", sep=";", tz="Europe/Paris"),
 ))
 df = park.timeseries(load_data=True)        # columns: PDL_123_power__W__school-A__total
 

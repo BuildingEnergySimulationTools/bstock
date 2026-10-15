@@ -52,7 +52,7 @@ parc de bâtiments, sa provenance et ses données mesurées.
 | **System** | Équipement : production de chauffage, de froid, d'ECS, ventilation, PV. Rattaché à un bâtiment ou à un site (partagé). |
 | **Envelope** | Enveloppe d'un bâtiment ou d'un site : synthèse et parois optionnelles. |
 | **Meter** | Point de mesure (compteur, sous-compteur, capteur) qui concerne 1..n entités du parc. |
-| **DataSource** | Description de l'endroit où lire les données d'un Meter (CSV, Parquet, API…). |
+| **DataReader** | Description de l'endroit où lire les données d'un Meter (CSV, Parquet, API…). |
 | **SourcedValue** | Une valeur d'attribut accompagnée de sa source, de sa date et d'un commentaire. |
 | **Source** | Identifiant de l'origine d'une information (`"bdnb"`, `"dpe"`, `"audit"`, `"bayonne_xlsx_2024"`…). |
 
@@ -73,7 +73,7 @@ BuildingPark
  │   ├─ envelope: Envelope
  │   └─ systems : heating / cooling / dhw / ventilation / pv
  ├─ meters: list[Meter]                # scope -> ids d'entités (site, bâtiment, système)
- │   └─ source: DataSource | None
+ │   └─ reader: DataReader | None
  └─ source_priority: SourcePriority
 ```
 
@@ -616,8 +616,8 @@ Règles :
 | `end_use` | sourcé `EndUse` | Usage mesuré |
 | `timestep` | sourcé `str` | Pas de temps nominal (`"10min"`, `"1h"`, `"1D"`…) |
 | `channels` | `list[Channel]` | Grandeurs mesurées (une colonne par grandeur) |
-| `data_source` | `DataSource \| None` | Où lire les données (nommé ainsi pour ne pas confondre avec la `source` de provenance) |
-| `original_data_source` | `DataSource \| None` | Source d'origine, conservée après `save(include_data=True)` |
+| `reader` | `DataReader \| None` | Où lire les données. « Source » est réservé à la provenance des valeurs (§4) : le côté séries temporelles parle de *reader* |
+| `original_reader` | `DataReader \| None` | Reader d'origine, conservé après `save(include_data=True)` |
 | `parent_meter` | `str \| None` | (v3) Id du compteur dont celui-ci est un **sous-compteur**. `None` = compteur de tête. Sert aux consommations (§6.5) : seuls les compteurs de tête sont additionnés. Optionnel, donc le JSON v2 reste lisible |
 | `bloc`, `sub_bloc` | `str \| None` | Surcharge des tags tide ; `None` = valeur dérivée (§6.4). `meter.tide_tags()` renvoie le couple effectif |
 | `data` | `pd.DataFrame \| None` | Données en mémoire, **non sérialisées en JSON** |
@@ -635,41 +635,42 @@ Exemples :
 park.add_meter(Meter(id="PDL_123", scope=["site-ecole-A"], energy_type="electricity",
                      end_use="total", timestep="30min",
                      channels=[Channel(name="power", unit="W", column="valeur")],
-                     data_source=CsvSource(path="data/enedis_PDL_123.csv", index_col="horodate")))
+                     reader=CsvReader(path="data/enedis_PDL_123.csv", index_col="horodate")))
 
 park.add_meter(Meter(id="SUB_chauff", scope=["heating-chaufferie-A"],
                      energy_type="natural_gas", end_use="heating", timestep="1D",
                      channels=[Channel(name="energy", unit="kWh")]))
 ```
 
-### 6.2 Sources de données
+### 6.2 Lecture des données (readers)
 
 ```python
-class DataSource(BaseModel):          # base abstraite, discriminée par `type`
+class DataReader(BaseModel):          # base abstraite, discriminée par `type`
     type: str
     tz: str | None                    # localise un index sans fuseau
     tz_ambiguous, tz_nonexistent      # comme pandas.DatetimeIndex.tz_localize
-    def read(self) -> pd.DataFrame: ...   # à implémenter par chaque source
-    def load(self) -> pd.DataFrame: ...   # read() + contrôle et localisation de l'index
+    def read_raw(self) -> pd.DataFrame: ...  # à implémenter par chaque reader
+    def read(self) -> pd.DataFrame: ...      # read_raw() + contrôle et localisation de l'index
 
-class CsvSource(DataSource):     type = "csv";     path; index_col; sep; decimal; tz; tz_ambiguous; ...
-class ParquetSource(DataSource): type = "parquet"; path
+class CsvReader(DataReader):     type = "csv";     path; index_col; sep; decimal; tz; tz_ambiguous; ...
+class ParquetReader(DataReader): type = "parquet"; path
 ```
 
 - Un CSV dont les horodatages ont des décalages UTC différents (changement d'heure) est converti en UTC.
 - Un chemin relatif est résolu par rapport au dossier du parc quand le parc a été chargé depuis un dossier
   (§7).
-- Un projet crée sa propre source en sous-classant `DataSource` et en implémentant `read()`, par exemple
-  pour une API client.
+- Un projet crée son propre reader en sous-classant `DataReader` et en implémentant `read_raw()`, par
+  exemple pour une API client. Une sous-classe qui redéfinit `read()` (et contournerait donc les contrôles
+  de l'index) lève `InvalidArgumentError` à sa définition.
   L'enregistrement est automatique dès que la classe est importée (registre par `type`, pour le chargement
   JSON).
-- Si le JSON référence une source dont le `type` n'est pas enregistré, la description est conservée telle
-  quelle, et `load()` lève une erreur explicite.
+- Si le JSON référence un reader dont le `type` n'est pas enregistré, la description est conservée telle
+  quelle (`UnregisteredReader`), et `read()` lève une `DataReadError` explicite.
 
 ### 6.3 Chargement et données en mémoire
 
 ```python
-m.load_data()            # data_source.load() -> sélection et renommage des colonnes -> m.data
+m.load_data()            # reader.read() -> sélection et renommage des colonnes -> m.data
 m.data                   # DataFrame au format décrit ci-dessous
 m.data = df_nettoye      # affectation directe (validée) ; colonnes nommées par channel.name
                          # ou déjà au format tide
@@ -813,7 +814,7 @@ compteur lui-même, ni un de ses descendants (`HierarchyError`, cycle). Ces cont
 compteurs, dans n'importe quel ordre). Hors parc, la valeur n'est pas contrôlée, comme `scope`. `park.remove`
 d'un compteur qui en a d'autres pour parent lève `EntityInUseError`, sauf avec `force=True`, qui remet
 leur `parent_meter` à `None` (ils deviennent compteurs de tête). Dans le JSON, la clé est absente pour un
-compteur de tête : un parc sans sous-compteur s'écrit comme en 0.6.0, et le format reste en
+compteur de tête : un parc sans sous-compteur s'écrit comme en 0.6.0, et le format est resté en
 `schema_version` 1. Un parc qui utilise `parent_meter` n'est pas lisible par une version antérieure.
 
 ---
@@ -838,17 +839,19 @@ park.json_schema()                        # classes du parc par défaut
 - `save` renvoie le chemin de `park.json` ; `load` accepte ce chemin ou le dossier.
 
 - `load` ne lit pas les séries : `meter.load_data()` ou `park.timeseries(load_data=True)` les chargent à la demande.
-- Dans un fichier de parc, les chemins relatifs des sources de données sont relatifs au dossier du parc.
+- Dans un fichier de parc, les chemins relatifs des readers sont relatifs au dossier du parc.
   À la sauvegarde, les chemins relatifs au répertoire courant sont donc rendus absolus. Un dossier de parc
   sauvegardé avec `include_data=True` peut être déplacé.
 - Un fichier écrit avec une autre version du format (`schema_version`) lève `UnsupportedSchemaError`.
+  Le format est en version 2 depuis le renommage `data_source` → `reader` ; les fichiers v1 ne
+  sont pas migrés.
   Des classes différentes de celles de la sauvegarde émettent un `ClassMismatchWarning`.
 - Les attributs sourcés n'étant pas des champs Pydantic, le JSON Schema les décrit à part, dans
   `x-bstock-sourced-attributes` : type, unité, héritage et description par classe.
 - Les méthodes Pydantic `model_dump_json` / `model_validate_json` du parc ne sont pas surchargées : elles
   ignorent les métadonnées (version du format, classes). La docstring de `BuildingPark` renvoie vers
   `to_json` / `from_json`.
-- `save` modifie le parc : chemins rendus absolus et, avec `include_data=True`, `data_source` remplacée
+- `save` modifie le parc : chemins rendus absolus et, avec `include_data=True`, `reader` remplacé
   (voir ci-dessous). C'est délibéré : le parc en mémoire décrit ce qui a été sauvegardé, une nouvelle
   sauvegarde ne relit pas les fichiers d'origine, et les chemins restent valides si le répertoire courant
   change.
@@ -856,8 +859,8 @@ park.json_schema()                        # classes du parc par défaut
   par mot-clé : `BuildingPark(name="Ville de Bayonne", site_cls=..., building_cls=...)`.
 
 Avec `include_data=True`, chaque Meter qui a des données en mémoire les écrit dans
-`timeseries/<meter_id>.parquet`. Sa `data_source` devient alors une `ParquetSource` vers ce fichier
-(chemin relatif au dossier du parc). L'ancienne est conservée dans `meter.original_data_source` pour la
+`timeseries/<meter_id>.parquet`. Son `reader` devient alors un `ParquetReader` vers ce fichier
+(chemin relatif au dossier du parc). L'ancien est conservé dans `meter.original_reader` pour la
 traçabilité. Le parc sauvegardé est alors **autonome**.
 
 ### 7.2 Format JSON (extrait)
@@ -865,7 +868,7 @@ traçabilité. Le parc sauvegardé est alors **autonome**.
 ```json
 {
   "bstock_version": "0.2.0",
-  "schema_version": 1,
+  "schema_version": 2,
   "site_cls": "projet_bayonne.model.BayonneSite",
   "building_cls": "projet_bayonne.model.BayonneBuilding",
   "name": "Ville de Bayonne",
@@ -899,7 +902,7 @@ traçabilité. Le parc sauvegardé est alors **autonome**.
     "id": "PDL_123", "scope": ["site-ecole-A"],
     "channels": [{"name": "power", "unit": "W", "column": "valeur"}],
     "values": {"energy_type": [{"value": "electricity", "source": "manual"}]},
-    "data_source": {"type": "parquet", "path": "timeseries/PDL_123.parquet"}
+    "reader": {"type": "parquet", "path": "timeseries/PDL_123.parquet"}
   }]
 }
 ```
@@ -975,7 +978,7 @@ géographiques (§9). Un extra manquant lève `MissingDependencyError` avec la c
   429 et 5xx sont réessayées avec attente avant d'abandonner.
 - **Pas de cache** dans bstock : on sauvegarde le parc enrichi, ou on passe au client sa propre session
   (`requests-cache`, par exemple).
-- Le format JSON du parc ne change pas (`schema_version` reste 1).
+- Le format JSON du parc ne change pas avec les connecteurs.
 
 ### 8.3 RNB
 
@@ -1162,7 +1165,7 @@ Version exécutable, avec des données fictives : `examples/bayonne.py` (vérifi
 
 ```python
 from datetime import date
-from bstock import BuildingPark, HeatingGenerator, Meter, Channel, CsvSource
+from bstock import BuildingPark, HeatingGenerator, Meter, Channel, CsvReader
 from projet_bayonne.model import new_park, BayonneSite, BayonneBuilding
 from projet_bayonne.readers import read_patrimoine_xlsx
 
@@ -1181,7 +1184,7 @@ park.add_system(HeatingGenerator(id="heating-chaufferie-A", technology="boiler_c
 park.add_meter(Meter(id="PDL_123", scope=[b.parent.id], end_use="total", timestep="30min",
                      energy_type="electricity",
                      channels=[Channel(name="power", unit="W", column="valeur")],
-                     data_source=CsvSource(path="data/enedis_PDL_123.csv", index_col="horodate")))
+                     reader=CsvReader(path="data/enedis_PDL_123.csv", index_col="horodate")))
 
 df = park.timeseries(load_data=True)
 park.save("out/bayonne/", include_data=True)
@@ -1207,7 +1210,7 @@ src/bstock/
   envelope.py          # Envelope, EnvelopeComponent, Window
   systems.py           # System, Generator, Heating/Cooling/DHWGenerator, Ventilation, SolarPV
   meters.py            # Meter, Channel, conventions tide
-  sources.py           # DataSource, CsvSource, ParquetSource, registre
+  readers.py           # DataReader, CsvReader, ParquetReader, registre
   io.py                # to_json/from_json, save/load, JSON Schema
   export.py            # to_dataframe, to_geodataframe, GeoPackage, GeoParquet (§9)
   display.py           # v3 : repr, tree() / TreeView, describe(), HTML (§14.1)

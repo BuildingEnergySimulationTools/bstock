@@ -19,9 +19,9 @@ from pydantic import (
 
 from bstock._ids import TIDE_SEPARATOR, check_id, new_id
 from bstock.enums import EndUse, EnergyType
-from bstock.exceptions import DataSourceError, InvalidTagError, TimeSeriesError
+from bstock.exceptions import DataReadError, InvalidTagError, TimeSeriesError
 from bstock.provenance import SourcedModel, sourced
-from bstock.sources import DataSource, _data_source_from_dict, _ensure_time_index
+from bstock.readers import DataReader, _ensure_time_index, _reader_from_dict
 
 __all__ = ["Channel", "Meter", "tide_column"]
 
@@ -37,7 +37,7 @@ def _check_timestep(value: str) -> str:
 Timestep = Annotated[str, AfterValidator(_check_timestep)]
 """A pandas offset alias such as ``"30min"`` or ``"1h"``."""
 
-AnySource = Annotated[SerializeAsAny[DataSource], BeforeValidator(_data_source_from_dict)]
+AnyReader = Annotated[SerializeAsAny[DataReader], BeforeValidator(_reader_from_dict)]
 
 
 def tide_column(name: str, unit: str, bloc: str, sub_bloc: str) -> str:
@@ -65,7 +65,7 @@ class Channel(BaseModel):
     unit
         Unit of the values, e.g. ``"kWh"``, ``"W"``, ``"°C"``.
     column
-        Column name in the raw source data; defaults to ``name``.
+        Column name in the raw data, as read by the reader; defaults to ``name``.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -82,8 +82,8 @@ class Channel(BaseModel):
         return value
 
     @property
-    def source_column(self) -> str:
-        """Column read in the raw source data."""
+    def raw_column(self) -> str:
+        """Column read in the raw data."""
         return self.column or self.name
 
 
@@ -92,7 +92,7 @@ class Meter(SourcedModel):
 
     The data is a DataFrame with a sorted, time-zone aware ``DatetimeIndex`` and one column per
     channel, named after the tide convention ``name__unit__bloc__sub_bloc`` (SPEC §6.4). It is kept
-    in memory only: the JSON keeps ``data_source``, from which :meth:`load_data` reads it.
+    in memory only: the JSON keeps ``reader``, from which :meth:`load_data` reads it.
 
     Parameters
     ----------
@@ -108,10 +108,10 @@ class Meter(SourcedModel):
         is added and on assignment.
     channels
         Measured quantities, one column each.
-    data_source
+    reader
         Where to read the data.
-    original_data_source
-        Source the data came from before being saved in the park directory.
+    original_reader
+        Reader of the data before it was saved in the park directory.
     bloc, sub_bloc
         Tide tags of the columns; ``None`` (default) derives them, see :meth:`tide_tags`.
     """
@@ -120,8 +120,8 @@ class Meter(SourcedModel):
     scope: list[str] = Field(default_factory=list)
     parent_meter: str | None = None
     channels: list[Channel] = Field(min_length=1)
-    data_source: AnySource | None = None
-    original_data_source: AnySource | None = None
+    reader: AnyReader | None = None
+    original_reader: AnyReader | None = None
     bloc: str | None = None
     sub_bloc: str | None = None
 
@@ -192,7 +192,7 @@ class Meter(SourcedModel):
         """Return the tide column name of each channel, by channel name.
 
         These are the columns of :attr:`data`; ``Channel.column`` is the column read in the raw
-        source data.
+        data.
         """
         bloc, sub_bloc = self.tide_tags()
         return {
@@ -225,32 +225,32 @@ class Meter(SourcedModel):
         self._data = renamed[expected]
 
     def load_data(self) -> pd.DataFrame:
-        """Read the data from ``data_source``, keep it in :attr:`data` and return it.
+        """Read the data from ``reader``, keep it in :attr:`data` and return it.
 
         Columns already in tide format (as saved by the park) are taken as is. Otherwise each
-        channel reads the column ``channel.column`` (or ``channel.name``), and a source with a
+        channel reads the column ``channel.column`` (or ``channel.name``), and a reader with a
         single column feeds a single channel whatever its name.
 
         Raises
         ------
-        DataSourceError
-            If there is no data source, or a channel column is missing.
+        DataReadError
+            If there is no reader, or a channel column is missing.
         """
-        if self.data_source is None:
-            raise DataSourceError(f"meter {self.id!r} has no data source")
-        raw = self.data_source.load()
+        if self.reader is None:
+            raise DataReadError(f"meter {self.id!r} has no reader")
+        raw = self.reader.read()
         tide_names = list(self.tide_columns().values())
         if all(name in raw.columns for name in tide_names):
             selected = raw[tide_names]
         elif len(self.channels) == 1 and raw.shape[1] == 1:
             selected = raw.set_axis([self.channels[0].name], axis=1)
         else:
-            missing = [c.source_column for c in self.channels if c.source_column not in raw]
+            missing = [c.raw_column for c in self.channels if c.raw_column not in raw]
             if missing:
-                raise DataSourceError(
+                raise DataReadError(
                     f"meter {self.id!r}: columns {missing} not found in {list(raw.columns)}"
                 )
-            selected = raw[[c.source_column for c in self.channels]].set_axis(
+            selected = raw[[c.raw_column for c in self.channels]].set_axis(
                 [c.name for c in self.channels], axis=1
             )
         self.data = selected

@@ -5,7 +5,7 @@ It shows the typical project workflow:
 1. project subclasses adding client attributes;
 2. a project reader loading the client inventory;
 3. provenance: several sources for one value, inheritance from a BDNB group site;
-4. shared systems, envelope computations and a meter with a CSV data source;
+4. shared systems, envelope computations and a meter read from a CSV file;
 5. a tide-ready time series, then a self-contained park directory reloaded with the project classes.
 
 Run it with ``python examples/bayonne.py [output_directory]``.
@@ -25,7 +25,7 @@ from bstock import (
     Building,
     BuildingPark,
     Channel,
-    CsvSource,
+    CsvReader,
     EnvelopeComponent,
     HeatingGenerator,
     Meter,
@@ -162,7 +162,7 @@ def main(output: Path) -> BuildingPark:
             energy_type="electricity",
             timestep="30min",
             channels=[Channel(name="power", unit="W", column="valeur")],
-            data_source=CsvSource(
+            reader=CsvReader(
                 path=str(load_curve), index_col="horodate", sep=";", tz="Europe/Paris"
             ),
         )

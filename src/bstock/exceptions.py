@@ -65,8 +65,8 @@ class TimeSeriesError(BstockError, ValueError):
     """Metered data does not respect the time series format (SPEC §6.3)."""
 
 
-class DataSourceError(BstockError):
-    """A data source cannot be loaded."""
+class DataReadError(BstockError):
+    """The data of a meter cannot be read (no reader, unreadable file, missing column...)."""
 
 
 class UnsupportedSchemaError(BstockError):

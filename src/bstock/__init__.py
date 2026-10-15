@@ -28,7 +28,7 @@ from bstock.exceptions import (
     BstockWarning,
     ClassMismatchWarning,
     ConnectorError,
-    DataSourceError,
+    DataReadError,
     DuplicateIdError,
     EntityInUseError,
     HierarchyError,
@@ -62,9 +62,9 @@ from bstock.provenance import (
     SourcePriority,
     sourced,
 )
+from bstock.readers import CsvReader, DataReader, ParquetReader, UnregisteredReader
 from bstock.selection import Selection
 from bstock.site import Site
-from bstock.sources import CsvSource, DataSource, ParquetSource, UnknownSource
 from bstock.systems import (
     CoolingGenerator,
     DHWGenerator,
@@ -96,10 +96,10 @@ __all__ = [
     "ComponentKind",
     "ConnectorError",
     "CoolingGenerator",
-    "CsvSource",
+    "CsvReader",
     "DHWGenerator",
-    "DataSource",
-    "DataSourceError",
+    "DataReadError",
+    "DataReader",
     "DescribedEntity",
     "DuplicateIdError",
     "EndUse",
@@ -124,7 +124,7 @@ __all__ = [
     "MissingDependencyError",
     "NoDataWarning",
     "Orientation",
-    "ParquetSource",
+    "ParquetReader",
     "PerformanceRatioWarning",
     "ProjectClassError",
     "Selection",
@@ -142,8 +142,8 @@ __all__ = [
     "UnknownFieldError",
     "UnknownIdError",
     "UnknownKindError",
-    "UnknownSource",
     "UnmappedValueWarning",
+    "UnregisteredReader",
     "UnsupportedSchemaError",
     "Ventilation",
     "Window",

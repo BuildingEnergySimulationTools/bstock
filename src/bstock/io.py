@@ -1,7 +1,7 @@
 """Persistence of a park: JSON, park directories and JSON Schema (SPEC §7).
 
 A park directory holds ``park.json`` and, when saved with ``include_data=True``, one Parquet
-file per meter in ``timeseries/``. Relative paths of data sources are relative to the park
+file per meter in ``timeseries/``. Relative paths of the readers are relative to the park
 directory.
 """
 
@@ -20,8 +20,8 @@ from bstock.envelope import Envelope, EnvelopeComponent, Window
 from bstock.exceptions import ClassMismatchWarning, UnsupportedSchemaError
 from bstock.meters import Meter
 from bstock.provenance import SourcedModel
+from bstock.readers import DataReader, ParquetReader
 from bstock.site import CLASSES_CONTEXT_KEY, Site
-from bstock.sources import DataSource, ParquetSource
 from bstock.systems import SYSTEM_CLASSES
 
 if TYPE_CHECKING:
@@ -38,7 +38,7 @@ __all__ = [
     "to_json",
 ]
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 """Version of the park file format."""
 
 PARK_FILE = "park.json"
@@ -134,30 +134,30 @@ def save(park: BuildingPark, directory: str | Path, *, include_data: bool = Fals
         Target directory, created if needed.
     include_data
         Also write the data in memory of each meter to ``timeseries/<meter_id>.parquet``. The
-        meter ``data_source`` then points to that file and its former source is kept in
-        ``original_data_source``: the saved park no longer depends on the original files.
+        meter ``reader`` then points to that file and its former reader is kept in
+        ``original_reader``: the saved park no longer depends on the original files.
 
     Notes
     -----
-    Relative paths of the other data sources are made absolute, since relative paths in a park
-    file are relative to the park directory. With ``include_data``, the ``data_source`` of the
+    Relative paths of the other readers are made absolute, since relative paths in a park
+    file are relative to the park directory. With ``include_data``, the ``reader`` of the
     meters is replaced in memory too: saving again does not rewrite unchanged data from the
     original files, and the park keeps working if the working directory changes.
     """
     directory = Path(directory)
     directory.mkdir(parents=True, exist_ok=True)
     for meter in park.meters:
-        for source in (meter.data_source, meter.original_data_source):
-            _make_path_absolute(source)
+        for reader in (meter.reader, meter.original_reader):
+            _make_path_absolute(reader)
         if include_data and meter.data is not None:
             relative = Path(TIMESERIES_DIR) / f"{meter.id}.parquet"
             (directory / TIMESERIES_DIR).mkdir(exist_ok=True)
             meter.data.to_parquet(directory / relative)
-            if meter.original_data_source is None:
-                meter.original_data_source = meter.data_source
-            new_source = ParquetSource(path=relative.as_posix())
-            new_source._base_dir = directory
-            meter.data_source = new_source
+            if meter.original_reader is None:
+                meter.original_reader = meter.reader
+            new_reader = ParquetReader(path=relative.as_posix())
+            new_reader._base_dir = directory
+            meter.reader = new_reader
     path = directory / PARK_FILE
     path.write_text(to_json(park), encoding="utf-8")
     return path
@@ -169,7 +169,7 @@ def load(
     site_cls: type[Site] = Site,
     building_cls: type[Building] = Building,
 ) -> BuildingPark:
-    """Load a park saved by :func:`save`; data sources resolve relative paths in ``directory``.
+    """Load a park saved by :func:`save`; readers resolve relative paths in ``directory``.
 
     ``directory`` is the park directory or its ``park.json`` file, as returned by :func:`save`.
     Metered data is not read: call ``meter.load_data()`` or ``park.timeseries(load_data=True)``.
@@ -183,18 +183,18 @@ def load(
         building_cls=building_cls,
     )
     for meter in park.meters:
-        for source in (meter.data_source, meter.original_data_source):
-            if source is not None:
-                source._base_dir = directory
+        for reader in (meter.reader, meter.original_reader):
+            if reader is not None:
+                reader._base_dir = directory
     return park
 
 
-def _make_path_absolute(source: DataSource | None) -> None:
-    path = getattr(source, "path", None)
-    if source is None or not isinstance(path, str) or Path(path).is_absolute():
+def _make_path_absolute(reader: DataReader | None) -> None:
+    path = getattr(reader, "path", None)
+    if reader is None or not isinstance(path, str) or Path(path).is_absolute():
         return
-    if source._base_dir is None:  # relative to the working directory
-        source.path = str(Path(path).resolve())
+    if reader._base_dir is None:  # relative to the working directory
+        reader.path = str(Path(path).resolve())
 
 
 # --- JSON Schema ------------------------------------------------------------------------------

@@ -8,9 +8,10 @@ from pydantic import ValidationError
 from bstock.building import Building
 from bstock.enums import EndUse
 from bstock.exceptions import (
-    DataSourceError,
+    DataReadError,
     EntityInUseError,
     HierarchyError,
+    InvalidArgumentError,
     InvalidTagError,
     NoDataWarning,
     TimeSeriesError,
@@ -18,7 +19,7 @@ from bstock.exceptions import (
 )
 from bstock.meters import Channel, Meter, tide_column
 from bstock.park import BuildingPark
-from bstock.sources import CsvSource, DataSource, ParquetSource, UnknownSource
+from bstock.readers import CsvReader, DataReader, ParquetReader, UnregisteredReader
 from bstock.systems import HeatingGenerator
 
 RNB_A, RNB_B = "A1B2C3D4E5F6", "B1B2C3D4E5F6"
@@ -167,7 +168,7 @@ def test_csv_source_with_offsets(tmp_path):
     meter = Meter(
         id="m",
         channels=[Channel(name="power", unit="W", column="valeur")],
-        data_source=CsvSource(path=str(csv), index_col="horodate", sep=";", decimal=","),
+        reader=CsvReader(path=str(csv), index_col="horodate", sep=";", decimal=","),
     )
     data = meter.load_data()
     assert data.iloc[:, 0].tolist() == [1.5, 2.5]
@@ -177,8 +178,8 @@ def test_csv_source_with_offsets(tmp_path):
 def test_csv_source_naive_index_needs_tz(tmp_path):
     csv = write_csv(tmp_path / "m.csv", "t,v\n2024-01-01 00:00,1\n2024-01-01 01:00,2\n")
     with pytest.raises(TimeSeriesError, match="time zone"):
-        CsvSource(path=str(csv)).load()
-    loaded = CsvSource(path=str(csv), tz="Europe/Paris").load()
+        CsvReader(path=str(csv)).read()
+    loaded = CsvReader(path=str(csv), tz="Europe/Paris").read()
     assert str(loaded.index.tz) == "Europe/Paris"
 
 
@@ -188,7 +189,7 @@ def test_csv_source_handles_daylight_saving_time_change(tmp_path):
         tmp_path / "m.csv",
         "t,v\n2024-10-27T02:30:00+02:00,1\n2024-10-27T02:30:00+01:00,2\n",
     )
-    loaded = CsvSource(path=str(csv)).load()
+    loaded = CsvReader(path=str(csv)).read()
     assert len(loaded.index.unique()) == 2
     assert str(loaded.index.tz) == "UTC"
 
@@ -199,26 +200,22 @@ def test_naive_ambiguous_hour_with_infer(tmp_path):
         "t,v\n2024-10-27 01:30,0\n2024-10-27 02:30,1\n2024-10-27 02:30,2\n2024-10-27 03:30,3\n",
     )
     with pytest.raises(TimeSeriesError, match="localise"):
-        CsvSource(path=str(csv), tz="Europe/Paris").load()
-    loaded = CsvSource(path=str(csv), tz="Europe/Paris", tz_ambiguous="infer").load()
+        CsvReader(path=str(csv), tz="Europe/Paris").read()
+    loaded = CsvReader(path=str(csv), tz="Europe/Paris", tz_ambiguous="infer").read()
     assert loaded.index.tz_convert("UTC").is_unique
 
 
 def test_parquet_source(tmp_path):
     path = tmp_path / "m.parquet"
     hourly(power=[1.0, 2.0, 3.0]).to_parquet(path)
-    meter = Meter(
-        channels=[Channel(name="power", unit="W")], data_source=ParquetSource(path=str(path))
-    )
+    meter = Meter(channels=[Channel(name="power", unit="W")], reader=ParquetReader(path=str(path)))
     assert meter.load_data().shape == (3, 1)
 
 
 def test_single_column_feeds_single_channel(tmp_path):
     path = tmp_path / "m.parquet"
     hourly(whatever=[1.0, 2.0, 3.0]).to_parquet(path)
-    meter = Meter(
-        channels=[Channel(name="power", unit="W")], data_source=ParquetSource(path=str(path))
-    )
+    meter = Meter(channels=[Channel(name="power", unit="W")], reader=ParquetReader(path=str(path)))
     assert meter.load_data().iloc[:, 0].tolist() == [1.0, 2.0, 3.0]
 
 
@@ -227,47 +224,70 @@ def test_missing_source_column(tmp_path):
     hourly(a=[1, 2, 3], b=[1, 2, 3]).to_parquet(path)
     meter = Meter(
         channels=[Channel(name="power", unit="W", column="c")],
-        data_source=ParquetSource(path=str(path)),
+        reader=ParquetReader(path=str(path)),
     )
-    with pytest.raises(DataSourceError, match="not found"):
+    with pytest.raises(DataReadError, match="not found"):
         meter.load_data()
 
 
-def test_missing_file_raises_data_source_error(tmp_path):
-    with pytest.raises(DataSourceError):
-        CsvSource(path=str(tmp_path / "nope.csv")).load()
+def test_missing_file_raises_data_read_error(tmp_path):
+    with pytest.raises(DataReadError):
+        CsvReader(path=str(tmp_path / "nope.csv")).read()
 
 
 def test_load_without_source():
-    with pytest.raises(DataSourceError, match="no data source"):
+    with pytest.raises(DataReadError, match="no reader"):
         Meter(channels=[Channel(name="power", unit="W")]).load_data()
 
 
 def test_relative_path_resolved_against_base_dir(tmp_path):
     hourly(power=[1, 2, 3]).to_parquet(tmp_path / "m.parquet")
-    source = ParquetSource(path="m.parquet")
+    source = ParquetReader(path="m.parquet")
     source._base_dir = tmp_path
-    assert source.load().shape == (3, 1)
+    assert source.read().shape == (3, 1)
 
 
-class ApiSource(DataSource):
-    """A project specific source."""
+class ApiReader(DataReader):
+    """A project specific reader."""
 
     type: str = "test_api"
     endpoint: str
 
-    def read(self):
+    def read_raw(self):
         return hourly(tz="Europe/Paris", power=[5.0, 6.0, 7.0])
+
+
+def test_reader_overriding_read_is_rejected():
+    with pytest.raises(InvalidArgumentError, match="implement read_raw"):
+
+        class BadReader(DataReader):
+            type: str = "test_bad"
+
+            def read(self):
+                return hourly(tz="UTC", power=[1.0])
+
+
+def test_reader_read_checks_the_raw_index():
+    with pytest.raises(TimeSeriesError, match="no time zone"):
+        NaiveReader().read()
+    assert NaiveReader(tz="Europe/Paris").read().index.tz is not None
+
+
+class NaiveReader(DataReader):
+    type: str = "test_naive"
+
+    def read_raw(self):
+        return hourly(tz=None, power=[1.0, 2.0, 3.0])
 
 
 def test_custom_source_is_registered_and_round_trips():
     meter = Meter(
         id="m",
         channels=[Channel(name="power", unit="W")],
-        data_source=ApiSource(endpoint="https://example.org"),
+        reader=ApiReader(endpoint="https://example.org"),
     )
     data = json.loads(meter.model_dump_json())
-    assert data["data_source"] == {
+    assert data["reader"] == {
         "type": "test_api",
         "tz": None,
         "tz_ambiguous": "raise",
@@ -275,7 +295,7 @@ def test_custom_source_is_registered_and_round_trips():
         "endpoint": "https://example.org",
     }
     loaded = Meter.model_validate(data)
-    assert isinstance(loaded.data_source, ApiSource)
+    assert isinstance(loaded.reader, ApiReader)
     assert loaded.load_data().iloc[:, 0].tolist() == [5.0, 6.0, 7.0]
 
 
@@ -283,14 +303,14 @@ def test_unknown_source_type_is_kept():
     data = {
         "id": "m",
         "channels": [{"name": "power", "unit": "W"}],
-        "data_source": {"type": "client_sftp", "host": "sftp.example.org"},
+        "reader": {"type": "client_sftp", "host": "sftp.example.org"},
     }
     meter = Meter.model_validate(data)
-    assert isinstance(meter.data_source, UnknownSource)
-    assert json.loads(meter.model_dump_json(exclude_none=True))["data_source"]["host"] == (
+    assert isinstance(meter.reader, UnregisteredReader)
+    assert json.loads(meter.model_dump_json(exclude_none=True))["reader"]["host"] == (
         "sftp.example.org"
     )
-    with pytest.raises(DataSourceError, match="client_sftp"):
+    with pytest.raises(DataReadError, match="client_sftp"):
         meter.load_data()
 
 
@@ -410,7 +430,7 @@ def test_timeseries_skips_meters_without_data(park):
 def test_timeseries_load(park, tmp_path):
     hourly(energy=[1.0, 2.0, 3.0]).to_parquet(tmp_path / "m.parquet")
     park.add_meter(
-        make_meter("m", ["site-A"], data_source=ParquetSource(path=str(tmp_path / "m.parquet")))
+        make_meter("m", ["site-A"], reader=ParquetReader(path=str(tmp_path / "m.parquet")))
     )
     assert park.timeseries(load_data=True).shape == (3, 1)
 
@@ -424,10 +444,10 @@ def test_meters_with_same_tags_get_distinct_columns(park):
 
 
 def test_source_equality_ignores_base_dir(tmp_path):
-    first, second = ParquetSource(path="m.parquet"), ParquetSource(path="m.parquet")
+    first, second = ParquetReader(path="m.parquet"), ParquetReader(path="m.parquet")
     first._base_dir = tmp_path
     assert first == second
-    assert first != ParquetSource(path="other.parquet")
+    assert first != ParquetReader(path="other.parquet")
 
 
 # --- sub-meters -------------------------------------------------------------------------------

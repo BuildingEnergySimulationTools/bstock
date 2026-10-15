@@ -19,7 +19,7 @@ from bstock import (
     Building,
     BuildingPark,
     Channel,
-    CsvSource,
+    CsvReader,
     EnvelopeComponent,
     HeatingGenerator,
     Meter,
@@ -184,9 +184,7 @@ park.add_meter(
         energy_type="electricity",
         timestep="30min",
         channels=[Channel(name="power", unit="W", column="valeur")],
-        data_source=CsvSource(
-            path=str(load_curve), index_col="horodate", sep=";", tz="Europe/Paris"
-        ),
+        reader=CsvReader(path=str(load_curve), index_col="horodate", sep=";", tz="Europe/Paris"),
     )
 )
 

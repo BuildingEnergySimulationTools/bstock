@@ -1,9 +1,9 @@
-"""Data sources of metered data (SPEC §6.2).
+"""Readers of metered data (SPEC §6.2).
 
-A :class:`DataSource` describes where the data of a meter lives and returns it as a DataFrame with a
-time-zone aware, sorted :class:`pandas.DatetimeIndex`. Projects add their own sources by subclassing
-:class:`DataSource` with a new ``type`` and implementing :meth:`DataSource.read`; the subclass is
-registered as soon as it is imported, so parks saved with it can be loaded back.
+A :class:`DataReader` describes where the data of a meter lives and reads it as a DataFrame with a
+time-zone aware, sorted :class:`pandas.DatetimeIndex`. Projects add their own readers by
+subclassing :class:`DataReader` with a new ``type`` and implementing :meth:`DataReader.read_raw`;
+the subclass is registered as soon as it is imported, so parks saved with it can be loaded back.
 """
 
 from __future__ import annotations
@@ -14,18 +14,18 @@ from typing import Any, ClassVar, Literal
 import pandas as pd
 from pydantic import BaseModel, ConfigDict, PrivateAttr
 
-from bstock.exceptions import DataSourceError, TimeSeriesError
+from bstock.exceptions import DataReadError, InvalidArgumentError, TimeSeriesError
 
 __all__ = [
-    "CsvSource",
-    "DataSource",
-    "ParquetSource",
-    "UnknownSource",
+    "CsvReader",
+    "DataReader",
+    "ParquetReader",
+    "UnregisteredReader",
 ]
 
 
-class DataSource(BaseModel):
-    """Base class of data sources.
+class DataReader(BaseModel):
+    """Base class of data readers.
 
     Parameters
     ----------
@@ -41,7 +41,7 @@ class DataSource(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    registry: ClassVar[dict[str, type[DataSource]]] = {}
+    registry: ClassVar[dict[str, type[DataReader]]] = {}
 
     type: str
     tz: str | None = None
@@ -52,14 +52,24 @@ class DataSource(BaseModel):
 
     @classmethod
     def __pydantic_init_subclass__(cls, **kwargs: Any) -> None:
-        """Register the subclass under its ``type`` default value."""
+        """Register the subclass under its ``type`` default value.
+
+        Raises
+        ------
+        InvalidArgumentError
+            If the subclass overrides :meth:`read` instead of implementing :meth:`read_raw`.
+        """
         super().__pydantic_init_subclass__(**kwargs)
+        if "read" in vars(cls):
+            raise InvalidArgumentError(
+                f"{cls.__name__}: implement read_raw(), not read(), which checks the index"
+            )
         type_name = cls.model_fields["type"].default
         if isinstance(type_name, str) and type_name:
-            DataSource.registry[type_name] = cls
+            DataReader.registry[type_name] = cls
 
     def __eq__(self, other: object) -> bool:
-        # The base directory is a runtime detail: two sources describing the same data are equal.
+        # The base directory is a runtime detail: two readers describing the same data are equal.
         if not isinstance(other, BaseModel):
             return NotImplemented
         return (
@@ -70,28 +80,28 @@ class DataSource(BaseModel):
 
     __hash__ = None  # type: ignore[assignment]
 
-    def read(self) -> pd.DataFrame:
-        """Read the raw data; implemented by subclasses, called by :meth:`load`.
+    def read_raw(self) -> pd.DataFrame:
+        """Read the data as stored; implemented by subclasses, called by :meth:`read`.
 
-        Users call :meth:`load` (or ``meter.load_data()``), which also checks and localises the
+        Users call :meth:`read` (or ``meter.load_data()``), which also checks and localises the
         index.
         """
         raise NotImplementedError
 
-    def load(self) -> pd.DataFrame:
+    def read(self) -> pd.DataFrame:
         """Return the data with a sorted, time-zone aware ``DatetimeIndex``.
 
         Raises
         ------
-        DataSourceError
+        DataReadError
             If the data cannot be read.
         TimeSeriesError
             If the index is not a datetime index, or is naive while ``tz`` is not set.
         """
         try:
-            frame = self.read()
+            frame = self.read_raw()
         except (OSError, ValueError, KeyError) as error:
-            raise DataSourceError(f"cannot load {self!r}: {error}") from error
+            raise DataReadError(f"cannot read {self!r}: {error}") from error
         return _ensure_time_index(
             frame, tz=self.tz, ambiguous=self.tz_ambiguous, nonexistent=self.tz_nonexistent
         )
@@ -104,7 +114,7 @@ class DataSource(BaseModel):
         return path
 
 
-class CsvSource(DataSource):
+class CsvReader(DataReader):
     """CSV file whose index column holds timestamps.
 
     Timestamps with mixed UTC offsets (typical around daylight saving time changes) are converted
@@ -120,7 +130,7 @@ class CsvSource(DataSource):
     date_format: str | None = None
     dayfirst: bool = False
 
-    def read(self) -> pd.DataFrame:
+    def read_raw(self) -> pd.DataFrame:
         """Read the CSV file and parse its index as datetimes."""
         frame = pd.read_csv(
             self.resolve_path(self.path),
@@ -133,14 +143,14 @@ class CsvSource(DataSource):
         return frame
 
 
-class ParquetSource(DataSource):
+class ParquetReader(DataReader):
     """Parquet file, with a datetime index or a datetime column given by ``index_col``."""
 
     type: Literal["parquet"] = "parquet"
     path: str
     index_col: str | None = None
 
-    def read(self) -> pd.DataFrame:
+    def read_raw(self) -> pd.DataFrame:
         """Read the Parquet file."""
         frame = pd.read_parquet(self.resolve_path(self.path))
         if self.index_col is not None:
@@ -148,26 +158,26 @@ class ParquetSource(DataSource):
         return frame
 
 
-class UnknownSource(DataSource):
-    """Placeholder for a source whose ``type`` is not registered; it keeps the description as is.
+class UnregisteredReader(DataReader):
+    """Placeholder for a reader whose ``type`` is not registered; it keeps the description as is.
 
-    It typically appears when a park saved with a project source is loaded without importing the
+    It typically appears when a park saved with a project reader is loaded without importing the
     project code.
     """
 
     model_config = ConfigDict(extra="allow")
 
-    def read(self) -> pd.DataFrame:
-        """Raise: the source class is not available."""
-        raise DataSourceError(
-            f"no data source registered for type {self.type!r}; import the module defining it"
+    def read_raw(self) -> pd.DataFrame:
+        """Raise: the reader class is not available."""
+        raise DataReadError(
+            f"no data reader registered for type {self.type!r}; import the module defining it"
         )
 
 
-def _data_source_from_dict(value: Any) -> Any:
-    """Build the source registered for ``value["type"]``, or an :class:`UnknownSource`."""
+def _reader_from_dict(value: Any) -> Any:
+    """Build the reader registered for ``value["type"]``, or an :class:`UnregisteredReader`."""
     if isinstance(value, dict):
-        cls = DataSource.registry.get(value.get("type", ""), UnknownSource)
+        cls = DataReader.registry.get(value.get("type", ""), UnregisteredReader)
         return cls.model_validate(value)
     return value
 
@@ -195,7 +205,7 @@ def _ensure_time_index(
         raise TimeSeriesError(f"the index must be a DatetimeIndex, got {type(index).__name__}")
     if index.tz is None:
         if tz is None:
-            raise TimeSeriesError("the index has no time zone; set one or give tz= to the source")
+            raise TimeSeriesError("the index has no time zone; set one or give tz= to the reader")
         try:
             index = index.tz_localize(tz, ambiguous=ambiguous, nonexistent=nonexistent)
         except (ValueError, TypeError) as error:  # pandas raises ValueError subclasses here
