@@ -143,7 +143,10 @@ Toutes les entités (`Site`, `Building`, `Envelope`, systèmes, `Meter`) hérite
 - **Verbes** : `new_*` crée et rattache une entité ; `add_*` rattache un objet déjà construit ;
   `remove_*` (entité) et `remove` (parc, générique) le retirent ; toutes les méthodes qui désignent une
   entité existante acceptent l'objet ou son id. `iter_*` parcourt l'arbre et renvoie un itérateur ;
-  `find_*` est une requête filtrée et renvoie une liste.
+  `find_*` est une requête filtrée et renvoie une liste. `compute_*` calcule une valeur **et**
+  l'enregistre comme candidat de source `"computed"`, que la priorité des sources arbitre ensuite ; c'est
+  un instantané, à recalculer si les données d'entrée changent. Une méthode qui calcule sans rien
+  enregistrer ne commence pas par `compute_` (ex. `component.heat_loss_coefficient_or_ua()`).
 
 ### 3.4 BuildingPark
 
@@ -330,7 +333,8 @@ celle d'un parc entier garde ses liens internes.
 ajoutent un candidat `source="computed"`, et c'est la priorité des sources qui arbitre :
 
 ```python
-# H d'une paroi = heat_loss_coefficient s'il est renseigné, sinon U·A (ou ψ·L)
+# H d'une paroi = heat_loss_coefficient s'il est renseigné, sinon U·A (ou ψ·L) :
+# component.heat_loss_coefficient_or_ua(), qui n'enregistre rien
 env.compute_heat_loss_coefficient()  # Σ H des parois
 env.compute_loss_area()              # Σ A des parois hors ponts thermiques
 env.compute_u_bat()                  # heat_loss_coefficient / loss_area (valeurs effectives)
@@ -453,8 +457,9 @@ La **valeur effective** est choisie parmi les candidats selon la priorité des s
 ```python
 b.construction_year                    # -> 1972 (valeur effective) ou None
 b.construction_year = 1968             # équivaut à b.set(..., source="manual")
-b.construction_year = None             # retire le candidat "manual" (équivaut à unset(source="manual")) :
-                                       # une valeur d'une autre source peut rester ; unset(name) retire tout
+b.construction_year = None             # InvalidArgumentError : ambigu, voir unset ci-dessous
+b.unset("construction_year", source="manual")  # retire la valeur manuelle (une autre source peut rester)
+b.unset("construction_year")                   # retire toutes les valeurs
 
 b.set("construction_year", 1970, source="bdnb", date=date(2024, 10, 1))
 b.set("construction_year", 1972, source="dpe", ref="2364E0123456X")
@@ -471,7 +476,10 @@ Règles :
 - Un même `source` ne peut avoir **qu'un candidat par attribut** : un nouveau `set` avec la même source le
   remplace.
 - `set` valide la valeur contre le type et les contraintes du champ (Pydantic `TypeAdapter`) et lève
-  `ValidationError` si elle est invalide. `set(attr, None, source=s)` équivaut à `unset(attr, source=s)`.
+  `ValidationError` si elle est invalide. `None` n'est pas une valeur : `set(attr, None, source=s)` et
+  `b.attr = None` lèvent `InvalidArgumentError`, dont le message renvoie vers `unset(attr, source=s)`
+  (retirer une source) et `unset(attr)` (tout retirer). Écrire `None` retirait autrefois le seul candidat
+  de cette source, si bien que la valeur d'une autre source restait effective sans qu'on s'en aperçoive.
 - Un nom d'attribut inconnu lève `UnknownFieldError`.
 - À la construction, les kwargs sont enregistrés sous la source `"manual"`, sauf si l'appel précise
   `source=` (une valeur `None` est ignorée) :

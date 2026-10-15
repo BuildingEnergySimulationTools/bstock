@@ -158,7 +158,7 @@ class DescribedEntity(SourcedModel):
     # --- footprint ----------------------------------------------------------------------------
 
     def compute_footprint_area(self) -> SourcedValue:
-        """Add a ``"computed"`` candidate to ``footprint_area`` from the effective ``footprint``.
+        """Compute ``footprint_area`` from the effective ``footprint``, stored as ``"computed"``.
 
         The area, in m², is computed without dependency on a local equirectangular projection
         (SPEC §3.6): holes are subtracted and the polygons of a ``MultiPolygon`` added up. Like any
@@ -177,14 +177,12 @@ class DescribedEntity(SourcedModel):
         footprint = self.footprint
         if footprint is None:
             raise IncompleteDataError(f"{self.id!r} has no footprint")
-        candidate = self.set(
+        return self.set(
             "footprint_area",
             geometry_area(footprint),
             source=COMPUTED_SOURCE,
             comment="from footprint",
         )
-        assert candidate is not None
-        return candidate
 
     # --- systems ------------------------------------------------------------------------------
 

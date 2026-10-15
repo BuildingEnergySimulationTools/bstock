@@ -58,12 +58,11 @@ def test_window_kind_requires_window_class():
 
 
 def test_component_heat_loss_prefers_given_value():
-    assert wall(area=10.0, u_value=0.5).resolved_heat_loss_coefficient() == 5.0
+    assert wall(area=10.0, u_value=0.5).heat_loss_coefficient_or_ua() == 5.0
     assert (
-        wall(area=10.0, u_value=0.5, heat_loss_coefficient=7.0).resolved_heat_loss_coefficient()
-        == 7.0
+        wall(area=10.0, u_value=0.5, heat_loss_coefficient=7.0).heat_loss_coefficient_or_ua() == 7.0
     )
-    assert wall(area=10.0).resolved_heat_loss_coefficient() is None
+    assert wall(area=10.0).heat_loss_coefficient_or_ua() is None
 
 
 def test_units_are_declared():

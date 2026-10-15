@@ -80,13 +80,15 @@ def test_direct_assignment_uses_manual_source():
     assert thing.effective("area").source == "manual"
 
 
-def test_assigning_none_removes_manual_candidate():
+def test_assigning_none_is_refused_and_points_to_unset():
+    # ambiguous: it used to remove the manual value only, leaving the bdnb one effective
     thing = Thing()
     thing.set("area", 10.0, source="bdnb")
     thing.area = 12.5
-    thing.area = None
-    assert thing.area == 10.0
-    assert [c.source for c in thing.candidates("area")] == ["bdnb"]
+    with pytest.raises(InvalidArgumentError, match=r"unset\('area', source='manual'\)"):
+        thing.area = None
+    assert thing.area == 12.5
+    assert [c.source for c in thing.candidates("area")] == ["bdnb", "manual"]
 
 
 def test_set_keeps_provenance():
@@ -118,11 +120,12 @@ def test_one_candidate_per_source():
     assert [c.value for c in thing.candidates("area")] == [11.0]
 
 
-def test_set_none_unsets_that_source():
+def test_set_none_is_refused():
     thing = Thing()
     thing.set("area", 10.0, source="bdnb")
-    assert thing.set("area", None, source="bdnb") is None
-    assert thing.candidates("area") == []
+    with pytest.raises(InvalidArgumentError, match=r"unset\('area', source='bdnb'\)"):
+        thing.set("area", None, source="bdnb")
+    assert thing.area == 10.0
 
 
 def test_unset_all_sources():

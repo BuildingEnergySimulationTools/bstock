@@ -70,8 +70,11 @@ class EnvelopeComponent(SourcedModel):
         items = super()._repr_items()
         return [items[0], ("kind", repr(str(self.kind))), *items[1:]]
 
-    def resolved_heat_loss_coefficient(self) -> float | None:
-        """Return the heat loss coefficient in W/K: the given one, else U·A, else ``None``."""
+    def heat_loss_coefficient_or_ua(self) -> float | None:
+        """Return the heat loss coefficient in W/K: the given one, else U·A, else ``None``.
+
+        Unlike the ``compute_*`` methods, it stores nothing.
+        """
         if self.heat_loss_coefficient is not None:
             return self.heat_loss_coefficient
         if self.u_value is not None and self.area is not None:
@@ -214,7 +217,11 @@ class Envelope(SourcedModel):
     # --- computations -----------------------------------------------------------------------
 
     def compute_heat_loss_coefficient(self) -> SourcedValue:
-        """Set ``heat_loss_coefficient`` to the sum of the component heat losses, in W/K.
+        """Compute ``heat_loss_coefficient``, the sum of the component heat losses, in W/K.
+
+        Like every ``compute_*`` method, it computes the value *and* stores it as the
+        ``"computed"`` candidate, which the source priority then weighs against the others; it is
+        a snapshot: compute again after changing the inputs.
 
         Each component contributes its ``heat_loss_coefficient``, or U·A (ψ·L for a thermal bridge).
 
@@ -229,14 +236,18 @@ class Envelope(SourcedModel):
             If there is no component, or a component heat loss cannot be determined.
         """
         components = self._require_components()
-        missing = [c.id for c in components if c.resolved_heat_loss_coefficient() is None]
+        missing = [c.id for c in components if c.heat_loss_coefficient_or_ua() is None]
         if missing:
             raise IncompleteDataError(f"heat loss unknown for components {missing}")
-        total = sum(c.resolved_heat_loss_coefficient() or 0.0 for c in components)
+        total = sum(c.heat_loss_coefficient_or_ua() or 0.0 for c in components)
         return self._set_computed("heat_loss_coefficient", total, len(components))
 
     def compute_loss_area(self) -> SourcedValue:
-        """Set ``loss_area`` to the summed area of the components except thermal bridges, in m².
+        """Compute ``loss_area``, the summed area of the components except thermal bridges, in m².
+
+        Like every ``compute_*`` method, it computes the value *and* stores it as the
+        ``"computed"`` candidate, which the source priority then weighs against the others; it is
+        a snapshot: compute again after changing the inputs.
 
         Raises
         ------
@@ -253,7 +264,11 @@ class Envelope(SourcedModel):
         return self._set_computed("loss_area", total, len(components))
 
     def compute_u_bat(self) -> SourcedValue:
-        """Set ``u_bat`` to the effective ``heat_loss_coefficient`` / ``loss_area``, in W/(m².K).
+        """Compute ``u_bat``, the effective ``heat_loss_coefficient`` / ``loss_area``, in W/(m².K).
+
+        Like every ``compute_*`` method, it computes the value *and* stores it as the
+        ``"computed"`` candidate, which the source priority then weighs against the others; it is
+        a snapshot: compute again after changing the inputs.
 
         Raises
         ------
@@ -263,17 +278,19 @@ class Envelope(SourcedModel):
         heat_loss, area = self.heat_loss_coefficient, self.loss_area
         if heat_loss is None or not area:
             raise IncompleteDataError("u_bat needs heat_loss_coefficient and a non-zero loss_area")
-        candidate = self.set(
+        return self.set(
             "u_bat",
             heat_loss / area,
             source=COMPUTED_SOURCE,
             comment="heat_loss_coefficient / loss_area",
         )
-        assert candidate is not None
-        return candidate
 
     def compute_window_shgc(self) -> SourcedValue:
-        """Set ``window_shgc`` to the mean window SHGC weighted by window area.
+        """Compute ``window_shgc``, the mean window SHGC weighted by window area.
+
+        Like every ``compute_*`` method, it computes the value *and* stores it as the
+        ``"computed"`` candidate, which the source priority then weighs against the others; it is
+        a snapshot: compute again after changing the inputs.
 
         Raises
         ------
@@ -299,6 +316,4 @@ class Envelope(SourcedModel):
 
     def _set_computed(self, name: str, value: float, count: int) -> SourcedValue:
         comment = f"from {count} components"
-        candidate = self.set(name, value, source=COMPUTED_SOURCE, comment=comment)
-        assert candidate is not None
-        return candidate
+        return self.set(name, value, source=COMPUTED_SOURCE, comment=comment)

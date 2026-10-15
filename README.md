@@ -63,10 +63,10 @@ group.set("construction_year", 1972, source="bdnb")
 b = park.new_building(rnb_id="A1B2C3D4E5F6", parent=group, asset_code="BAT-0042", source="client")
 b.set("construction_year", 1974, source="audit")
 b.construction_year                    # 1974: own value, audit
-b.construction_year = None             # removes the "manual" candidate only: still 1974
 b.inherited_candidates("construction_year")
 # [('A1B2C3D4E5F6', SourcedValue(value=1974, source='audit', ...)),
 #  ('bdnb-bg-1111-1HRT-8SVH', SourcedValue(value=1972, source='bdnb', ...))]
+b.unset("construction_year", source="audit")  # back to the inherited BDNB value: 1972
 
 park.add_meter(Meter(
     id="PDL_123", scope=["school-A"], end_use="total",

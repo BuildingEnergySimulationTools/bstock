@@ -222,7 +222,7 @@ class SourcedField(Generic[T]):
         candidate = obj.effective(self.name)
         return None if candidate is None else candidate.value
 
-    def __set__(self, obj: SourcedModel, value: T | None) -> None:
+    def __set__(self, obj: SourcedModel, value: T) -> None:
         obj.set(self.name, value, source=MANUAL_SOURCE)
 
     def validate(self, value: Any) -> Any:
@@ -303,9 +303,9 @@ class SourcedModel(BaseModel):
         Building(rnb_id="A1B2C3D4E5F6", construction_year=1970, source="bdnb")
 
     Reading a sourced field returns the effective value; assigning it writes the ``"manual"``
-    candidate only. In particular ``b.heated_area = None`` removes the manual value, and
-    ``b.heated_area`` may still return a value from another source: use ``b.unset("heated_area")``
-    to remove every candidate.
+    candidate only. Assigning ``None`` raises :class:`InvalidArgumentError`, since it is ambiguous:
+    use ``b.unset("heated_area", source="manual")`` to remove the manual value (a value from
+    another source may remain), or ``b.unset("heated_area")`` to remove every candidate.
     """
 
     model_config = ConfigDict(
@@ -459,7 +459,7 @@ class SourcedModel(BaseModel):
         comment: str | None = None,
         ref: str | None = None,
         raw: Any = None,
-    ) -> SourcedValue | None:
+    ) -> SourcedValue:
         """Add or replace the candidate of ``source`` for the field ``name``.
 
         Parameters
@@ -467,26 +467,32 @@ class SourcedModel(BaseModel):
         name
             Sourced field name.
         value
-            New value. ``None`` removes the candidate of ``source`` instead.
+            New value; not ``None`` (see :meth:`unset`).
         source, date, comment, ref, raw
             Provenance of the value, see :class:`SourcedValue`.
 
         Returns
         -------
-        SourcedValue or None
-            The stored candidate, or ``None`` when ``value`` is ``None``.
+        SourcedValue
+            The stored candidate.
 
         Raises
         ------
         UnknownFieldError
             If ``name`` is not a sourced field.
+        InvalidArgumentError
+            If ``value`` is ``None``: removing a value is done with :meth:`unset`, for one source
+            or for all.
         pydantic.ValidationError
             If ``value`` does not match the field type or constraints.
         """
         field = self._field(name)
         if value is None:
-            self.unset(name, source=source)
-            return None
+            raise InvalidArgumentError(
+                f"None is not a value of {name!r}: use unset({name!r}, source={source!r}) to "
+                f"remove the {source!r} value (another source may still give one), or "
+                f"unset({name!r}) to remove every value"
+            )
         candidate = SourcedValue(
             value=field.validate(value),
             source=source,
