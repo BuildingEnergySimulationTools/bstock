@@ -421,7 +421,7 @@ class BuildingPark(BaseModel):
         systems: bool = False,
         meters: bool = False,
         max_depth: int | None = None,
-        fields: Sequence[str] | None = None,
+        fields: str | Sequence[str] | None = None,
     ) -> TreeView:
         """Return the tree of the sites and buildings of the park (SPEC §14.1).
 

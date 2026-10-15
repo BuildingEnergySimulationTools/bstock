@@ -13,6 +13,7 @@ from typing import TYPE_CHECKING, Any
 
 import pandas as pd
 
+from bstock._fields import field_names
 from bstock.exceptions import InvalidArgumentError, UnknownFieldError
 
 if TYPE_CHECKING:
@@ -136,7 +137,7 @@ def build_tree(
     systems: bool = False,
     meters: bool = False,
     max_depth: int | None = None,
-    fields: Sequence[str] | None = None,
+    fields: str | Sequence[str] | None = None,
     shown: Collection[str] | None = None,
     header: str | None = None,
 ) -> TreeView:
@@ -150,7 +151,7 @@ def build_tree(
 
     if max_depth is not None and max_depth < 0:
         raise InvalidArgumentError(f"max_depth must be positive or None, not {max_depth!r}")
-    fields = list(fields or [])
+    fields = field_names(fields) or []
     _check_fields(fields, [*root.iter_sites(), *root.iter_buildings()])
     park = root if isinstance(root, BuildingPark) else root.park
     builder = _TreeBuilder(

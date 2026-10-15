@@ -99,8 +99,8 @@ def test_completeness_stacks_own_and_inherited_shares(park):
 
 
 @requires_plotly
-def test_completeness_by_entity_has_one_bar_per_entity(park):
-    fig = park.select().plot.completeness("entity", fields=["heated_area"])
+def test_completeness_per_entity_has_one_bar_per_entity(park):
+    fig = park.select().plot.completeness(["heated_area"], per="entity")
     assert list(fig.data[0].y) == [f"b{i}" for i in (5, 0, 1, 2, 3, 4)]
 
 
@@ -243,3 +243,16 @@ def test_intensity_per_period_divides_by_the_total_area(park):
     fig = park.select(entity="site").plot.intensity(**YEAR, freq="YS")
     gas = dict(zip(trace_names(fig), fig.data, strict=True))["natural_gas"]
     assert list(gas.y) == [pytest.approx(2 * 366 / 1500)]
+
+
+@requires_plotly
+@pytest.mark.parametrize("method", ["consumption", "intensity"])
+def test_consumption_plots_reject_an_unknown_argument(park, method):
+    with pytest.raises(TypeError, match="breakdwn"):
+        getattr(park.select(entity="site").plot, method)(**YEAR, breakdwn=True)
+
+
+@requires_plotly
+def test_consumption_plot_passes_its_arguments(park):
+    fig = park.select(entity="site").plot.consumption(**YEAR, tz="UTC", breakdown=True)
+    assert fig.data

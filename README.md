@@ -121,7 +121,7 @@ sel.aggregate(["heated_area"])         # per site: sum of the buildings, site va
                                        # total (prefer="buildings" or "site"), then a "__park__" row
 sel.aggregate(by="usage")              # extensive fields summed per usage
 sel.completeness()                     # per field: filled, inherited, total, rate
-sel.completeness("entity")             # per building: what is missing
+sel.completeness(per="entity")         # per building: what is missing
 sel.provenance(normalize=True)         # share of each source in the effective values
 sel.conflicts(rtol=0.05)               # own candidates that disagree (floats within 5 %)
 ```

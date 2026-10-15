@@ -221,8 +221,8 @@ def test_completeness_covers_every_attribute_by_default(sourced_park):
     assert list(frame.index) == list(Building.sourced_fields())
 
 
-def test_completeness_by_entity_lists_missing_attributes(sourced_park):
-    frame = sourced_park.select().completeness("entity", fields=["usage", "heated_area", "name"])
+def test_completeness_per_entity_lists_missing_fields(sourced_park):
+    frame = sourced_park.select().completeness(["usage", "heated_area", "name"], per="entity")
     assert frame.index.name == "id"
     assert frame.loc["b1", "missing"] == ["name"]
     assert frame.loc["b2", "missing"] == ["heated_area"]
@@ -330,3 +330,26 @@ def test_no_conflict_gives_an_empty_frame(park):
     frame = park.select().conflicts()
     assert frame.empty
     assert list(frame.columns) == ["entity", "field", "values", "retained"]
+
+
+# --- fields argument ----------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("report", ["completeness", "provenance", "conflicts"])
+def test_report_accepts_a_single_field_name(sourced_park, report):
+    selection = sourced_park.select()
+    single = getattr(selection, report)("construction_year")
+    listed = getattr(selection, report)(["construction_year"])
+    pd.testing.assert_frame_equal(single, listed)
+
+
+def test_aggregate_accepts_a_single_field_name(park):
+    pd.testing.assert_frame_equal(
+        park.select().aggregate(HEATED), park.select().aggregate([HEATED])
+    )
+
+
+def test_completeness_first_argument_is_fields(sourced_park):
+    # per= is a keyword: completeness("entity") names a field, unknown here
+    with pytest.raises(UnknownFieldError, match="'entity'"):
+        sourced_park.select().completeness("entity")

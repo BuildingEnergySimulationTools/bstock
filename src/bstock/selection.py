@@ -157,7 +157,7 @@ class Selection:
 
     def aggregate(
         self,
-        fields: Sequence[str] | None = None,
+        fields: str | Sequence[str] | None = None,
         *,
         by: str | None = None,
         prefer: Literal["buildings", "site"] = "buildings",
@@ -170,8 +170,8 @@ class Selection:
         Parameters
         ----------
         fields
-            Extensive fields of the buildings (``sourced(extensive=True)``); all of them by
-            default.
+            Extensive fields of the buildings (``sourced(extensive=True)``), a name or a list of
+            names; all of them by default.
         by
             Without it, one row per site concerned (the sites containing selected buildings, or
             the selected sites) and a total row indexed ``"__park__"``. With a field name,
@@ -210,9 +210,9 @@ class Selection:
 
     def completeness(
         self,
-        per: Literal["field", "entity"] = "field",
+        fields: str | Sequence[str] | None = None,
         *,
-        fields: Sequence[str] | None = None,
+        per: Literal["field", "entity"] = "field",
     ) -> pd.DataFrame:
         """Return how complete the sourced fields of the selected entities are (SPEC §14.4).
 
@@ -220,14 +220,14 @@ class Selection:
 
         Parameters
         ----------
+        fields
+            Fields to look at (a name or a list of names); by default every sourced field of
+            the selected entities, project ones and ``footprint`` included.
         per
             ``"field"``: one row per sourced field, with ``filled`` (entities having an
             effective value), ``inherited`` (of which inherited), ``total`` and ``rate`` (0 to 1).
             ``"entity"``: one row per entity, with ``filled``, ``total``, ``rate`` and
             ``missing`` (names of the fields without value).
-        fields
-            Fields to look at; by default every sourced field of the selected entities,
-            project ones and ``footprint`` included.
 
         Returns
         -------
@@ -243,17 +243,18 @@ class Selection:
         """
         from bstock.analysis import completeness  # circular import
 
-        return completeness(self, per=per, fields=fields)
+        return completeness(self, fields=fields, per=per)
 
     def provenance(
-        self, fields: Sequence[str] | None = None, *, normalize: bool = False
+        self, fields: str | Sequence[str] | None = None, *, normalize: bool = False
     ) -> pd.DataFrame:
         """Return the sources of the effective values of the selected entities (SPEC §14.4).
 
         Parameters
         ----------
         fields
-            Fields to look at; by default every sourced field of the selected entities.
+            Fields to look at (a name or a list of names); by default every sourced field of
+            the selected entities.
         normalize
             Return shares of the entities (0 to 1) rather than counts.
 
@@ -274,7 +275,9 @@ class Selection:
 
         return provenance(self, fields=fields, normalize=normalize)
 
-    def conflicts(self, fields: Sequence[str] | None = None, *, rtol: float = 0.05) -> pd.DataFrame:
+    def conflicts(
+        self, fields: str | Sequence[str] | None = None, *, rtol: float = 0.05
+    ) -> pd.DataFrame:
         """Return the fields whose own candidates disagree (SPEC §14.4).
 
         Inherited candidates are not compared: another level is not a conflict. Strings, enums,
@@ -284,8 +287,9 @@ class Selection:
         Parameters
         ----------
         fields
-            Fields to compare; by default every sourced field of the selected entities
-            except ``footprint`` (two geometries from different sources never match exactly).
+            Fields to compare (a name or a list of names); by default every sourced field of
+            the selected entities except ``footprint`` (two geometries from different sources
+            never match exactly).
         rtol
             Relative tolerance for floats.
 
@@ -467,7 +471,7 @@ class Selection:
         systems: bool = False,
         meters: bool = False,
         max_depth: int | None = None,
-        fields: Sequence[str] | None = None,
+        fields: str | Sequence[str] | None = None,
     ) -> TreeView:
         """Return the tree of the selected entities and of their ancestor sites.
 

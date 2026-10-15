@@ -111,6 +111,10 @@ def test_fields_show_effective_values_with_unit(park):
     assert lines[-1].endswith("annex  Mairie annexe  usage=None, heated_area=None")
 
 
+def test_tree_accepts_a_single_field_name(park):
+    assert park.tree(fields="usage").lines() == park.tree(fields=["usage"]).lines()
+
+
 def test_unknown_field_is_refused(park):
     with pytest.raises(UnknownFieldError, match="colour"):
         park.tree(fields=["colour"])

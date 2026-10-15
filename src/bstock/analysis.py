@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING, Any, Literal
 
 import pandas as pd
 
+from bstock._fields import field_names
 from bstock.enums import SystemKind
 from bstock.exceptions import InvalidArgumentError, NoDataWarning, UnknownFieldError
 
@@ -41,7 +42,7 @@ Container = Any  # BuildingPark or Site
 
 def aggregate(
     selection: Selection,
-    fields: Sequence[str] | None = None,
+    fields: str | Sequence[str] | None = None,
     *,
     by: str | None = None,
     prefer: Prefer = "buildings",
@@ -63,8 +64,9 @@ def aggregate(
     return frame
 
 
-def _extensive_fields(park: BuildingPark, fields: Sequence[str] | None) -> list[str]:
+def _extensive_fields(park: BuildingPark, fields: str | Sequence[str] | None) -> list[str]:
     available = park.building_cls.sourced_fields()
+    fields = field_names(fields)
     if fields is None:
         return [name for name, field in available.items() if field.extensive]
     for name in fields:
@@ -320,7 +322,7 @@ def completeness(
     selection: Selection,
     *,
     per: Literal["field", "entity"] = "field",
-    fields: Sequence[str] | None = None,
+    fields: str | Sequence[str] | None = None,
 ) -> pd.DataFrame:
     """Return the share of filled fields; see :meth:`Selection.completeness`."""
     if per not in ("field", "entity"):
@@ -361,7 +363,7 @@ def completeness(
 
 
 def provenance(
-    selection: Selection, *, fields: Sequence[str] | None = None, normalize: bool = False
+    selection: Selection, *, fields: str | Sequence[str] | None = None, normalize: bool = False
 ) -> pd.DataFrame:
     """Return the sources of the effective values; see :meth:`Selection.provenance`."""
     entities = selection._entities()
@@ -399,7 +401,7 @@ def provenance(
 
 
 def conflicts(
-    selection: Selection, *, fields: Sequence[str] | None = None, rtol: float = 0.05
+    selection: Selection, *, fields: str | Sequence[str] | None = None, rtol: float = 0.05
 ) -> pd.DataFrame:
     """Return the fields whose own candidates disagree; see :meth:`Selection.conflicts`."""
     if rtol < 0:
@@ -430,9 +432,10 @@ def conflicts(
 
 
 def _sourced_names(
-    selection: Selection, entities: list[Any], fields: Sequence[str] | None
+    selection: Selection, entities: list[Any], fields: str | Sequence[str] | None
 ) -> list[str]:
     """Return ``fields``, checked, or every sourced field of the selected entities."""
+    fields = field_names(fields)
     park = selection.park
     base = park.building_cls if selection.entity == "building" else park.site_cls
     available = list(base.sourced_fields())

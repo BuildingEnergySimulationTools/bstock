@@ -94,7 +94,7 @@ class Site(DescribedEntity):
         systems: bool = False,
         meters: bool = False,
         max_depth: int | None = None,
-        fields: Sequence[str] | None = None,
+        fields: str | Sequence[str] | None = None,
     ) -> TreeView:
         """Return the tree of the sub-sites and buildings of the site.
 

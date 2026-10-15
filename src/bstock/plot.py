@@ -77,19 +77,19 @@ class SelectionPlot:
 
     def completeness(
         self,
-        per: Literal["field", "entity"] = "field",
+        fields: str | Sequence[str] | None = None,
         *,
-        fields: Sequence[str] | None = None,
+        per: Literal["field", "entity"] = "field",
     ) -> Figure:
         """Plot the share of filled fields (horizontal bars, 0 to 100 %).
 
         Parameters
         ----------
+        fields
+            Fields to look at; see :meth:`Selection.completeness`.
         per
             ``"field"``: one bar per sourced field, own and inherited values stacked.
             ``"entity"``: one bar per entity.
-        fields
-            Fields to look at; see :meth:`Selection.completeness`.
 
         Returns
         -------
@@ -101,7 +101,7 @@ class SelectionPlot:
             If plotly is not installed.
         """
         go = _plotly()
-        frame = self._selection.completeness(per, fields=fields)
+        frame = self._selection.completeness(fields, per=per)
         count = _plural(len(self._selection), self._selection.entity)
         fig = go.Figure()
         if per == "field":
@@ -145,7 +145,7 @@ class SelectionPlot:
         fig.update_xaxes(range=[0, 100])
         return fig
 
-    def provenance(self, fields: Sequence[str] | None = None) -> Figure:
+    def provenance(self, fields: str | Sequence[str] | None = None) -> Figure:
         """Plot the share of each source in the effective values (stacked horizontal bars).
 
         Parameters
@@ -420,7 +420,10 @@ class SelectionPlot:
         end: TimeLike,
         freq: Literal["YS", "MS"] | None = None,
         by: Literal["energy_type", "end_use"] = "energy_type",
-        **kwargs: Any,
+        tz: str = "Europe/Paris",
+        breakdown: bool = False,
+        split: str | None = None,
+        load_data: bool = False,
     ) -> Figure:
         """Plot the measured consumption in kWh (stacked bars).
 
@@ -431,9 +434,8 @@ class SelectionPlot:
         by
             Stack the bars by ``"energy_type"`` or by ``"end_use"`` (then use
             ``breakdown=True`` to split the head meters by end use).
-        **kwargs
-            Other arguments of :meth:`Selection.consumption` (``tz``, ``breakdown``, ``split``,
-            ``load_data``).
+        tz, breakdown, split, load_data
+            See :meth:`Selection.consumption`.
 
         Returns
         -------
@@ -451,7 +453,15 @@ class SelectionPlot:
         """
         go = _plotly()
         _check_stack(by)
-        frame = self._selection.consumption(start=start, end=end, freq=freq, **kwargs)
+        frame = self._selection.consumption(
+            start=start,
+            end=end,
+            freq=freq,
+            tz=tz,
+            breakdown=breakdown,
+            split=split,
+            load_data=load_data,
+        )
         frame = frame[frame["energy"].notna()]
         x = "period" if freq else "entity"
         table = frame.pivot_table(
@@ -470,18 +480,19 @@ class SelectionPlot:
         start: TimeLike,
         end: TimeLike,
         area: str = "heated_area",
+        prefer: Literal["buildings", "site"] = "buildings",
         freq: Literal["YS", "MS"] | None = None,
-        **kwargs: Any,
+        tz: str = "Europe/Paris",
+        breakdown: bool = False,
+        split: str | None = None,
+        load_data: bool = False,
     ) -> Figure:
         """Plot the consumption per unit of area, stacked by energy (bars).
 
         Parameters
         ----------
-        start, end, area, freq
+        start, end, area, prefer, freq, tz, breakdown, split, load_data
             See :meth:`Selection.intensity`.
-        **kwargs
-            Other arguments of :meth:`Selection.intensity` (``prefer``, ``tz``, ``split``,
-            ``load_data``...).
 
         Returns
         -------
@@ -495,7 +506,17 @@ class SelectionPlot:
             If plotly is not installed.
         """
         go = _plotly()
-        frame = self._selection.intensity(start=start, end=end, area=area, freq=freq, **kwargs)
+        frame = self._selection.intensity(
+            start=start,
+            end=end,
+            area=area,
+            prefer=prefer,
+            freq=freq,
+            tz=tz,
+            breakdown=breakdown,
+            split=split,
+            load_data=load_data,
+        )
         frame = frame[frame["intensity"].notna()]
         unit = _unit_of(self._selection, area) or "unit"
         if freq:

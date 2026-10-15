@@ -110,7 +110,13 @@ Toutes les entités (`Site`, `Building`, `Envelope`, systèmes, `Meter`) hérite
   `SourcePriority.per_field`, colonne ou index `field` des tableaux d'analyse). Trois mots ont un sens
   fixe dans l'API : `entity=` désigne le type d'entité (`"building"` ou `"site"`) ; `kind=` une catégorie
   typée par une énumération (`SystemKind`, `ComponentKind`) ; `by=` un regroupement (`aggregate(by=)`,
-  `plot.consumption(by=)`).
+  `plot.consumption(by=)`). `tz=` a deux rôles, d'où deux valeurs par défaut : dans `timeseries`, c'est
+  le fuseau de l'index renvoyé (`"UTC"`, ce qu'attend tide) ; dans `consumption` et `intensity`, celui
+  du calendrier des périodes et des bornes sans fuseau (`"Europe/Paris"`, notion métier).
+- **Paramètres des rapports** : `fields` est le seul argument positionnel de `aggregate`,
+  `completeness`, `provenance`, `conflicts` et de leurs graphiques ; les options sont nommées. Partout
+  où il apparaît (rapports, `tree`), `fields` accepte un nom seul ou une liste de noms. Les graphiques
+  listent explicitement les paramètres de la méthode qu'ils tracent (pas de `**kwargs`).
 - **Unité fixée par champ**, sans bibliothèque d'unités : SI, ou unité usuelle du métier telle que la
   donnent les sources (kW, kWp, L, °, m³/(h.m²)), pour éviter des conversions dans les connecteurs. L'unité
   est déclarée dans les métadonnées du champ : elle apparaît dans le JSON Schema, dans `Building.sourced_fields()["heated_area"].unit` et dans
@@ -1281,8 +1287,8 @@ Noms dépréciés en 0.2.0, **retirés en 0.4.0** (v3.a) :
 1. Bâtiment client qui couvre **plusieurs ID RNB** : il se modélise comme un site contenant ces bâtiments.
    À valider à l'usage.
 2. Valeurs proposées pour la v3, à confirmer pendant l'implémentation : troncature du repr à 30 lignes
-   (§14.1), tolérance relative des conflits `rtol=0.05` (§14.4), fuseau des périodes de consommation
-   `tz="Europe/Paris"` (§6.5).
+   (§14.1), tolérance relative des conflits `rtol=0.05` (§14.4). Le fuseau des périodes de consommation
+   `tz="Europe/Paris"` (§6.5) est confirmé (§3.3).
 3. `aggregate(by=...)` ignore les valeurs propres des sites (§14.3). Si le besoin apparaît, une option
    pourrait les rattacher à un groupe.
 
@@ -1487,7 +1493,7 @@ signale. `by` n'est accepté que pour une sélection de bâtiments.
 
 ```python
 sel.completeness()                    # par attribut (field)
-sel.completeness("entity")            # par entité
+sel.completeness(per="entity")        # par entité
 sel.provenance(normalize=True)        # répartition des sources
 sel.conflicts(rtol=0.05)              # candidats en désaccord
 ```
@@ -1495,12 +1501,12 @@ sel.conflicts(rtol=0.05)              # candidats en désaccord
 Par défaut, `fields` contient tous les attributs sourcés de la classe des entités sélectionnées (projet
 compris, `footprint` compris). L'enveloppe et les systèmes ne sont pas couverts en v3.
 
-Signatures : `completeness(per="field", *, fields=None)`, `provenance(fields=None, *,
+Signatures : `completeness(fields=None, *, per="field")`, `provenance(fields=None, *,
 normalize=False)`, `conflicts(fields=None, *, rtol=0.05)`. Un attribut inconnu lève `UnknownFieldError`.
 Une entité dont la classe ne déclare pas un attribut (champ d'une autre sous-classe projet) n'est pas
 comptée pour lui. Un taux sans entité concernée est manquant (NaN).
 
-**`completeness(per="field", fields=None)`.** Une valeur héritée compte comme renseignée.
+**`completeness(fields=None, per="field")`.** Une valeur héritée compte comme renseignée.
 - `per="field"` : une ligne par attribut (index `field`). Colonnes `filled` (nombre d'entités avec une valeur
   effective), `inherited` (dont valeurs héritées), `total` et `rate` (`filled / total`).
 - `per="entity"` : une ligne par entité. Colonnes `filled`, `total`, `rate` et `missing` (liste des
@@ -1533,13 +1539,13 @@ On la personnalise ensuite avec `fig.update_layout(...)`.
 
 | Méthode | Graphique | Données |
 |---|---|---|
-| `plot.completeness(per="field", *, fields=None)` | Barres horizontales du taux, avec la part héritée en couleur distincte | §14.4 |
+| `plot.completeness(fields=None, *, per="field")` | Barres horizontales du taux, avec la part héritée en couleur distincte | §14.4 |
 | `plot.provenance(fields=None)` | Barres empilées des sources par attribut (parts) | §14.4 |
 | `plot.aggregate(field, *, by=None, prefer="buildings")` | Barres de `total` par site (ou par groupe `by`), avec la couverture au survol | §14.3 |
 | `plot.distribution(field, *, bins=None)` | Histogramme pour un nombre ; barres de fréquence pour une enum ou une chaîne | Valeurs effectives |
 | `plot.map(*, geometry="point", color=None)` | Carte sur fond OpenStreetMap (sans clé d'API) : points `lat` / `lon` ou emprises `footprint` (GeoJSON WGS84, sans l'extra `[geo]`), colorés par un attribut | Valeurs effectives |
-| `plot.consumption(*, start, end, freq=None, by="energy_type", **kwargs)` | Barres empilées de la consommation (kWh) par entité, empilées par énergie (`by="energy_type"`) ou par usage (`by="end_use"`) ; une barre par période avec `freq` | §6.5 |
-| `plot.intensity(*, start, end, area="heated_area", freq=None, **kwargs)` | Barres du kWh/m² par entité, empilées par énergie | §6.5 |
+| `plot.consumption(*, start, end, freq=None, by="energy_type", tz, breakdown, split, load_data)` | Barres empilées de la consommation (kWh) par entité, empilées par énergie (`by="energy_type"`) ou par usage (`by="end_use"`) ; une barre par période avec `freq` | §6.5 |
+| `plot.intensity(*, start, end, area="heated_area", prefer, freq=None, tz, breakdown, split, load_data)` | Barres du kWh/m² par entité, empilées par énergie | §6.5 |
 
 Une entité sans valeur n'est pas tracée, et le titre indique la couverture (« 34 / 42 bâtiments »). Les
 unités des champs (métadonnée `unit`) étiquettent les axes.
