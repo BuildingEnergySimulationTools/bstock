@@ -1,4 +1,5 @@
 import importlib
+import inspect
 import pkgutil
 
 import pytest
@@ -32,7 +33,7 @@ def test_errors_derive_from_bstock_error(error):
         (bstock.InvalidArgumentError, ValueError),
         (bstock.UnknownKindError, bstock.InvalidArgumentError),
         (bstock.HierarchyError, ValueError),
-        (bstock.ProjectClassError, TypeError),
+        (bstock.ClassMismatchError, TypeError),
         (bstock.MissingDependencyError, ImportError),
     ],
 )
@@ -72,6 +73,20 @@ def test_public_submodules_define_their_api(module_name):
     module = importlib.import_module(module_name)
     for name in module.__all__:
         assert hasattr(module, name)
+
+
+@pytest.mark.parametrize("module_name", sorted(PUBLIC_SUBMODULES))
+def test_public_submodules_export_every_unprefixed_function_and_class(module_name):
+    # dpe.enrich was once missing from __all__; helpers must start with an underscore
+    module = importlib.import_module(module_name)
+    defined = {
+        name
+        for name, value in vars(module).items()
+        if not name.startswith("_")
+        and (inspect.isfunction(value) or inspect.isclass(value))
+        and value.__module__ == module_name
+    }
+    assert defined <= set(module.__all__)
 
 
 def test_unmapped_value_warning_is_a_bstock_warning():

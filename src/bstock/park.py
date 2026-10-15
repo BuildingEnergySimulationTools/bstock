@@ -7,7 +7,7 @@ import types
 import warnings
 from collections.abc import Callable, Iterable, Iterator, Sequence
 from pathlib import Path
-from typing import Any, ClassVar, Literal, Self, TypeVar, overload
+from typing import TYPE_CHECKING, Any, ClassVar, Literal, Self, TypeVar, overload
 
 import pandas as pd
 from pydantic import (
@@ -35,11 +35,11 @@ from bstock.description import DescribedEntity
 from bstock.display import REPR_MAX_LINES, TreeView, build_tree
 from bstock.enums import EndUse, EnergyType, SystemKind
 from bstock.exceptions import (
+    ClassMismatchError,
     DuplicateIdError,
     EntityInUseError,
     HierarchyError,
     NoDataWarning,
-    ProjectClassError,
     UnknownIdError,
 )
 from bstock.meters import Meter
@@ -47,6 +47,9 @@ from bstock.provenance import SourcePriority
 from bstock.selection import EntityType, Predicate, Selection, select
 from bstock.site import Site, build_children
 from bstock.systems import System
+
+if TYPE_CHECKING:
+    from geopandas import GeoDataFrame
 
 __all__ = ["BuildingPark"]
 
@@ -245,7 +248,7 @@ class BuildingPark(BaseModel):
         *,
         geometry: Literal["footprint", "point"] = "footprint",
         provenance: bool = False,
-    ) -> Any:
+    ) -> GeoDataFrame:
         """Return :meth:`to_dataframe` as a GeoDataFrame in WGS84 (SPEC §9, extra ``[geo]``).
 
         See :func:`bstock.export.to_geodataframe`.
@@ -526,7 +529,7 @@ class BuildingPark(BaseModel):
 
         Raises
         ------
-        ProjectClassError
+        ClassMismatchError
             If a site of the subtree is not an instance of :attr:`site_cls`, or a building of
             :attr:`building_cls`.
         DuplicateIdError
@@ -547,7 +550,7 @@ class BuildingPark(BaseModel):
 
         Raises
         ------
-        ProjectClassError
+        ClassMismatchError
             If ``building`` is not an instance of :attr:`building_cls`.
         DuplicateIdError
             If its id, RNB id or one of its system ids is already used in the park.
@@ -879,7 +882,7 @@ class BuildingPark(BaseModel):
                 continue
             expected = self.site_cls if isinstance(item, Site) else self.building_cls
             if not isinstance(item, expected):
-                raise ProjectClassError(
+                raise ClassMismatchError(
                     f"{item.id!r}: expected an instance of {expected.__name__}, "
                     f"got {type(item).__name__}"
                 )

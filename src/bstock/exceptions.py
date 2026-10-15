@@ -49,8 +49,12 @@ class HierarchyError(BstockError, ValueError):
     """
 
 
-class ProjectClassError(BstockError, TypeError):
-    """A site or building is not an instance of the class configured on the park (SPEC §5)."""
+class ClassMismatchError(BstockError, TypeError):
+    """A site or building is not an instance of the class configured on the park (SPEC §5).
+
+    Raised when an entity is attached; :class:`ClassMismatchWarning` is its counterpart when a park
+    file is loaded with other classes than the ones it was saved with.
+    """
 
 
 class UnknownFieldError(BstockError, AttributeError):

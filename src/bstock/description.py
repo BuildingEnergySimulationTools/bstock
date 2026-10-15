@@ -37,6 +37,8 @@ from bstock.systems import (
 )
 
 if TYPE_CHECKING:
+    from bstock.meters import Meter
+    from bstock.park import BuildingPark
     from bstock.site import Site
 
 __all__ = ["DescribedEntity"]
@@ -138,12 +140,13 @@ class DescribedEntity(SourcedModel):
         return self._container if isinstance(self._container, Site) else None
 
     @property
-    def park(self) -> Any:
+    def park(self) -> BuildingPark | None:
         """The park this entity belongs to, or ``None``."""
         node = self._container
         while isinstance(node, SourcedModel):
             node = node._container
-        return node
+        park: BuildingPark | None = node
+        return park
 
     def _inheritance_parent(self) -> SourcedModel | None:
         """Inherited values come from the parent site."""
@@ -238,7 +241,7 @@ class DescribedEntity(SourcedModel):
                 f"'serves' only applies to systems owned by a site, not {self.id!r}"
             )
 
-    def find_meters(self) -> list[Any]:
+    def find_meters(self) -> list[Meter]:
         """Return the park meters whose scope contains this entity or one of its own systems.
 
         ``park.meters`` is the list of every meter of the park. Outside a park, the list is empty.

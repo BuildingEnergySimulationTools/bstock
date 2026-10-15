@@ -3,10 +3,10 @@ from pydantic import ValidationError
 
 from bstock.building import Building
 from bstock.exceptions import (
+    ClassMismatchError,
     DuplicateIdError,
     EntityInUseError,
     HierarchyError,
-    ProjectClassError,
     UnknownIdError,
 )
 from bstock.meters import Channel, Meter
@@ -205,16 +205,16 @@ def test_new_entities_use_project_classes():
 
 def test_add_checks_project_class():
     park = BuildingPark(name="Bayonne", building_cls=BayonneBuilding)
-    with pytest.raises(ProjectClassError, match="BayonneBuilding"):
+    with pytest.raises(ClassMismatchError, match="BayonneBuilding"):
         park.add_building(Building(rnb_id=RNB_A))
 
 
 def test_site_methods_check_project_class():
     park = BuildingPark(name="Bayonne", site_cls=BayonneSite, building_cls=BayonneBuilding)
     site = park.new_site("s1")
-    with pytest.raises(ProjectClassError, match="BayonneBuilding"):
+    with pytest.raises(ClassMismatchError, match="BayonneBuilding"):
         site.add_building(Building(rnb_id=RNB_A))
-    with pytest.raises(ProjectClassError, match="BayonneSite"):
+    with pytest.raises(ClassMismatchError, match="BayonneSite"):
         site.add_site(Site(id="s2"))
     assert site.buildings == []
     assert site.sites == []
@@ -223,7 +223,7 @@ def test_site_methods_check_project_class():
 
 def test_add_site_checks_classes_of_subtree():
     park = BuildingPark(name="Bayonne", site_cls=BayonneSite, building_cls=BayonneBuilding)
-    with pytest.raises(ProjectClassError, match="BayonneBuilding"):
+    with pytest.raises(ClassMismatchError, match="BayonneBuilding"):
         park.add_site(BayonneSite(id="s1", buildings=[Building(rnb_id=RNB_A)]))
     assert "s1" not in park
 
@@ -242,7 +242,7 @@ def test_park_built_from_data_uses_project_classes():
 
 
 def test_park_built_with_other_classes_is_rejected():
-    with pytest.raises(ProjectClassError, match="BayonneBuilding"):
+    with pytest.raises(ClassMismatchError, match="BayonneBuilding"):
         BuildingPark(
             name="Bayonne",
             building_cls=BayonneBuilding,

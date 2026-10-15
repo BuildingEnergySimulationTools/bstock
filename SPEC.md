@@ -637,7 +637,7 @@ Règles :
   `site.add_building` font le même contrôle quand le site appartient à un parc, de même que la construction
   directe `BuildingPark(..., site_cls=..., building_cls=..., sites=[...])`. Dans ce dernier cas, les
   entités données sous forme de dict sont créées avec ces classes. Une instance d'une autre classe lève
-  `ProjectClassError`.
+  `ClassMismatchError`.
 - **Chargement** : `BuildingPark.load(path, site_cls=BayonneSite, building_cls=BayonneBuilding)`. Si un
   fichier contient des attributs inconnus de la classe utilisée (par exemple, un parc Bayonne rechargé avec
   `Building`), ils sont **conservés tels quels** et réécrits à la sauvegarde. Un avertissement est émis :
@@ -1369,7 +1369,8 @@ Changements **incompatibles de 0.9.0**, sans alias ni migration :
 Ajouts compatibles : `fields` accepte un nom seul ; `site.remove_site` / `remove_building` ; la copie
 profonde d'une entité seule est détachée de son propriétaire.
 
-Changements **incompatibles de 0.10.0** (en préparation : connecteurs §8, énumérations §3.9) :
+Changements **incompatibles de 0.10.0** (en préparation : connecteurs §8, énumérations §3.9, petits
+points) :
 
 | Avant 0.10.0 | Depuis 0.10.0 |
 |---|---|
@@ -1382,10 +1383,13 @@ Changements **incompatibles de 0.10.0** (en préparation : connecteurs §8, énu
 | `BuildingUsage.SECONDARY`, `BuildingUsage.PRIMARY` | `INDUSTRY`, `AGRICULTURE` |
 | fichier de parc `schema_version` 2 | `UnsupportedSchemaError` ; format v3 (§7) |
 | production PV additionnée à la consommation | lignes `pv_production` négatives : bilans nets (§6.5) |
+| `ProjectClassError` | `ClassMismatchError`, pendant de `ClassMismatchWarning` |
+| `bstock.io.to_dict`, `bstock.io.class_path`, `bstock.export.entities_frame` | internes (`_to_dict`…) |
 
 Ajouts compatibles : `rnb.add_buildings_at_address` ; `bdnb.enrich` signale chaque bâtiment déplacé
 dans un sous-site de groupe ; familles d'enums, `.family`, `.variants()` et critère `attr__family`
-(§3.9).
+(§3.9) ; `dpe.enrich` figure dans `dpe.__all__` (il y manquait) ; `entity.park`, `find_meters()` et
+`park.to_geodataframe()` sont typés.
 
 ---
 

@@ -73,10 +73,10 @@ def to_dataframe(
     """
     check_entity_type(entity)
     entities = list(park.iter_buildings() if entity == "building" else park.iter_sites())
-    return entities_frame(park, entity, entities, provenance=provenance)
+    return _entities_frame(park, entity, entities, provenance=provenance)
 
 
-def entities_frame(
+def _entities_frame(
     park: BuildingPark,
     entity_type: EntityType,
     entities: list[DescribedEntity],

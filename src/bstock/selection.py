@@ -462,9 +462,9 @@ class Selection:
             The rows of :meth:`BuildingPark.to_dataframe` for the selected entities, in the
             order of the selection.
         """
-        from bstock.export import entities_frame  # circular import
+        from bstock.export import _entities_frame  # circular import
 
-        return entities_frame(
+        return _entities_frame(
             self._park, self._entity_type, self._entities(), provenance=provenance
         )
 

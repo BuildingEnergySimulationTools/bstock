@@ -141,7 +141,7 @@ class Site(DescribedEntity):
         ------
         DuplicateIdError
             If the id is already used by a direct child or in the park.
-        ProjectClassError
+        ClassMismatchError
             If the site belongs to a park and a site or building of the added subtree is not an
             instance of the park ``site_cls`` or ``building_cls``.
         """
@@ -158,7 +158,7 @@ class Site(DescribedEntity):
         ------
         DuplicateIdError
             If the id is already used by a direct child or in the park.
-        ProjectClassError
+        ClassMismatchError
             If the site belongs to a park and a site or building of the added subtree is not an
             instance of the park ``site_cls`` or ``building_cls``.
         """

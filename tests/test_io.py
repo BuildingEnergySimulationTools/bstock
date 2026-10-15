@@ -8,7 +8,7 @@ from bstock.building import Building
 from bstock.enums import Inertia
 from bstock.envelope import EnvelopeComponent, Window
 from bstock.exceptions import ClassMismatchWarning, UnknownFieldWarning, UnsupportedSchemaError
-from bstock.io import class_path
+from bstock.io import _class_path
 from bstock.meters import Channel, Meter
 from bstock.park import BuildingPark
 from bstock.provenance import SourcePriority, sourced
@@ -79,8 +79,8 @@ def park():
 def test_json_contains_metadata_and_candidates_only(park):
     data = json.loads(park.to_json())
     assert data["schema_version"] == 3
-    assert data["site_cls"] == class_path(BayonneSite)
-    assert data["building_cls"] == class_path(BayonneBuilding)
+    assert data["site_cls"] == _class_path(BayonneSite)
+    assert data["building_cls"] == _class_path(BayonneBuilding)
     group = data["sites"][0]["sites"][0]
     assert group["values"]["construction_year"] == [
         {"value": 1972, "source": "bdnb", "ref": GROUP, "raw": "1972"}

@@ -47,7 +47,7 @@ TIMESERIES_DIR = "timeseries"
 _METADATA_KEYS = ("bstock_version", "schema_version", "site_cls", "building_cls")
 
 
-def class_path(cls: type) -> str:
+def _class_path(cls: type) -> str:
     """Return the import path ``module.QualName`` of ``cls``."""
     return f"{cls.__module__}.{cls.__qualname__}"
 
@@ -62,20 +62,20 @@ def _bstock_version() -> str:
 # --- JSON -------------------------------------------------------------------------------------
 
 
-def to_dict(park: BuildingPark) -> dict[str, Any]:
+def _to_dict(park: BuildingPark) -> dict[str, Any]:
     """Return the JSON-compatible content of ``park.json``."""
     metadata = {
         "bstock_version": _bstock_version(),
         "schema_version": SCHEMA_VERSION,
-        "site_cls": class_path(park.site_cls),
-        "building_cls": class_path(park.building_cls),
+        "site_cls": _class_path(park.site_cls),
+        "building_cls": _class_path(park.building_cls),
     }
     return {**metadata, **park.model_dump(mode="json", exclude_none=True)}
 
 
 def to_json(park: BuildingPark, *, indent: int | None = 2) -> str:
     """Serialise ``park`` to JSON; metered data is not included (see :func:`save`)."""
-    return json.dumps(to_dict(park), indent=indent, ensure_ascii=False)
+    return json.dumps(_to_dict(park), indent=indent, ensure_ascii=False)
 
 
 def from_json(
@@ -106,9 +106,9 @@ def from_json(
         )
     for key, cls in (("site_cls", site_cls), ("building_cls", building_cls)):
         saved = metadata[key]
-        if saved is not None and saved != class_path(cls):
+        if saved is not None and saved != _class_path(cls):
             warnings.warn(
-                f"the park was saved with {key}={saved}, loaded with {class_path(cls)}; "
+                f"the park was saved with {key}={saved}, loaded with {_class_path(cls)}; "
                 f"import that class and pass {key}= to load it with its project fields",
                 ClassMismatchWarning,
                 stacklevel=3,

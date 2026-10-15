@@ -32,6 +32,7 @@ __all__ = [
     "DATASETS",
     "SOURCE",
     "DpeClient",
+    "enrich",
 ]
 
 logger = logging.getLogger(__name__)
