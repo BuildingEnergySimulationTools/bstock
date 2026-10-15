@@ -6,7 +6,8 @@ Règles (voir `CLAUDE.md`) :
 - un écart avec la SPEC passe d'abord par une mise à jour de `SPEC.md`.
 
 Sommaire : [v1](#v1--terminée) (terminée, 0.1.0 puis ajustements d'API en 0.2.0) ·
-[v2](#v2--connecteurs-emprise-et-exports) (terminée, 0.3.0) · [v3](#v3--rappel-de-la-feuille-de-route)
+[v2](#v2--connecteurs-emprise-et-exports) (terminée, 0.3.0) ·
+[v3](#v3--lisibilité-sélection-analyse-consommations-graphiques) (en cours)
 
 ---
 
@@ -266,6 +267,127 @@ inconnus, `ImportReport`, erreurs, pas de cache, format JSON inchangé).
 
 ---
 
-# v3 — rappel de la feuille de route
-- Filtrage, agrégations des grandeurs extensives, rapport de complétude et de provenance ; graphiques
-  plotly
+# v3 — lisibilité, sélection, analyse, consommations, graphiques
+
+Périmètre v3 (SPEC §12), en cinq blocs livrés chacun dans une version : v3.a lisibilité (**0.4.0**),
+v3.b sélection (**0.5.0**), v3.c analyse (**0.6.0**), v3.d consommations (**0.7.0**), v3.e graphiques
+(**0.8.0**).
+
+## Décisions de conception (interview du 2026-10-15)
+
+Reportées dans `SPEC.md` (§3.3, §3.6, §3.7, §6.1, §6.5, §11 à §14) à l'étape 21.
+
+| # | Sujet | Décision |
+|---|---|---|
+| E1 | Découpage | 5 blocs, une version chacun ; consommations mesurées ajoutées comme bloc à part |
+| E2 | Support | Texte (console / IDE) et HTML (`_repr_html_`) ; le texte d'abord |
+| E3 | Règle du repr | `BuildingPark` et `Site` : arbre résumé tronqué, avec une ligne de comptage. Entités feuilles (`Building`, systèmes, `Meter`…) : une ligne |
+| E4 | Arbre | `tree()` renvoie un `TreeView` : sites et bâtiments par défaut ; options `systems=`, `meters=`, `max_depth=` |
+| E5 | `describe()` | DataFrame, une ligne par attribut sourcé : valeur effective, unité, source, entité qui fournit la valeur, héritage |
+| E6 | Étiquettes | Type, id, nom (et nombre de bâtiments pour un site) ; `fields=[...]` ajoute des valeurs effectives |
+| E7 | HTML | Arbre repliable en `<details>` imbriqués, sans JS, dans une étape séparée |
+| F1 | Retour d'un filtre | Objet `Selection` qui porte les méthodes des blocs suivants. Remplace `park.buildings.filter` (conflit avec `park.buildings` = premier niveau) |
+| F2 | Critères | `park.select(predicate=None, kind="building", **criteria)` et `sel.filter(...)`, sur la valeur effective (héritage compris) |
+| F3 | Portée | `kind="building"` ou `"site"`, jamais mélangés ; systèmes et compteurs hors `Selection` |
+| F4 | Palette | `__in`, `__lt/__le/__gt/__ge`, `__isnull`, `__contains` ; `within`, `parent`, `has_rnb_id`, `has_meter`, `has_system` ; `\| & -`. Pas de critère de provenance |
+| F5 | Instantané | La sélection fige les ids à sa création |
+| A1 | Sortie | DataFrame seulement, le modèle n'est jamais modifié |
+| A2 | Site / bâtiments | Somme des bâtiments, valeur du site, écart et couverture affichés côte à côte ; total selon `prefer="buildings" \| "site"` |
+| A3 | Grandeurs | Champs `sourced(extensive=True)`, puissances des systèmes par type, comptages. Pas d'extrapolation |
+| A4 | Regroupement | Hiérarchie (sites, puis total parc) ; `by="<attr>"` pour les bâtiments |
+| R1 | Complétude | Par attribut et par entité ; une valeur héritée compte comme renseignée, avec la part héritée à part |
+| R2 | Provenance | Répartition des sources, part héritée, conflits entre candidats propres (`rtol` pour les flottants) |
+| C2 | Canaux | `energy` sommé, `index` = dernier − premier ; pas d'intégration de puissance (tide) ; Wh à GWh → kWh ; énergie finale |
+| C3 | Sous-compteurs | `Meter.parent_meter` optionnel ; seuls les compteurs de tête sont sommés ; `breakdown=True` ventile par usage |
+| C4 | Affectation | Au niveau du `scope` ; `split="<champ extensif>"` répartit au prorata (lignes `estimated`) |
+| C5 | Période | `start` / `end`, plus `freq="YS" \| "MS"` en option ; couverture temporelle, sans extrapolation |
+| C6 | kWh/m² | `area="heated_area"` par défaut, paramétrable ; surface prise au niveau de la ligne |
+| G1 | Graphiques | Complétude, provenance, agrégations, distributions, carte OSM, consommations, kWh/m². Pas de treemap |
+| G2 | API de tracé | Accesseur `sel.plot.*`, code dans `plot.py`, renvoie une `Figure` |
+
+## Étape 21 — SPEC v3
+- [x] Reporter les décisions dans `SPEC.md` : §14 (lisibilité, sélection, agrégations, complétude et
+      provenance, graphiques), §6.5 et `parent_meter` (§6.1), `extensive` (§3.3, §3.6, §3.7), §11, §12,
+      §13 (valeurs proposées à confirmer)
+
+## v3.a — Lisibilité (0.4.0)
+
+### Étape 22 — Repr texte, arbre et `describe()`
+- [ ] Retrait des noms dépréciés (SPEC §12) et de leurs tests
+- [ ] Module `display.py` : `TreeView`, rendu texte de l'arbre (`systems`, `meters`, `max_depth`,
+      `fields`), en-tête de comptage, troncature du repr
+- [ ] `park.tree()`, `site.tree()` ; `__repr__` de `BuildingPark` et `Site` (arbre tronqué)
+- [ ] `__repr__` sur une ligne : `Building`, systèmes, `Meter`, `Envelope`, parois (classe projet affichée)
+- [ ] `describe()` sur les entités sourcées (héritage, unité, attributs vides, champs projet)
+- [ ] Tests : arbre (sites imbriqués, options, troncature, champ inconnu), repr d'une sous-classe projet,
+      `describe` (valeur héritée, attribut vide)
+
+### Étape 23 — HTML Jupyter
+- [ ] `_repr_html_` de `BuildingPark`, `Site`, `TreeView` : `<details>` imbriqués, style intégré,
+      premier niveau ouvert, échappement des noms
+- [ ] Tests : structure HTML (imbrication, échappement), sans navigateur
+
+### Étape 24 — Finalisation 0.4.0
+- [ ] `examples/bayonne_interactive.py` : remplacer le helper `tree()` écrit à la main par `park.tree()`
+- [ ] Revue de l'API publique (`TreeView` exporté) et des docstrings ; README ; version `0.4.0` et tag
+
+## v3.b — Sélection (0.5.0)
+
+### Étape 25 — `Selection`
+- [ ] Module `selection.py` : `Selection` (instantané d'ids, parcours dans l'ordre de l'arbre, `len`,
+      `in`, `ids`, `kind`, repr), `park.select`, `sel.filter`
+- [ ] Critères de valeur et opérateurs ; critères de structure ; prédicat ; erreurs (champ inconnu,
+      opérateur inconnu, critère inadapté au `kind`)
+- [ ] Opérations d'ensemble ; `to_dataframe` et `tree` restreints à la sélection
+- [ ] Tests : valeur héritée retenue, valeur absente, chaque opérateur (paramétré), `within` à plusieurs
+      niveaux, `has_system` avec un système partagé, entité retirée après la sélection, parcs ou `kind`
+      différents
+- [ ] Finalisation 0.5.0 (API publique, docstrings, README, version et tag)
+
+## v3.c — Analyse (0.6.0)
+
+### Étape 26 — Métadonnée `extensive` et agrégations
+- [ ] `sourced(extensive=True)` ; interdit avec `inherit=True` ; posé sur les champs du §3.6 et de
+      l'enveloppe ; visible dans `sourced_fields()` et dans le JSON Schema
+- [ ] Module `analysis.py` : `sel.aggregate` en mode hiérarchique (mesures `buildings`, `site`, `delta`,
+      `coverage`, `total` ; règle `prefer` de bas en haut ; ligne `park`) et comptages
+- [ ] Puissances des systèmes (systèmes partagés comptés une fois, sur leur porteur)
+- [ ] `by="<attr>"`, avec un avertissement quand des valeurs propres de site sont ignorées
+- [ ] Tests : exemple « Résidence X » (pas de double compte, `prefer` dans les deux sens), sites
+      imbriqués, couverture partielle, champ projet extensif, sélection de sites, `by`
+
+### Étape 27 — Complétude et provenance
+- [ ] `completeness(by="attribute" | "entity")`, `provenance(normalize=)`, `conflicts(rtol=)`
+- [ ] Tests : valeur héritée comptée, part héritée, conflits (entier strict, flottant dans et hors
+      tolérance, enum), candidats hérités non comparés
+- [ ] Finalisation 0.6.0
+
+## v3.d — Consommations (0.7.0)
+
+### Étape 28 — `parent_meter`
+- [ ] Champ `Meter.parent_meter` ; contrôles (existence, pas de cycle) à `add_meter` et à l'affectation ;
+      `remove` avec `force` ; aller-retour JSON, lecture d'un JSON v2
+- [ ] Tests des contrôles et de la suppression
+
+### Étape 29 — Consommations et kWh/m²
+- [ ] Module `consumption.py` : énergie par canal (`energy` sommé, `index` dernier − premier, unités
+      converties en kWh), période et fuseau, `freq`, couverture temporelle
+- [ ] Compteurs retenus (tête seulement, porteurs) et lignes selon le `kind` de la sélection
+- [ ] `breakdown=True` (reste `other`), `split=` (lignes `estimated`), `load_data=`
+- [ ] `sel.intensity(area=, prefer=)`
+- [ ] Tests : sous-compteurs sans double compte, index remis à zéro, unité refusée, puissance ignorée,
+      couverture partielle, découpage annuel autour du changement d'heure, compteur multi-bâtiments,
+      répartition avec une surface manquante, kWh/m² d'un site
+- [ ] Finalisation 0.7.0 (exemple de bout en bout avec des compteurs et des sous-compteurs)
+
+## v3.e — Graphiques (0.8.0)
+
+### Étape 30 — `sel.plot`
+- [ ] Module `plot.py` : accesseur `Selection.plot`, import paresseux de plotly
+      (`MissingDependencyError`)
+- [ ] `completeness`, `provenance`, `aggregate`, `distribution`, `map` (points et emprises),
+      `consumption`, `intensity`
+- [ ] Tests (sautés sans l'extra `[plot]`) : type `Figure`, traces et axes attendus, couverture dans le
+      titre, erreur claire sans plotly
+- [ ] Finalisation 0.8.0 : exemple de graphiques dans `examples/`, README, statut de la SPEC passé en
+      v3, version et tag

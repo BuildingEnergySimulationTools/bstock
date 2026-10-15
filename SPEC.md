@@ -3,6 +3,9 @@
 > Statut : **v2.0**, implémentée par bstock 0.3.0 (périmètres v1 et v2 du §12 : modèle, provenance,
 > compteurs, persistance ; emprise §3.6, connecteurs §8, exports §9, annexe A). Issue des interviews de
 > conception du 2026-10-13 et ajustée pendant l'implémentation. Points ouverts : §13.
+>
+> **v3 en conception** (interview du 2026-10-15) : lisibilité, sélection, analyse et graphiques (§14),
+> consommations mesurées (§6.5), métadonnée `extensive` (§3.3). Découpage et versions : §12.
 
 ---
 
@@ -109,6 +112,12 @@ Toutes les entités (`Site`, `Building`, `Envelope`, systèmes, `Meter`) hérite
 - Les attributs **descriptifs** sont « sourcés » (§4). Les **identifiants et relations** (`id`, `rnb_id`,
   listes d'enfants, `scope`, `serves`) sont des valeurs simples.
 - Tous les attributs sourcés sont optionnels : une valeur inconnue vaut `None`.
+- **Grandeurs extensives** (v3) : un attribut qui s'additionne d'une entité à l'autre (comptage,
+  surface, puissance, coefficient de déperdition) est déclaré `sourced(..., extensive=True)`. C'est la
+  métadonnée qu'utilisent les agrégations (§14.3) et l'indicateur kWh/m² (§6.5). Elle est distincte de
+  `inherit=False` : `name` et `footprint` ne s'héritent pas non plus, mais ne s'additionnent pas. Un champ
+  ne peut pas être à la fois `extensive=True` et `inherit=True` (`InvalidArgumentError` à la définition
+  de la classe). Une sous-classe projet déclare ses propres champs extensifs de la même façon.
 - **Les collections (sites, bâtiments, systèmes, parois, compteurs) se modifient uniquement via les
   méthodes du parc ou des entités** (`new_*`, `add_*`, `remove`, `move`). Ces méthodes maintiennent l'index
   des ids, les liens vers le parent et les contrôles de cohérence. La modification directe des listes
@@ -196,7 +205,8 @@ retiré (`scope` d'un Meter, `serves` d'un système). Pour retirer aussi ces ré
 **Attributs descriptifs communs à Site et Building.** La colonne « Hérité » indique si un bâtiment, ou
 un sous-site, reprend la valeur de son site parent quand il n'a pas la sienne (§4.4). Les grandeurs
 **intensives** sont héritées. Les grandeurs **extensives** (comptages, surfaces) ne le sont jamais, pour
-éviter les doubles comptes.
+éviter les doubles comptes. Les champs extensifs (`extensive=True`, §3.3) sont `dwelling_count`,
+`footprint_area`, `floor_area` et `heated_area`.
 
 | Attribut | Type | Unité | Hérité | Description |
 |---|---|---|---|---|
@@ -261,6 +271,9 @@ La composition des parois (couches, matériaux) est hors périmètre.
 | `window_shgc` | sourcé `float` | – | oui | Facteur solaire moyen des vitrages |
 | `infiltration_q4pa` | sourcé `float` | m³/(h.m²) | oui | Perméabilité à l'air sous 4 Pa |
 | `components` | `list[EnvelopeComponent]` | | **non** | Description détaillée, vide si inconnue |
+
+`loss_area` et `heat_loss_coefficient` sont déclarés `extensive=True` (§3.3). L'enveloppe n'est pas
+agrégée en v3, mais la métadonnée est posée dès maintenant pour rester cohérente.
 
 **EnvelopeComponent**
 
@@ -485,7 +498,7 @@ b.set("construction_year", 1985, source="audit")   # valeur propre : masque l'h�
 
 - Les grandeurs extensives (`dwelling_count`, surfaces, `heat_loss_coefficient`…) ne sont **jamais**
   héritées. Une valeur posée sur un site vaut pour le site entier. Les agrégations (somme des bâtiments
-  comparée à la valeur du site) sont prévues en v3.
+  comparée à la valeur du site) sont décrites au §14.3.
 - Un champ ajouté par un projet choisit son comportement : `sourced(str, inherit=True)`. Par défaut, il n'est
   pas hérité.
 - Un bâtiment ou un site sans parent n'hérite de rien.
@@ -592,6 +605,7 @@ Règles :
 | `channels` | `list[Channel]` | Grandeurs mesurées (une colonne par grandeur) |
 | `data_source` | `DataSource \| None` | Où lire les données (nommé ainsi pour ne pas confondre avec la `source` de provenance) |
 | `original_data_source` | `DataSource \| None` | Source d'origine, conservée après `save(include_data=True)` |
+| `parent_meter` | `str \| None` | (v3) Id du compteur dont celui-ci est un **sous-compteur**. `None` = compteur de tête. Sert aux consommations (§6.5) : seuls les compteurs de tête sont additionnés. Optionnel, donc le JSON v2 reste lisible |
 | `bloc`, `sub_bloc` | `str \| None` | Surcharge des tags tide ; `None` = valeur dérivée (§6.4). `meter.tide_tags()` renvoie le couple effectif |
 | `data` | `pd.DataFrame \| None` | Données en mémoire, **non sérialisées en JSON** |
 
@@ -686,6 +700,88 @@ Plumber(df).show()
   `NoDataWarning`.
 - `park.meters_for(entité)` et `entité.find_meters()` renvoient les compteurs dont le `scope` contient l'entité
   ou un de ses systèmes propres.
+
+### 6.5 Consommations et indicateurs (v3)
+
+Bilan d'énergie finale par entité, par énergie et par usage sur une période, et indicateur en kWh/m². Les
+deux méthodes portent sur une `Selection` (§14.2) et renvoient un DataFrame. Elles ne modifient pas le
+modèle.
+
+```python
+sel = park.select(within="gs-a")
+sel.consumption(start="2024-01-01", end="2025-01-01")                  # une ligne par entité et énergie
+sel.consumption(start="2022-01-01", end="2025-01-01", freq="YS")       # une ligne par année
+sel.consumption(..., breakdown=True)                                   # ventilation par usage
+sel.consumption(..., split="heated_area")                              # répartition au prorata
+sel.intensity(start="2024-01-01", end="2025-01-01", area="heated_area")  # kWh/m²
+```
+
+**Frontière avec tide.** bstock additionne des énergies, sans traiter de série temporelle :
+- un canal `name="energy"` est **sommé** sur la période ;
+- un canal `name="index"` donne **dernier relevé moins premier relevé** de la période. Un écart négatif
+  (compteur remis à zéro) donne une valeur manquante et un `NoDataWarning` ;
+- une puissance (`"power"`) n'est **pas** intégrée. Il faut la convertir en énergie avec tide, puis
+  l'affecter par `meter.data = ...` (§6.3). Un compteur sans canal `energy` ni `index` est ignoré avec un
+  `NoDataWarning`. S'il a les deux canaux, `energy` est utilisé ;
+- unités acceptées : `Wh`, `kWh`, `MWh`, `GWh`, converties en **kWh**. Une autre unité lève
+  `TimeSeriesError` ;
+- énergie finale seulement : pas de coefficient d'énergie primaire, pas de correction climatique (DJU).
+
+**Période.** `start` (inclus) et `end` (exclu), dates ou horodatages. Un horodatage sans fuseau est lu
+dans le fuseau `tz` (`"Europe/Paris"` par défaut, car les périodes calendaires sont une notion métier
+locale). Chaque échantillon est rangé selon son horodatage, qui est lu comme le **début** de son pas de
+temps. Avec `freq="YS"` (années) ou `freq="MS"` (mois), la fenêtre est découpée en périodes calendaires
+dans le fuseau `tz` : c'est une somme par période, pas un rééchantillonnage. La colonne `coverage` donne
+la part de la période couverte par des données : nombre d'échantillons non manquants × `timestep` /
+durée de la période. Si `timestep` est vide, il est déduit de l'écart médian entre échantillons. Pour un
+index, la couverture va du premier au dernier relevé. Il n'y a **jamais d'extrapolation**.
+
+**Compteurs retenus.**
+- Seuls les compteurs de tête (`parent_meter=None`) sont additionnés, ce qui évite de compter deux fois
+  un compteur général et ses sous-compteurs.
+- Chaque id du `scope` est ramené à son **porteur** : un système à son bâtiment ou à son site.
+- Sélection de bâtiments : on retient les compteurs dont un porteur est un bâtiment sélectionné, ou un
+  site ancêtre d'un bâtiment sélectionné.
+- Sélection de sites : on retient les compteurs dont un porteur est dans le sous-arbre d'un site
+  sélectionné.
+- Un compteur sans données en mémoire est ignoré avec un `NoDataWarning`, sauf avec `load_data=True`
+  (comme `timeseries`, §6.4).
+
+**Lignes.**
+- Sélection de bâtiments : une ligne au niveau du `scope` de chaque compteur. Il n'y a **pas de
+  répartition par défaut**. Un compteur de site apparaît sur la ligne du site. Un compteur qui couvre
+  plusieurs entités apparaît sur une ligne dont l'`entity` est la liste des ids joints par `+`. Un
+  bâtiment sans compteur n'a pas de ligne.
+- Sélection de sites : une ligne par site sélectionné, qui additionne les compteurs de tête de son
+  sous-arbre. Les lignes de sites imbriqués se recouvrent et ne s'additionnent donc pas entre elles.
+
+**Ventilation par usage** (`breakdown=True`). Un compteur de tête qui a des sous-compteurs directs est
+remplacé par une ligne par `end_use` de ses sous-compteurs. Une ligne `end_use="other"` reçoit le reste :
+tête moins somme des sous-compteurs. Un reste négatif émet un `NoDataWarning` et reste affiché tel quel.
+Un sous-compteur d'une autre énergie que sa tête lève `TimeSeriesError`. Seul le premier niveau de
+sous-compteurs est ventilé.
+
+**Répartition** (`split="<champ extensif>"`). Une ligne de site ou de groupe est répartie sur les
+bâtiments qu'elle couvre (sous-arbre du site, ou bâtiments du `scope`) au prorata de la valeur effective
+du champ. Seules les parts des bâtiments sélectionnés sont gardées. Ces lignes ont `estimated=True`. Si
+un des bâtiments couverts n'a pas de valeur, la ligne n'est pas répartie et un `NoDataWarning` le
+signale. Un champ non extensif lève `InvalidArgumentError`.
+
+**Colonnes de `consumption()`** (format long, une ligne par entité × période × énergie × usage) :
+`entity`, `period` (début de la période, absent sans `freq`), `energy_type`, `end_use`, `energy`
+(kWh), `coverage` (0 à 1), `estimated` (bool), `meters` (liste des ids de compteurs).
+
+**`intensity(area="heated_area", prefer="buildings", **mêmes paramètres)`** ajoute `area` (m²) et
+`intensity` (kWh/m²) à `consumption()`. La surface est prise au niveau de la ligne. Pour un bâtiment,
+c'est sa valeur effective. Pour un site, c'est la valeur retenue par l'agrégation (§14.3, règle
+`prefer`). Pour une ligne qui couvre plusieurs entités, c'est la somme de leurs surfaces. Si une de ces
+surfaces manque, `area` et `intensity` sont manquants. `area` doit être un champ extensif
+(`InvalidArgumentError` sinon).
+
+**Contrôles de `parent_meter`.** L'id doit exister dans le parc. Il ne peut désigner ni le compteur
+lui-même, ni un de ses descendants (pas de cycle). Ces contrôles ont lieu à `add_meter` et à
+l'affectation, avec les mêmes erreurs que pour `scope`. `park.remove` d'un compteur qui en a d'autres
+pour parent lève `EntityInUseError`, sauf avec `force=True`, qui remet leur `parent_meter` à `None`.
 
 ---
 
@@ -1081,6 +1177,11 @@ src/bstock/
   sources.py           # DataSource, CsvSource, ParquetSource, registre
   io.py                # to_json/from_json, save/load, JSON Schema
   export.py            # to_dataframe, to_geodataframe, GeoPackage, GeoParquet (§9)
+  display.py           # v3 : repr, tree() / TreeView, describe(), HTML (§14.1)
+  selection.py         # v3 : Selection, critères (§14.2)
+  analysis.py          # v3 : agrégations, complétude, provenance (§14.3, §14.4)
+  consumption.py       # v3 : consommations et kWh/m² (§6.5)
+  plot.py              # v3 : accesseur Selection.plot, extra [plot] (§14.5)
   _geometry.py         # validation GeoJSON, aire de l'emprise (sans dépendance)
   _deps.py             # import des dépendances optionnelles (MissingDependencyError)
   connectors/          # RNB, BDNB, DPE (§8.1)
@@ -1110,9 +1211,13 @@ scripts/               # outils de maintenance (régénération de dpe_generator
 |---|---|
 | **v1** | Modèle (Park, Site, Building, Envelope, systèmes, Meter), provenance multi-sources, extension par héritage, sources CSV/Parquet, `timeseries()` au format tide, save/load JSON + Parquet, JSON Schema |
 | **v2** | Connecteurs API RNB, BDNB, DPE (§8) avec suggestions d'appariement RNB ; exports `to_dataframe()`, `to_geodataframe()`, GeoPackage, GeoParquet (§9) ; emprise au sol `footprint` et `compute_footprint_area()` (§3.6) |
-| v3 | Filtrage (`park.buildings.filter(...)`), agrégations par site ou par parc (grandeurs extensives), rapport de complétude et de provenance |
+| v3.a (0.4.0) | Lisibilité : repr, `tree()`, `describe()`, HTML Jupyter (§14.1) ; retrait des noms dépréciés ci-dessous |
+| v3.b (0.5.0) | Sélection : `park.select(...)`, `Selection` (§14.2) |
+| v3.c (0.6.0) | Analyse : métadonnée `extensive` (§3.3), agrégations (§14.3), complétude et provenance (§14.4) |
+| v3.d (0.7.0) | Consommations mesurées et kWh/m², `Meter.parent_meter` (§6.5) |
+| v3.e (0.8.0) | Graphiques plotly : `sel.plot.*` (§14.5) |
 
-Noms dépréciés (ils émettent un `DeprecationWarning` et seront retirés en v3) :
+Noms dépréciés (ils émettent un `DeprecationWarning` et seront retirés en v3.a) :
 
 | Ancien nom | Remplacé par |
 |---|---|
@@ -1127,6 +1232,238 @@ Noms dépréciés (ils émettent un `DeprecationWarning` et seront retirés en v
 
 1. Bâtiment client qui couvre **plusieurs ID RNB** : il se modélise comme un site contenant ces bâtiments.
    À valider à l'usage.
+2. Valeurs proposées pour la v3, à confirmer pendant l'implémentation : troncature du repr à 30 lignes
+   (§14.1), tolérance relative des conflits `rtol=0.05` (§14.4), fuseau des périodes de consommation
+   `tz="Europe/Paris"` (§6.5).
+3. `aggregate(by=...)` ignore les valeurs propres des sites (§14.3). Si le besoin apparaît, une option
+   pourrait les rattacher à un groupe.
+
+---
+
+## 14. Exploration et analyse (v3)
+
+Décisions issues de l'interview du 2026-10-15 (tableau E1 à G2 de `PLAN.md`). Les consommations
+mesurées sont au §6.5.
+
+### 14.1 Lisibilité (v3.a)
+
+**Règle des repr.** Le repr dépend du rôle de l'objet.
+- **Conteneurs** (`BuildingPark`, `Site`) : on les tape seuls dans une cellule pour avoir une vue
+  d'ensemble. Leur repr est un **arbre résumé**, précédé d'une ligne de comptage et tronqué au-delà de
+  30 lignes, avec une dernière ligne qui indique le nombre de lignes masquées. C'est `str(x.tree())`
+  avec les paramètres par défaut.
+- **Entités feuilles** (`Building`, systèmes, `Meter`, `Envelope`, parois) : on les voit dans des listes
+  et des messages. Leur repr tient sur **une ligne** : nom de la classe (celle du projet le cas échéant),
+  `id`, puis quelques valeurs clés non vides. Pour un bâtiment : `rnb_id` s'il diffère de l'`id`, `name`,
+  `parent`. Pour un générateur : `technology`, `energy_type`, `nominal_power` avec son unité. Pour un
+  compteur : `energy_type`, `end_use`, `scope`, et si des données sont en mémoire.
+  Exemple : `BayonneBuilding(id='A1B2C3D4E5F6', name='École Jean Jaurès', parent='gs-a')`.
+
+```
+BuildingPark 'Ville de Bayonne' : 3 sites, 12 buildings, 4 meters
+├── [site] gs-a  Groupe scolaire A  (3 buildings)
+│   ├── [site] bdnb-bg-1111-1HRT-8SVH  (2 buildings)
+│   │   ├── [building] A1B2C3D4E5F6  École Jean Jaurès
+│   │   └── [building] B2C3D4E5F6G7
+│   └── [building] C3D4E5F6G7H8  Gymnase
+└── [building] bldg-1f3a  Mairie annexe
+… 18 more lines: park.tree() shows the full tree
+```
+
+**`tree(*, systems=False, meters=False, max_depth=None, fields=None)`** est défini sur `BuildingPark`,
+`Site` et `Selection` (§14.2). Il renvoie un objet `TreeView`. Son `str()` et son repr donnent le texte
+complet, sans troncature. Son `_repr_html_` donne la version HTML.
+- Par défaut, l'arbre montre les sites et les bâtiments, dans l'ordre de `iter_sites` / `iter_buildings`.
+- Chaque nœud affiche son type, son `id` et son `name`. Un site affiche aussi le nombre de bâtiments de
+  son sous-arbre.
+- `fields=["usage", "heated_area"]` ajoute les **valeurs effectives** de ces champs (héritage compris),
+  avec leur unité. Un champ inconnu lève `UnknownFieldError`.
+- `systems=True` ajoute les systèmes propres sous leur porteur (`[heating] id  name`). `meters=True`
+  ajoute les compteurs sous chaque porteur de leur `scope` (un compteur à plusieurs porteurs apparaît
+  plusieurs fois).
+- `max_depth=n` coupe l'arbre au niveau `n` (1 = premier niveau). Un nœud coupé indique ce qu'il
+  contient (`… 5 buildings`).
+
+**`describe()`** est défini sur toute entité sourcée (Site, Building, Envelope, systèmes, Meter). Il
+renvoie un DataFrame avec une ligne par attribut sourcé, dans l'ordre de déclaration, y compris ceux de la
+sous-classe projet et ceux qui n'ont pas de valeur. L'index est le nom de l'attribut. Colonnes : `value`
+(valeur effective, enums rendus par leur valeur), `unit`, `source` (source retenue), `provider` (id de
+l'entité qui fournit la valeur), `inherited` (bool) et `candidates` (nombre de candidats propres).
+
+**HTML (Jupyter).** `BuildingPark`, `Site`, `Selection` et `TreeView` ont un `_repr_html_`. C'est un arbre
+repliable en `<details>` imbriqués, sans JavaScript, avec un style intégré. Le premier niveau est ouvert,
+les autres sont fermés. L'arbre HTML n'est pas tronqué, puisqu'il est repliable. Les entités feuilles
+n'ont pas de HTML propre : Jupyter affiche leur repr texte.
+
+### 14.2 Sélection (v3.b)
+
+```python
+sel = park.select(usage="education", construction_year__lt=1975, within="gs-a")
+sel = sel.filter(heated_area__isnull=False)
+sel = park.select(lambda b: b.height is not None and b.height > 2 * b.level_count, kind="building")
+écoles_sans_rnb = park.select(usage="education") - park.select(has_rnb_id=True)
+len(sel); list(sel); "A1B2C3D4E5F6" in sel; sel.ids; sel.kind
+sel.to_dataframe(provenance=True); sel.tree(fields=["usage"])
+```
+
+`park.select(predicate=None, *, kind="building", **criteria)` renvoie une `Selection`. Sans critère, la
+sélection contient toutes les entités du `kind` : `park.select()` est le point d'entrée des analyses sur
+tout le parc. `kind` vaut `"building"` ou `"site"` : une sélection ne mélange jamais les deux. Un autre
+`kind` lève `UnknownKindError`. Les systèmes et les compteurs ne se sélectionnent pas : leurs filtres
+existent déjà (`iter_systems(kind)`, `timeseries(...)`).
+
+**`Selection`** :
+- C'est un **instantané** : elle retient les ids et le parc au moment de sa création. Elle se parcourt
+  dans l'ordre de l'arbre et rend les entités du parc. Si une entité a été retirée du parc depuis,
+  l'utilisation de la sélection lève `UnknownIdError`. Pour tenir compte des changements du parc, on
+  refait la sélection.
+- `sel.filter(predicate=None, **criteria)` renvoie une nouvelle sélection, plus restreinte, du même
+  `kind`.
+- Opérations d'ensemble `sel_a | sel_b`, `sel_a & sel_b` et `sel_a - sel_b`. Les deux sélections doivent
+  avoir le même parc et le même `kind` (`InvalidArgumentError` sinon). L'ordre du résultat est celui de
+  l'arbre.
+- Méthodes : `to_dataframe(provenance=False)` (§9, restreint aux entités sélectionnées), `tree(...)`
+  (§14.1 : entités sélectionnées et leurs sites ancêtres), `aggregate`, `completeness`, `provenance`,
+  `conflicts` (§14.3, §14.4), `consumption`, `intensity` (§6.5) et l'accesseur `plot` (§14.5).
+- Repr sur une ligne : `Selection(kind='building', 42 entities)`. En HTML, c'est l'arbre de la sélection.
+
+**Critères.** Tous les critères se combinent par ET, et le prédicat aussi. Ils portent sur la **valeur
+effective**, héritage compris : un bâtiment qui hérite `usage="education"` de son site est retenu.
+
+| Forme | Sens |
+|---|---|
+| `attr=v` | Valeur effective égale à `v`. Une enum accepte sa chaîne |
+| `attr__in=[...]` | Valeur dans la liste |
+| `attr__lt`, `__le`, `__gt`, `__ge` | Comparaison |
+| `attr__isnull=True / False` | Valeur absente / présente |
+| `attr__contains=v` | Attribut liste (`sub_usages`, `dpe_ids`) qui contient `v` |
+| `within=site` | Dans le sous-arbre du site (objet ou id), à toute profondeur. Pour `kind="site"`, il s'agit des descendants stricts |
+| `parent=site` | Parent direct égal à `site` ; `parent=None` désigne le premier niveau |
+| `has_rnb_id=True / False` | Bâtiments seulement |
+| `has_meter=True / False` | `find_meters()` non vide / vide |
+| `has_system="heating"` (ou `True`) | Bâtiment : au moins un système de ce `kind` qui le dessert, systèmes partagés compris (`serving_systems`). Site : au moins un système propre |
+
+- Les attributs utilisables sont les attributs sourcés de la classe (y compris ceux du projet), `rnb_id`,
+  les ids BDNB et `dpe_ids`.
+- Un attribut inconnu lève `UnknownFieldError`. Un opérateur inconnu ou un critère de structure
+  inadapté au `kind` (`has_rnb_id` sur des sites, par exemple) lève `InvalidArgumentError`.
+- Une valeur absente ne satisfait aucune comparaison, sauf `__isnull=True`.
+- Le prédicat reçoit l'entité. Ses exceptions ne sont pas interceptées.
+- Il n'y a pas de critère sur la provenance : pour cela, on passe par
+  `to_dataframe(provenance=True)` et pandas.
+
+### 14.3 Agrégations (v3.c)
+
+Les agrégations renvoient un DataFrame et **ne modifient jamais le modèle** : aucun candidat
+`"aggregated"` n'est posé.
+
+```python
+park.select().aggregate()                           # champs extensifs, par site, avec un total parc
+park.select(within="gs-a").aggregate(["heated_area"], prefer="site")
+park.select().aggregate(by="usage")                 # regroupement des bâtiments par valeur effective
+```
+
+`sel.aggregate(fields=None, *, by=None, prefer="buildings")`. Par défaut, `fields` contient tous les champs
+extensifs (§3.3) de `building_cls`. Un champ non extensif lève `InvalidArgumentError`.
+
+**Le double compte.** Prenons un site « Résidence X » qui a `heated_area = 3 000 m²` (DPE immeuble), et
+ses 3 bâtiments qui ont leurs propres valeurs : 1 000 + 1 200 + 700 = 2 900 m². Additionner les deux
+donnerait 5 900 m², ce qui est faux. bstock ne choisit pas silencieusement : il montre les deux valeurs.
+
+**Mode hiérarchique** (`by=None`). On a une ligne par site concerné, puis une ligne `park` pour le total.
+- Pour une sélection de bâtiments, les sites concernés sont les ancêtres d'au moins un bâtiment
+  sélectionné, et seuls les bâtiments sélectionnés sont comptés.
+- Pour une sélection de sites, ce sont les sites sélectionnés, avec tous les bâtiments de leur
+  sous-arbre.
+
+Les colonnes forment un `MultiIndex` (champ, mesure) :
+
+| Mesure | Sens |
+|---|---|
+| `buildings` | Somme des valeurs effectives des bâtiments comptés du sous-arbre (valeurs connues seulement) |
+| `site` | Valeur propre du site, sans héritage puisque le champ est extensif |
+| `delta` | `site − buildings`, quand les deux existent |
+| `coverage` | Part des bâtiments comptés qui ont une valeur (0 à 1) |
+| `total` | Valeur retenue selon `prefer` (voir ci-dessous) |
+
+Plus des colonnes de comptage : `building_count` (bâtiments comptés), et pour chaque `kind` de système
+`<kind>_count`, puis `meter_count`.
+
+**Règle `prefer`** pour `total`. Elle se calcule de bas en haut. Pour un bâtiment, `total` est sa valeur.
+Pour un site :
+- `prefer="buildings"` : `total` est la somme des `total` de ses enfants (bâtiments comptés et
+  sous-sites). Si aucun enfant n'a de valeur, on prend la valeur propre du site.
+- `prefer="site"` : `total` est la valeur propre du site si elle existe, sinon la somme des `total` de ses
+  enfants.
+
+La ligne `park` additionne les `total` du premier niveau. Un même bâtiment n'est donc jamais compté deux
+fois dans un `total`. **Pas d'extrapolation** : une valeur manquante n'est pas estimée, et `coverage`
+montre ce qui manque.
+
+**Puissances des systèmes.** Des colonnes `heating_power`, `cooling_power` et `dhw_power` (somme des
+`nominal_power`, kW) et `pv_peak_power` (somme des `peak_power`, kWp), avec les mesures `value` et
+`coverage` (part des systèmes qui ont une valeur). Un système est attaché à une seule entité : il est
+compté une fois, sur son porteur, et remonte dans les sites ancêtres. Il n'y a donc pas de conflit
+site / bâtiments. Pour une sélection de bâtiments, un système de site est compté s'il dessert au moins un
+bâtiment sélectionné.
+
+**Regroupement par attribut** (`by="usage"`, ou tout attribut sourcé). On a une ligne par valeur effective
+des bâtiments sélectionnés, plus une ligne `<NA>` pour les bâtiments sans valeur. Les mesures sont
+`buildings`, `coverage` et `building_count`. Les valeurs propres des sites sont ignorées, parce qu'elles
+ne se rattachent à aucun groupe. Si un site concerné en a une pour un champ agrégé, un `NoDataWarning` le
+signale. `by` n'est accepté que pour une sélection de bâtiments.
+
+### 14.4 Complétude et provenance (v3.c)
+
+```python
+sel.completeness()                    # par attribut
+sel.completeness(by="entity")         # par entité
+sel.provenance()                      # répartition des sources
+sel.conflicts(rtol=0.05)              # candidats en désaccord
+```
+
+Par défaut, `fields` contient tous les attributs sourcés de la classe des entités sélectionnées (projet
+compris, `footprint` compris). L'enveloppe et les systèmes ne sont pas couverts en v3.
+
+**`completeness(by="attribute", fields=None)`.** Une valeur héritée compte comme renseignée.
+- `by="attribute"` : une ligne par attribut. Colonnes `filled` (nombre d'entités avec une valeur
+  effective), `inherited` (dont valeurs héritées), `total` et `rate` (`filled / total`).
+- `by="entity"` : une ligne par entité. Colonnes `filled`, `total`, `rate` et `missing` (liste des
+  attributs sans valeur).
+
+**`provenance(fields=None, normalize=False)`.** Une ligne par attribut et une colonne par source retenue
+(nombre d'entités dont la valeur effective vient de cette source). S'y ajoutent les colonnes `inherited`
+(dont valeurs héritées, toutes sources confondues) et `missing`. Avec `normalize=True`, on obtient des
+parts plutôt que des nombres.
+
+**`conflicts(fields=None, rtol=0.05)`.** Une ligne par entité et par attribut dont les **candidats
+propres** ne sont pas d'accord. Les valeurs héritées ne sont pas comparées : un autre niveau n'est pas un
+conflit.
+- Les chaînes, les enums, les listes et les entiers sont comparés strictement. Une année 1970 contre 1972
+  est donc un conflit.
+- Les flottants sont comparés avec la tolérance relative `rtol` (rapportée à la plus grande valeur
+  absolue).
+- Colonnes : `entity`, `attribute`, `values` (dict source → valeur), `retained` (source retenue).
+
+### 14.5 Graphiques (v3.e)
+
+Les graphiques sont des méthodes de l'accesseur `sel.plot`, dans le style de `df.plot` de pandas. Le code
+est dans `plot.py`. plotly (extra `[plot]`) est importé à l'appel ; sans lui, l'appel lève
+`MissingDependencyError`. Chaque méthode **renvoie une `plotly.graph_objects.Figure`** sans l'afficher.
+On la personnalise ensuite avec `fig.update_layout(...)`.
+
+| Méthode | Graphique | Données |
+|---|---|---|
+| `plot.completeness(by="attribute", fields=None)` | Barres horizontales du taux, avec la part héritée en couleur distincte | §14.4 |
+| `plot.provenance(fields=None)` | Barres empilées des sources par attribut (parts) | §14.4 |
+| `plot.aggregate(field, by=None, prefer="buildings")` | Barres de `total` par site (ou par groupe `by`), avec la couverture au survol | §14.3 |
+| `plot.distribution(field, bins=None)` | Histogramme pour un nombre ; barres de fréquence pour une enum ou une chaîne | Valeurs effectives |
+| `plot.map(geometry="point", color=None)` | Carte sur fond OpenStreetMap (sans clé d'API) : points `lat` / `lon` ou emprises `footprint` (GeoJSON WGS84, sans l'extra `[geo]`), colorés par un attribut | Valeurs effectives |
+| `plot.consumption(start, end, freq=None, by="energy_type")` | Barres empilées de la consommation (kWh) par entité, empilées par énergie (`by="energy_type"`) ou par usage (`by="end_use"`) ; une barre par période avec `freq` | §6.5 |
+| `plot.intensity(start, end, area="heated_area", freq=None)` | Barres du kWh/m² par entité, empilées par énergie | §6.5 |
+
+Une entité sans valeur n'est pas tracée, et le titre indique la couverture (« 34 / 42 bâtiments »). Les
+unités des champs (métadonnée `unit`) étiquettent les axes.
 
 ---
 
