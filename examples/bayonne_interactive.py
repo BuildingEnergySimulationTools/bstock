@@ -130,6 +130,12 @@ columns += ["construction_year_provider", "heated_area", "code_patrimoine"]
 park.to_dataframe(provenance=True)[columns]
 
 
+# %% select on effective values, inheritance included: tertiary buildings without heated area
+missing = park.select(usage="tertiary", heated_area__isnull=True)
+print(missing.ids)
+missing.tree(fields=["usage", "heated_area"])
+
+
 # %% 4. detailed envelope from an audit: the computed U_bat beats the DPE value
 for component in (
     EnvelopeComponent(id="walls", kind="wall", area=900.0, u_value=1.1),

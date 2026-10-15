@@ -96,6 +96,11 @@ columns += ["height", "footprint_area", "footprint_area_source"]
 park.to_dataframe(provenance=True)[columns]
 
 
+# %% buildings the sources left without construction year, and where they are
+undated = park.select(construction_year__isnull=True)
+undated.tree()
+
+
 # %% all candidates of one value, e.g. the footprint area of the first building
 first = next(park.iter_buildings())
 print(first)

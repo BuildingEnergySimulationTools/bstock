@@ -7,7 +7,7 @@ Règles (voir `CLAUDE.md`) :
 
 Sommaire : [v1](#v1--terminée) (terminée, 0.1.0 puis ajustements d'API en 0.2.0) ·
 [v2](#v2--connecteurs-emprise-et-exports) (terminée, 0.3.0) ·
-[v3](#v3--lisibilité-sélection-analyse-consommations-graphiques) (en cours ; v3.a terminée, 0.4.0)
+[v3](#v3--lisibilité-sélection-analyse-consommations-graphiques) (en cours ; v3.a et v3.b terminées, 0.5.0)
 
 ---
 
@@ -343,7 +343,7 @@ Reportées dans `SPEC.md` (§3.3, §3.6, §3.7, §6.1, §6.5, §11 à §14) à l
 - [x] Tests : valeur héritée retenue, valeur absente, chaque opérateur (paramétré), `within` à plusieurs
       niveaux, `has_system` avec un système partagé, entité retirée après la sélection, parcs ou `kind`
       différents
-- [ ] Finalisation 0.5.0 (API publique, docstrings, README, version et tag)
+- [x] Finalisation 0.5.0 (API publique, docstrings, README, exemples, version et tag)
 
 ## v3.c — Analyse (0.6.0)
 

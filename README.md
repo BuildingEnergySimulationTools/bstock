@@ -16,6 +16,9 @@ Common data structure for building stocks: sites, buildings, envelopes, systems 
   (energy performance certificates, ADEME), with RNB match suggestions for buildings without RNB id.
 - **Exports**: DataFrame with provenance, GeoDataFrame, GeoPackage and GeoParquet; footprints as
   GeoJSON with a dependency-free area computation.
+- **Selections**: `park.select(usage="tertiary", construction_year__lt=1975, within="school-A")`
+  filters buildings or sites on their effective values, with operators, structure criteria and set
+  operations.
 - **Readable in a console or a notebook**: a park or a site displays as a tree (foldable HTML in
   Jupyter), other entities on one line, and `describe()` lists the effective values with their
   source.
@@ -83,6 +86,24 @@ park["A1B2C3D4E5F6"].describe()        # value, unit, source, provider, inherite
 ```
 
 In Jupyter, the park, its sites and `tree()` display as a foldable HTML tree.
+
+## Selecting buildings
+
+```python
+sel = park.select(usage="tertiary", construction_year__lt=1975)    # effective values, inherited too
+sel = sel.filter(heated_area__isnull=False)                         # narrow it down
+park.select(within="school-A") - park.select(has_rnb_id=True)     # set operations: | & -
+park.select(lambda b: (b.height or 0) > 10, has_system="heating")  # any predicate, structure criteria
+park.select(kind="site", parent=None)                              # top-level sites
+
+len(sel), list(sel), sel.ids
+sel.to_dataframe(provenance=True)      # the rows of the selected buildings
+sel.tree(fields=["construction_year"]) # the selected buildings and their sites
+```
+
+Operators: `__in`, `__lt`, `__le`, `__gt`, `__ge`, `__isnull`, `__contains`. Structure criteria:
+`within`, `parent`, `has_rnb_id`, `has_meter`, `has_system`. A selection is a snapshot of ids: select
+again after changing the park.
 
 ## Examples
 

@@ -78,6 +78,9 @@ def main(
     with pd.option_context("display.width", 200):
         print(park.to_dataframe(provenance=True)[columns].to_string())
 
+    # buildings the sources left without construction year, and where they are
+    print(park.select(construction_year__isnull=True).tree())
+
     # 6. exports
     try:
         park.to_geopackage(output / "nobatek.gpkg")

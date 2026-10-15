@@ -118,6 +118,10 @@ def main(output: Path) -> BuildingPark:
     print(f"A usage {a.usage} inherited from {a.provider_id('usage')}")
     print(a.describe().loc[["construction_year", "usage", "heated_area"]].to_string())
 
+    # Select on effective values, inheritance included: tertiary buildings without heated area.
+    missing = park.select(usage="tertiary", heated_area__isnull=True)
+    print(missing.tree(fields=["usage", "heated_area"]))
+
     # Detailed envelope from an audit, then the computed U_bat beats the DPE value.
     for component in (
         EnvelopeComponent(id="walls", kind="wall", area=900.0, u_value=1.1),
