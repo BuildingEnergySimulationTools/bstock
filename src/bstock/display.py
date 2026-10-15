@@ -225,7 +225,7 @@ class _TreeBuilder:
             if self.systems:
                 nodes.extend(_Node(_system_label(s)) for s in entity.iter_systems())
             if self.meters and self.park is not None:
-                nodes.extend(_Node(_meter_label(m)) for m in self.park.meters_for(entity))
+                nodes.extend(_Node(_meter_label(m)) for m in self.park._meters_for(entity))
         if isinstance(entity, Site):
             nodes.extend(self.children(entity, depth))
         return nodes

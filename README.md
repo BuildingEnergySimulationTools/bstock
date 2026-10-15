@@ -60,7 +60,7 @@ school = park.new_site("school-A", name="School A")
 group = park.new_site("bdnb-bg-1111-1HRT-8SVH", parent=school)
 group.set("construction_year", 1972, source="bdnb")
 
-b = park.new_building("A1B2C3D4E5F6", parent=group, asset_code="BAT-0042", source="client")
+b = park.new_building(rnb_id="A1B2C3D4E5F6", parent=group, asset_code="BAT-0042", source="client")
 b.set("construction_year", 1974, source="audit")
 b.construction_year                    # 1974: own value, audit
 b.construction_year = None             # removes the "manual" candidate only: still 1974

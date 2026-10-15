@@ -20,7 +20,7 @@ def park():
     park = BuildingPark(name="Bayonne")
     park.new_site("ecole", lat=43.49, lon=-1.47, footprint=MULTI, dpe_ids=["2664E2519948T"])
     park.new_building(
-        "A1B2C3D4E5F6",
+        rnb_id="A1B2C3D4E5F6",
         parent="ecole",
         footprint=FOOTPRINT,
         sub_usages=["school", "canteen"],

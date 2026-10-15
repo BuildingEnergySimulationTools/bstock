@@ -23,7 +23,7 @@ def park():
     park = BuildingPark(name="P")
     gs = park.new_site("gs", usage="tertiary", construction_year=1960)
     group = park.new_site("group", parent=gs)
-    park.new_building(RNB, id="b1", parent=group, heated_area=1000.0, sub_usages=["school"])
+    park.new_building(rnb_id=RNB, id="b1", parent=group, heated_area=1000.0, sub_usages=["school"])
     park.new_building(id="b2", parent=group, construction_year=1990)
     park.new_building(id="b3", parent=gs, name="Gym", heated_area=500.0)
     other = park.new_site("other", usage="residential_collective")

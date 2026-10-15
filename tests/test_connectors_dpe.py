@@ -199,7 +199,7 @@ def test_tertiary_heating_energy_only(line):
 
 
 def test_building_is_enriched_from_its_rnb_id(park, client):
-    building = park.new_building(IMMEUBLE_RNB)
+    building = park.new_building(rnb_id=IMMEUBLE_RNB)
     report = dpe.enrich(park, client=client)
     assert report.enriched == [IMMEUBLE_RNB]
     assert building.construction_year == 1838
@@ -222,7 +222,7 @@ def test_building_is_enriched_from_its_rnb_id(park, client):
 
 
 def test_running_twice_is_idempotent(park, client):
-    park.new_building(IMMEUBLE_RNB)
+    park.new_building(rnb_id=IMMEUBLE_RNB)
     dpe.enrich(park, client=client)
     first = park.to_json()
     dpe.enrich(park, client=client)
@@ -230,7 +230,7 @@ def test_running_twice_is_idempotent(park, client):
 
 
 def test_apartment_dpe_is_only_added_to_dpe_ids(park, client):
-    building = park.new_building(APARTMENT_RNB)
+    building = park.new_building(rnb_id=APARTMENT_RNB)
     report = dpe.enrich(park, client=client)
     assert building.dpe_ids == ["2664E2539952D"]
     assert building.values == {}
@@ -239,7 +239,7 @@ def test_apartment_dpe_is_only_added_to_dpe_ids(park, client):
 
 
 def test_apartment_dpe_leads_to_its_building_dpe(park, client):
-    building = park.new_building(FROM_BUILDING_RNB)
+    building = park.new_building(rnb_id=FROM_BUILDING_RNB)
     dpe.enrich(park, client=client)
     assert BUILDING_DPE in building.dpe_ids
     assert building.effective("dwelling_count").ref == BUILDING_DPE
@@ -258,7 +258,7 @@ def test_dpe_on_a_site_goes_to_the_site(park, client):
 
 
 def test_tertiary_dpe_enrichment(park, client):
-    building = park.new_building(TERTIARY_RNB)
+    building = park.new_building(rnb_id=TERTIARY_RNB)
     dpe.enrich(park, client=client)
     assert building.usage == BuildingUsage.TERTIARY
     assert building.heated_area == 153
@@ -266,12 +266,12 @@ def test_tertiary_dpe_enrichment(park, client):
 
 
 def test_building_without_dpe_is_not_found(park, client):
-    park.new_building("ZZZZZZZZZZZZ")
+    park.new_building(rnb_id="ZZZZZZZZZZZZ")
     assert dpe.enrich(park, client=client).not_found == ["ZZZZZZZZZZZZ"]
 
 
 def test_new_dpe_replaces_values_and_components(park, client, line):
-    building = park.new_building(IMMEUBLE_RNB)
+    building = park.new_building(rnb_id=IMMEUBLE_RNB)
     dpe.enrich(park, client=client)
     newer = {
         **line("2664T2231016O"),
@@ -290,8 +290,8 @@ def test_new_dpe_replaces_values_and_components(park, client, line):
 
 
 def test_explicit_buildings_only(park, client):
-    park.new_building(IMMEUBLE_RNB)
-    park.new_building(MAISON_RNB)
+    park.new_building(rnb_id=IMMEUBLE_RNB)
+    park.new_building(rnb_id=MAISON_RNB)
     report = dpe.enrich(park, [MAISON_RNB], client=client)
     assert report.enriched == [MAISON_RNB]
 

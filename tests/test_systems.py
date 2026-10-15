@@ -54,7 +54,7 @@ def test_systems_filter_accepts_member_or_string(kind):
     building = Building()
     boiler = building.add_system(HeatingGenerator())
     building.add_system(SolarPV())
-    assert building.serving_systems(kind) == [boiler]
+    assert building.find_serving_systems(kind) == [boiler]
     assert list(building.iter_systems(kind)) == [boiler]
 
 

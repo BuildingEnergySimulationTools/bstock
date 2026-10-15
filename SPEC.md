@@ -121,13 +121,17 @@ Toutes les entités (`Site`, `Building`, `Envelope`, systèmes, `Meter`) hérite
   `heat_loss_coefficient` de l'enveloppe (§3.7), `nominal_power` des générateurs et `peak_power` du PV
   (§3.8). La métadonnée figure dans `sourced_fields()` et dans le JSON Schema (`"extensive"`). Une sous-classe projet déclare ses propres champs extensifs de la même façon.
 - **Les collections (sites, bâtiments, systèmes, parois, compteurs) se modifient uniquement via les
-  méthodes du parc ou des entités** (`new_*`, `add_*`, `remove`, `move`). Ces méthodes maintiennent l'index
+  méthodes du parc ou des entités** (`new_*`, `add_*`, `remove*`, `move`). Ces méthodes maintiennent l'index
   des ids, les liens vers le parent et les contrôles de cohérence. La modification directe des listes
   est refusée : `park.sites`, `park.buildings`, `park.meters`, `site.sites`, `site.buildings`, les
   listes de systèmes (`heating`… `pv`) et `envelope.components` restent des `list` en lecture (index,
   itération, `==`), mais leurs méthodes de modification (`append`, `remove`, `sort`, `lst[i] = …`…) et
   leur réaffectation (`site.buildings = [...]`) lèvent `HierarchyError` en citant les méthodes à
   utiliser. Les listes d'ids (`scope`, `serves`, `dpe_ids`) ne sont pas concernées (§3.8).
+- **Verbes** : `new_*` crée et rattache une entité ; `add_*` rattache un objet déjà construit ;
+  `remove_*` (entité) et `remove` (parc, générique) le retirent ; toutes les méthodes qui désignent une
+  entité existante acceptent l'objet ou son id. `iter_*` parcourt l'arbre et renvoie un itérateur ;
+  `find_*` est une requête filtrée et renvoie une liste.
 
 ### 3.4 BuildingPark
 
@@ -147,7 +151,7 @@ Méthodes principales :
 | Méthode | Rôle |
 |---|---|
 | `new_site(id, *, parent=None, source=None, **attrs)` | Crée un site (instance de `site_cls`) au premier niveau ou sous `parent` |
-| `new_building(rnb_id=None, *, id=None, parent=None, source=None, **attrs)` | Crée un bâtiment (instance de `building_cls`) |
+| `new_building(*, id=None, rnb_id=None, parent=None, source=None, **attrs)` | Crée un bâtiment (instance de `building_cls`). Arguments nommés uniquement : `id` vaut `rnb_id` par défaut |
 | `add_site(site, parent=None)`, `add_building(building, parent=None)` | Ajoute un objet déjà construit (contrôle de classe et d'unicité des ids) |
 | `add_system(system, owner)` | Ajoute un système à un bâtiment ou à un site (`owner` = objet ou id) |
 | `add_meter(meter)` | Ajoute un compteur ; les ids du `scope` doivent exister |
@@ -183,10 +187,11 @@ Les deux se combinent : `Site « Groupe scolaire A » > Site « bdnb-bg-… » >
 Accès dérivés (non sérialisés) : `site.parent` (site parent ou `None`, comme `building.parent`), `site.park`,
 `site.iter_buildings(recursive=True)`, `site.iter_sites(recursive=True)`.
 
-Gestion des enfants au niveau du site : `site.add_site(s)`, `site.add_building(b)`, `site.detach(id)`. Site
-et Building ont aussi `add_system(system)` (rangé dans la liste de son `kind`), `remove_system(id)` et
-`iter_systems(kind=None)`. Quand l'entité appartient à un parc, ces méthodes mettent à jour l'index des ids
-du parc. `detach` et `remove_system` font sortir l'entité du parc avec les mêmes contrôles que
+Gestion des enfants au niveau du site : `site.add_site(s)`, `site.add_building(b)`, `site.remove_site(s)` et
+`site.remove_building(b)` (objet ou id d'un enfant direct). Site et Building ont aussi `add_system(system)`
+(rangé dans la liste de son `kind`), `remove_system(system)` (objet ou id) et `iter_systems(kind=None)`. Quand
+l'entité appartient à un parc, ces méthodes mettent à jour l'index des ids du parc. `remove_site`,
+`remove_building` et `remove_system` font sortir l'entité du parc avec les mêmes contrôles que
 `park.remove` : elles lèvent `EntityInUseError` si l'entité ou son contenu est référencé hors du sous-arbre
 retiré (`scope` d'un Meter, `serves` d'un système). Pour retirer aussi ces références, utiliser
 `park.remove(id, force=True)`.
@@ -250,7 +255,7 @@ et la priorité des sources arbitre avec la valeur de la BDNB.
 Accès dérivés du bâtiment (non sérialisés) :
 - `building.parent` : le site parent direct ou `None` ;
 - `building.park` : le parc ;
-- `building.serving_systems(kind="heating", include_shared=True)` : systèmes propres, plus systèmes des sites
+- `building.find_serving_systems(kind="heating", include_shared=True)` : systèmes propres, plus systèmes des sites
   ancêtres qui le desservent (`iter_systems()` ne donne que les systèmes propres) ;
 - `building.find_meters()` : compteurs dont le `scope` contient ce bâtiment ou un de ses systèmes.
 
@@ -319,7 +324,7 @@ env.compute_loss_area()              # Σ A des parois hors ponts thermiques
 env.compute_u_bat()                  # heat_loss_coefficient / loss_area (valeurs effectives)
 env.compute_window_shgc()  # moyenne des shgc pondérée par la surface des vitrages
 env.find_components(kind="window", orientation="s")   # filtrage
-env.add_component(c), env.remove_component(id)    # gestion des parois (ids uniques dans l'enveloppe)
+env.add_component(c), env.remove_component(c)     # gestion des parois (objet ou id, unique dans l'enveloppe)
 ```
 
 Un calcul impossible (aucune paroi, surface ou U manquant) lève `IncompleteDataError` en citant les parois
@@ -363,7 +368,7 @@ technologies génériques suivent leur famille : `BOILER` et `WATER_HEATER` comm
 `HEAT_PUMP` comme une PAC. Les PAC hybrides et le solaire thermique ne sont pas contrôlés.
 
 Chaque classe de système a un `kind` (`SystemKind` : `heating`, `cooling`, `dhw`, `ventilation`, `pv`) qui sert de préfixe
-aux ids générés et de filtre dans `building.serving_systems(kind=...)`.
+aux ids générés et de filtre dans `building.find_serving_systems(kind=...)`.
 
 `DHWGenerator` ajoute `storage_volume` (sourcé `float`, L) : volume de stockage, `None` = production
 instantanée ou inconnue (open data DPE : `volume_stockage_generateur_n*_ecs_n1`).
@@ -712,8 +717,8 @@ Plumber(df).show()
 - Les noms de colonnes commencent par l'id du compteur : ils sont donc uniques dans le parc.
 - Un compteur sélectionné sans données en mémoire (et sans `load_data=True`) est ignoré avec un
   `NoDataWarning`.
-- `park.meters_for(entité)` et `entité.find_meters()` renvoient les compteurs dont le `scope` contient l'entité
-  ou un de ses systèmes propres.
+- `entité.find_meters()` renvoie les compteurs dont le `scope` contient l'entité ou un de ses systèmes
+  propres (`park["id"].find_meters()` à partir d'un id).
 
 ### 6.5 Consommations et indicateurs (v3)
 
@@ -1384,7 +1389,7 @@ effective**, héritage compris : un bâtiment qui hérite `usage="tertiary"` de 
 | `parent=site` | Parent direct égal à `site` ; `parent=None` désigne le premier niveau |
 | `has_rnb_id=True / False` | Bâtiments seulement |
 | `has_meter=True / False` | `find_meters()` non vide / vide |
-| `has_system="heating"` (ou `True`) | Bâtiment : au moins un système de ce `kind` qui le dessert, systèmes partagés compris (`serving_systems`). Site : au moins un système propre |
+| `has_system="heating"` (ou `True`) | Bâtiment : au moins un système de ce `kind` qui le dessert, systèmes partagés compris (`find_serving_systems`). Site : au moins un système propre |
 
 - Les attributs utilisables sont les attributs sourcés de la classe (y compris ceux du projet), `rnb_id`,
   les ids BDNB et `dpe_ids`.

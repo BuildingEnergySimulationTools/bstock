@@ -242,14 +242,14 @@ def test_building_envelope_inherits_from_site_envelope(tree):
     assert a.envelope.inertia is Inertia.HEAVY
 
 
-def test_detached_building_stops_inheriting(tree):
+def test_removed_building_stops_inheriting(tree):
     _client, group, a, _, _ = tree
-    removed = group.detach(RNB_A)
+    removed = group.remove_building(RNB_A)
     assert removed is a
     assert a.parent is None
     assert a.usage is None
     with pytest.raises(UnknownIdError):
-        group.detach(RNB_A)
+        group.remove_building(RNB_A)
 
 
 def test_duplicate_child_id_is_rejected(tree):
@@ -292,16 +292,16 @@ def test_shared_systems_serve_buildings(tree):
     plant = client.add_system(HeatingGenerator(id="heating-chaufferie"))  # serves everything
     group_boiler = group.add_system(HeatingGenerator(id="heating-group", serves=[RNB_A]))
     own = b.add_system(HeatingGenerator(id="heating-b"))
-    assert a.serving_systems("heating") == [group_boiler, plant]
-    assert b.serving_systems("heating") == [own, plant]
-    assert c.serving_systems("heating") == [plant]
-    assert b.serving_systems("heating", include_shared=False) == [own]
-    assert a.serving_systems("pv") == []
+    assert a.find_serving_systems("heating") == [group_boiler, plant]
+    assert b.find_serving_systems("heating") == [own, plant]
+    assert c.find_serving_systems("heating") == [plant]
+    assert b.find_serving_systems("heating", include_shared=False) == [own]
+    assert a.find_serving_systems("pv") == []
 
 
 def test_unknown_system_kind_is_rejected():
     with pytest.raises(UnknownKindError, match="unknown system kind"):
-        Building().serving_systems("geothermal")
+        Building().find_serving_systems("geothermal")
 
 
 def test_duplicate_system_ids_rejected_at_construction():
@@ -323,7 +323,7 @@ def test_json_round_trip_rebuilds_tree(tree):
     loaded_a = next(x for x in loaded.iter_buildings() if x.id == RNB_A)
     assert loaded_a.construction_year == 1972
     assert loaded_a.envelope.u_bat == 1.1
-    assert [s.id for s in loaded_a.serving_systems("heating")] == ["heating-group"]
+    assert [s.id for s in loaded_a.find_serving_systems("heating")] == ["heating-group"]
     assert loaded_a.usage is BuildingUsage.TERTIARY
 
 
@@ -370,3 +370,43 @@ def test_envelope_copy_can_be_assigned():
     second.envelope = first.envelope.model_copy(deep=True)
     assert second.envelope.u_bat == 0.8
     assert first.envelope._container is first
+
+
+# --- removal ----------------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("by", ["object", "id"])
+def test_remove_building_accepts_object_or_id(tree, by):
+    _client, group, a, _, _ = tree
+    assert group.remove_building(a if by == "object" else a.id) is a
+    assert [b.id for b in group.buildings] == [RNB_B]
+
+
+@pytest.mark.parametrize("by", ["object", "id"])
+def test_remove_site_accepts_object_or_id(tree, by):
+    client, group, a, _, _ = tree
+    assert client.remove_site(group if by == "object" else group.id) is group
+    assert client.sites == []
+    assert a.parent is group  # the sub-site keeps its content
+
+
+def test_remove_site_does_not_remove_a_building(tree):
+    _client, group, a, _, _ = tree
+    with pytest.raises(UnknownIdError, match="no sub-site"):
+        group.remove_site(a.id)
+    assert a.parent is group
+
+
+def test_remove_building_refuses_another_object_with_the_same_id(tree):
+    _client, group, a, _, _ = tree
+    with pytest.raises(UnknownIdError):
+        group.remove_building(Building(rnb_id=a.rnb_id))
+    assert a.parent is group
+
+
+@pytest.mark.parametrize("by", ["object", "id"])
+def test_remove_system_accepts_object_or_id(by):
+    building = Building(id="b1")
+    plant = building.add_system(HeatingGenerator(id="h1"))
+    assert building.remove_system(plant if by == "object" else "h1") is plant
+    assert building.heating == []

@@ -71,7 +71,7 @@ class Building(DescribedEntity):
                 park._change_rnb(self, value)
         super().__setattr__(name, value)
 
-    def serving_systems(
+    def find_serving_systems(
         self, kind: SystemKind | str | None = None, *, include_shared: bool = True
     ) -> list[System]:
         """Return the systems serving this building: its own, then those shared by its sites.

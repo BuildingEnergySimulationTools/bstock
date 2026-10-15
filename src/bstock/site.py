@@ -7,7 +7,7 @@ from typing import Any, ClassVar
 
 from pydantic import Field, ValidationInfo, field_validator, model_validator
 
-from bstock._children import ChildList, append_child, remove_child, wrap_children
+from bstock._children import ChildList, append_child, find_child, remove_child, wrap_children
 from bstock._ids import check_external_id
 from bstock.building import Building
 from bstock.description import DescribedEntity
@@ -41,8 +41,8 @@ class Site(DescribedEntity):
 
     _child_hints: ClassVar[dict[str, str]] = {
         **DescribedEntity._child_hints,
-        "sites": "site.add_site, site.detach, park.move or park.remove",
-        "buildings": "site.add_building, site.detach, park.move or park.remove",
+        "sites": "site.add_site, site.remove_site, park.move or park.remove",
+        "buildings": "site.add_building, site.remove_building, park.move or park.remove",
     }
 
     @model_validator(mode="before")
@@ -168,29 +168,49 @@ class Site(DescribedEntity):
         append_child(self.buildings, building)
         return building
 
-    def detach(self, child_id: str) -> Site | Building:
-        """Detach the direct child (sub-site or building) ``child_id`` and return it.
+    def remove_site(self, site: Site | str) -> Site:
+        """Remove the direct sub-site ``site`` (object or id), with its content, and return it.
 
-        In a park, the child and its content leave the park, as with :meth:`BuildingPark.remove`.
+        In a park, the sub-site and its content leave the park, as with
+        :meth:`BuildingPark.remove`.
 
         Raises
         ------
         UnknownIdError
-            If no direct child has this id.
+            If ``site`` is not a direct sub-site.
         EntityInUseError
-            If, in a park, an entity outside the child references it or its content (``scope`` of a
-            meter, ``serves`` of a system); use ``park.remove(child_id, force=True)`` to drop the
+            If, in a park, an entity outside the sub-site references it or its content (``scope``
+            of a meter, ``serves`` of a system); use ``park.remove(site, force=True)`` to drop the
             references.
         """
-        for collection in (self.sites, self.buildings):
-            for child in collection:
-                if child.id == child_id:
-                    self._notify_park("_release", child)
-                    self._notify_park("_unregister", child)
-                    remove_child(collection, child)
-                    child._container = None
-                    return child
-        raise UnknownIdError(child_id)
+        child = find_child(self.sites, site, self.id, "sub-site")
+        self._take_out(self.sites, child)
+        return child
+
+    def remove_building(self, building: Building | str) -> Building:
+        """Remove the building ``building`` (object or id) directly attached to the site.
+
+        In a park, the building and its systems leave the park, as with
+        :meth:`BuildingPark.remove`.
+
+        Raises
+        ------
+        UnknownIdError
+            If ``building`` is not directly attached to the site.
+        EntityInUseError
+            If, in a park, an entity outside the building references it or its systems (``scope``
+            of a meter, ``serves`` of a system); use ``park.remove(building, force=True)`` to drop
+            the references.
+        """
+        child = find_child(self.buildings, building, self.id, "building")
+        self._take_out(self.buildings, child)
+        return child
+
+    def _take_out(self, collection: list[Any], child: Site | Building) -> None:
+        self._notify_park("_release", child)
+        self._notify_park("_unregister", child)
+        remove_child(collection, child)
+        child._container = None
 
     def _check_new_child(self, child: Site | Building) -> None:
         if child is self or any(child is s for s in self._ancestor_sites()):

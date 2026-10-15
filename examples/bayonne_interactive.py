@@ -89,7 +89,7 @@ for row in pd.read_csv(inventory).itertuples():
         row.code_site, name=row.nom_site, secteur=row.secteur, source=CLIENT_SOURCE
     )
     park.new_building(
-        row.rnb,
+        rnb_id=row.rnb,
         parent=site,
         source=CLIENT_SOURCE,
         code_patrimoine=row.code,
@@ -164,7 +164,7 @@ park.add_system(
     ),
     owner="site-ecole-A",
 )
-print(a.serving_systems("heating"))
+print(a.find_serving_systems("heating"))
 park.tree(systems=True)
 
 

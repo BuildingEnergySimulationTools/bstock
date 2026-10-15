@@ -10,6 +10,7 @@ from pydantic import Discriminator, Field, Tag, field_validator
 from bstock._children import (
     ChildList,
     append_child,
+    find_child,
     guard_assignment,
     remove_child,
     wrap_children,
@@ -24,7 +25,7 @@ from bstock.enums import (
     InsulationLevel,
     Orientation,
 )
-from bstock.exceptions import DuplicateIdError, IncompleteDataError, UnknownIdError
+from bstock.exceptions import DuplicateIdError, IncompleteDataError
 from bstock.provenance import COMPUTED_SOURCE, SourcedModel, SourcedValue, sourced
 
 __all__ = ["Envelope", "EnvelopeComponent", "Window"]
@@ -178,20 +179,19 @@ class Envelope(SourcedModel):
         append_child(self.components, component)
         return component
 
-    def remove_component(self, component_id: str) -> EnvelopeComponent:
-        """Remove the component ``component_id`` and return it.
+    def remove_component(self, component: EnvelopeComponent | str) -> EnvelopeComponent:
+        """Remove the component ``component`` (object or id) and return it.
 
         Raises
         ------
         UnknownIdError
-            If no component has this id.
+            If ``component`` is not a component of the envelope.
         """
-        for component in self.components:
-            if component.id == component_id:
-                component._container = None
-                remove_child(self.components, component)
-                return component
-        raise UnknownIdError(component_id)
+        owner_id = self._entity_id()
+        found = find_child(self.components, component, owner_id, "envelope component")
+        found._container = None
+        remove_child(self.components, found)
+        return found
 
     def find_components(
         self,

@@ -140,7 +140,7 @@ def test_dpe_date(value, expected):
 
 
 def test_single_construction_group_values_go_on_the_building(park, client):
-    building = park.new_building(SINGLE_RNB, parent="ecole")
+    building = park.new_building(rnb_id=SINGLE_RNB, parent="ecole")
     report = bdnb.enrich(park, client=client)
     assert report.enriched == [SINGLE_RNB]
     assert building.parent.id == "ecole"
@@ -162,7 +162,7 @@ def test_single_construction_group_values_go_on_the_building(park, client):
 
 
 def test_multi_construction_group_becomes_a_site(park, client):
-    building = park.new_building(MULTI_RNB, parent="ecole")
+    building = park.new_building(rnb_id=MULTI_RNB, parent="ecole")
     report = bdnb.enrich(park, client=client)
     site = park[MULTI_GROUP]
     assert isinstance(site, ProjectSite)
@@ -184,13 +184,14 @@ def test_multi_construction_group_becomes_a_site(park, client):
     # systems and DPE on the site, served to the building
     assert [s.id for s in site.heating] == [f"heating-{MULTI_GROUP}-bdnb-1"]
     assert building.heating == []
-    assert [s.id for s in building.serving_systems("heating")] == [f"heating-{MULTI_GROUP}-bdnb-1"]
+    served = building.find_serving_systems("heating")
+    assert [s.id for s in served] == [f"heating-{MULTI_GROUP}-bdnb-1"]
     assert site.dpe_ids == ["2664E0684239O"]
 
 
 def test_group_site_at_top_level(client, recorded):
     park = BuildingPark(name="p")
-    building = park.new_building(MULTI_RNB)
+    building = park.new_building(rnb_id=MULTI_RNB)
     bdnb.enrich(park, client=client)
     assert building.parent.id == MULTI_GROUP
     assert park[MULTI_GROUP].parent is None
@@ -198,8 +199,8 @@ def test_group_site_at_top_level(client, recorded):
 
 def test_two_buildings_of_a_group_share_the_site(park, recorded):
     client = FakeBdnbClient(recorded, rnb_of={OTHER_CONSTRUCTION: OTHER_RNB})
-    a = park.new_building(MULTI_RNB, parent="ecole")
-    b = park.new_building(OTHER_RNB, parent="ecole")
+    a = park.new_building(rnb_id=MULTI_RNB, parent="ecole")
+    b = park.new_building(rnb_id=OTHER_RNB, parent="ecole")
     bdnb.enrich(park, client=client)
     assert a.parent is b.parent is park[MULTI_GROUP]
     assert client.calls.count(("count", MULTI_GROUP)) == 1
@@ -207,7 +208,7 @@ def test_two_buildings_of_a_group_share_the_site(park, recorded):
 
 def test_existing_group_site_is_reused(park, client):
     site = park.new_site(MULTI_GROUP, parent="mairie", secteur="nord")
-    building = park.new_building(MULTI_RNB, parent="mairie")
+    building = park.new_building(rnb_id=MULTI_RNB, parent="mairie")
     report = bdnb.enrich(park, client=client)
     assert park[MULTI_GROUP] is site
     assert building.parent is site
@@ -217,8 +218,8 @@ def test_existing_group_site_is_reused(park, client):
 
 def test_different_parents_spread_intensive_values(park, recorded):
     client = FakeBdnbClient(recorded, rnb_of={OTHER_CONSTRUCTION: OTHER_RNB})
-    a = park.new_building(MULTI_RNB, parent="ecole")
-    b = park.new_building(OTHER_RNB, parent="mairie")
+    a = park.new_building(rnb_id=MULTI_RNB, parent="ecole")
+    b = park.new_building(rnb_id=OTHER_RNB, parent="mairie")
     report = bdnb.enrich(park, client=client)
     assert MULTI_GROUP not in park
     assert a.parent.id == "ecole"
@@ -232,7 +233,7 @@ def test_different_parents_spread_intensive_values(park, recorded):
 
 
 def test_group_sites_can_be_disabled(park, client):
-    building = park.new_building(MULTI_RNB, parent="ecole")
+    building = park.new_building(rnb_id=MULTI_RNB, parent="ecole")
     report = bdnb.enrich(park, group_sites=False, client=client)
     assert MULTI_GROUP not in park
     assert building.usage == BuildingUsage.RESIDENTIAL_COLLECTIVE
@@ -242,7 +243,7 @@ def test_group_sites_can_be_disabled(park, client):
 
 @pytest.mark.parametrize("rnb_id", [SINGLE_RNB, MULTI_RNB])
 def test_running_twice_is_idempotent(park, client, rnb_id):
-    park.new_building(rnb_id, parent="ecole")
+    park.new_building(rnb_id=rnb_id, parent="ecole")
     bdnb.enrich(park, client=client)
     first = park.to_json()
     report = bdnb.enrich(park, client=client)
@@ -254,14 +255,14 @@ def test_running_twice_is_idempotent(park, client, rnb_id):
 
 
 def test_building_without_construction_is_not_found(park, client):
-    park.new_building("ZZZZZZZZZZZZ")
+    park.new_building(rnb_id="ZZZZZZZZZZZZ")
     report = bdnb.enrich(park, client=client)
     assert report.not_found == ["ZZZZZZZZZZZZ"]
 
 
 def test_several_constructions_for_one_rnb_id_are_ambiguous(park, recorded):
     client = FakeBdnbClient(recorded, rnb_of={OTHER_CONSTRUCTION: MULTI_RNB})
-    building = park.new_building(MULTI_RNB)
+    building = park.new_building(rnb_id=MULTI_RNB)
     report = bdnb.enrich(park, client=client)
     assert report.ambiguous == [MULTI_RNB]
     assert building.values == {}
@@ -278,7 +279,7 @@ def test_building_without_rnb_id_is_noted(park, client):
 def test_without_geo_extra_geometries_are_ignored_with_a_warning(park, client, monkeypatch):
     _geo._transformer.cache_clear()
     monkeypatch.setitem(sys.modules, "pyproj", None)
-    building = park.new_building(SINGLE_RNB)
+    building = park.new_building(rnb_id=SINGLE_RNB)
     with pytest.warns(BstockWarning, match=r"bstock\[geo\]"):
         bdnb.enrich(park, client=client)
     _geo._transformer.cache_clear()
@@ -292,7 +293,7 @@ def test_project_building_class_is_kept(recorded):
         code = sourced(str)
 
     park = BuildingPark(name="p", building_cls=ProjectBuilding)
-    building = park.new_building(MULTI_RNB)
+    building = park.new_building(rnb_id=MULTI_RNB)
     bdnb.enrich(park, client=FakeBdnbClient(recorded))
     assert isinstance(park[MULTI_RNB], ProjectBuilding)
     assert building.parent.id == MULTI_GROUP
@@ -350,7 +351,7 @@ def test_unexpected_response_raises(fake_session):
 @pytest.mark.network
 def test_real_bdnb_enrichment():
     park = BuildingPark(name="réseau")
-    building = park.new_building(SINGLE_RNB)
+    building = park.new_building(rnb_id=SINGLE_RNB)
     report = bdnb.enrich(park)
     assert report.enriched == [SINGLE_RNB]
     assert building.bdnb_batiment_groupe_id == SINGLE_GROUP

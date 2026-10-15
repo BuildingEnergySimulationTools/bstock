@@ -4,12 +4,12 @@ from __future__ import annotations
 
 import copy
 from collections.abc import Iterable
-from typing import Any, NoReturn, SupportsIndex, TypeVar
+from typing import Any, NoReturn, Protocol, SupportsIndex, TypeVar
 
 from pydantic import BaseModel
 from pydantic_core import PydanticUndefined
 
-from bstock.exceptions import HierarchyError
+from bstock.exceptions import HierarchyError, UnknownIdError
 
 T = TypeVar("T")
 
@@ -58,6 +58,30 @@ def append_child(children: list[T], child: T) -> None:
 def remove_child(children: list[T], child: T) -> None:
     """Remove ``child`` from ``children``, bypassing the :class:`ChildList` guard."""
     list.remove(children, child)
+
+
+class _Identified(Protocol):
+    id: str
+
+
+C = TypeVar("C", bound=_Identified)
+
+
+def find_child(children: Iterable[C], ref: C | str, owner_id: str | None, what: str) -> C:
+    """Return the item of ``children`` designated by ``ref``, an object or an id.
+
+    An object must be the item itself, not another object with the same id.
+
+    Raises
+    ------
+    UnknownIdError
+        If no item matches ``ref``.
+    """
+    child_id = ref if isinstance(ref, str) else ref.id
+    for child in children:
+        if child.id == child_id and (isinstance(ref, str) or child is ref):
+            return child
+    raise UnknownIdError(f"{owner_id!r} has no {what} {child_id!r}")
 
 
 def guard_assignment(owner: Any, name: str) -> None:

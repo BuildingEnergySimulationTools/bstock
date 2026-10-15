@@ -67,7 +67,7 @@ def read_inventory(path: Path, park: BuildingPark) -> None:
             row.code_site, name=row.nom_site, secteur=row.secteur, source=CLIENT_SOURCE
         )
         park.new_building(
-            row.rnb,
+            rnb_id=row.rnb,
             parent=site,
             source=CLIENT_SOURCE,
             code_patrimoine=row.code,
@@ -147,7 +147,7 @@ def main(output: Path) -> BuildingPark:
         ),
         owner="site-ecole-A",
     )
-    print(f"A heating systems: {[s.id for s in a.serving_systems('heating')]}")
+    print(f"A heating systems: {[s.id for s in a.find_serving_systems('heating')]}")
 
     # Areas per site: client usable area and heated area, with the boiler power, no double count.
     totals = park.select().aggregate(["surface_utile_client", "heated_area"])

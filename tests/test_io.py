@@ -47,11 +47,13 @@ def park():
     group = park.new_site(GROUP, parent=client, bdnb_batiment_groupe_id=GROUP)
     group.set("construction_year", 1972, source="bdnb", ref=GROUP, raw="1972")
     group.envelope.set("u_bat", 1.1, source="dpe", ref="2611E0031228S")
-    a = park.new_building(RNB_A, parent=group, code_patrimoine="BAT-0042", source="bayonne_xlsx")
+    a = park.new_building(
+        rnb_id=RNB_A, parent=group, code_patrimoine="BAT-0042", source="bayonne_xlsx"
+    )
     a.set("heated_area", 1250.0, source="audit", comment="plans")
     a.envelope.add_component(EnvelopeComponent(id="walls", kind="wall", heat_loss_coefficient=120))
     a.envelope.add_component(Window(id="windows", area=40.0, shgc=0.6, glazing="double"))
-    park.new_building(RNB_B, parent=group)
+    park.new_building(rnb_id=RNB_B, parent=group)
     park.new_building(id="bldg-isolated", dpe_ids=["2611E0031228S"])
     park.add_system(
         HeatingGenerator(
@@ -103,7 +105,7 @@ def test_json_round_trip_with_project_classes(park):
     assert a.usage == "tertiary"
     assert a.envelope.u_bat == 1.1
     assert type(a.envelope.components[1]) is Window
-    assert [s.id for s in a.serving_systems("heating")] == ["plant"]
+    assert [s.id for s in a.find_serving_systems("heating")] == ["plant"]
     assert loaded.get_by_rnb(RNB_B) is loaded[RNB_B]
     assert a.find_meters() == []
     assert loaded["site-ecole-A"].find_meters()[0].id == "PDL_123"

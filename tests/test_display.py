@@ -20,7 +20,7 @@ def park():
     park = BuildingPark(name="Bayonne")
     school = park.new_site("gs-a", name="Groupe scolaire A", usage="tertiary")
     group = park.new_site("group", parent=school)
-    park.new_building(RNB, parent=group, name="École", heated_area=1250.0)
+    park.new_building(rnb_id=RNB, parent=group, name="École", heated_area=1250.0)
     park.new_building(id="b2", parent=group)
     park.new_building(id="gym", parent=school, name="Gymnase")
     park.new_building(id="annex", name="Mairie annexe")

@@ -10,6 +10,7 @@ from pydantic import Field, ValidationInfo, field_validator
 from bstock._children import (
     ChildList,
     append_child,
+    find_child,
     guard_assignment,
     remove_child,
     wrap_children,
@@ -22,7 +23,6 @@ from bstock.exceptions import (
     DuplicateIdError,
     HierarchyError,
     IncompleteDataError,
-    UnknownIdError,
     UnknownKindError,
 )
 from bstock.provenance import COMPUTED_SOURCE, SourcedModel, SourcedValue, sourced
@@ -215,25 +215,23 @@ class DescribedEntity(SourcedModel):
         append_child(getattr(self, system.kind), system)
         return system
 
-    def remove_system(self, system_id: str) -> System:
-        """Remove the owned system ``system_id`` and return it.
+    def remove_system(self, system: System | str) -> System:
+        """Remove the owned system ``system`` (object or id) and return it.
 
         Raises
         ------
         UnknownIdError
-            If this entity owns no system with this id.
+            If this entity does not own ``system``.
         EntityInUseError
             If the entity belongs to a park where a meter measures the system; use
-            ``park.remove(system_id, force=True)`` to drop the reference.
+            ``park.remove(system, force=True)`` to drop the reference.
         """
-        for system in self.iter_systems():
-            if system.id == system_id:
-                self._notify_park("_release", system)
-                self._notify_park("_unregister", system)
-                remove_child(getattr(self, system.kind), system)
-                system._container = None
-                return system
-        raise UnknownIdError(system_id)
+        owned = find_child(self.iter_systems(), system, self.id, "system")
+        self._notify_park("_release", owned)
+        self._notify_park("_unregister", owned)
+        remove_child(getattr(self, owned.kind), owned)
+        owned._container = None
+        return owned
 
     def _check_served(self, serves: list[str] | None) -> None:
         """Check the ``serves`` of a system owned by this entity; only sites accept one."""
@@ -245,11 +243,10 @@ class DescribedEntity(SourcedModel):
     def find_meters(self) -> list[Any]:
         """Return the park meters whose scope contains this entity or one of its own systems.
 
-        Same as ``park.meters_for(entity)``; ``park.meters`` is the list of every meter of the park.
-        Outside a park, the list is empty.
+        ``park.meters`` is the list of every meter of the park. Outside a park, the list is empty.
         """
         park = self.park
-        return [] if park is None else park.meters_for(self)
+        return [] if park is None else park._meters_for(self)
 
     def _notify_park(self, method: str, entity: SourcedModel) -> None:
         """Let the park check references and maintain its index (no-op outside a park)."""

@@ -90,6 +90,15 @@ def test_add_and_remove_components():
         envelope.remove_component("w1")
 
 
+def test_remove_component_accepts_object():
+    envelope = Envelope()
+    added = envelope.add_component(wall(id="w1"))
+    with pytest.raises(UnknownIdError, match="no envelope component 'w1'"):
+        envelope.remove_component(wall(id="w1"))  # same id, other object
+    assert envelope.remove_component(added) is added
+    assert envelope.components == []
+
+
 def test_duplicate_component_ids_rejected_at_construction():
     with pytest.raises(DuplicateIdError):
         Envelope(components=[wall(id="w"), wall(id="w")])

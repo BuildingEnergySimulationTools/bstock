@@ -649,7 +649,7 @@ def _structure_test(park: BuildingPark, kind: str, key: str, value: Any) -> _Tes
 
     def has_system(entity: DescribedEntity) -> bool:
         if isinstance(entity, Building):
-            systems = entity.serving_systems(system_kind)
+            systems = entity.find_serving_systems(system_kind)
         else:
             systems = list(entity.iter_systems(system_kind))
         return bool(systems) is flag

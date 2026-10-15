@@ -32,14 +32,14 @@ def park():
     park.new_site("ecole", usage="tertiary", construction_year=1972, secteur="nord", source="bdnb")
     park.new_site(GROUP, parent="ecole", bdnb_batiment_groupe_id=GROUP, dwelling_count=4)
     park.new_building(
-        RNB_A,
+        rnb_id=RNB_A,
         parent=GROUP,
         dpe_ids=["2611E0031228S"],
         sub_usages=["school", "canteen"],
         footprint=FOOTPRINT,
         code_patrimoine="BAY-001",
     )
-    park.new_building(RNB_B, construction_year=2001, heated_area=850.0, source="dpe")
+    park.new_building(rnb_id=RNB_B, construction_year=2001, heated_area=850.0, source="dpe")
     return park
 
 

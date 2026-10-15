@@ -22,7 +22,7 @@ def bdnb(value, **kwargs):
 @pytest.fixture
 def park():
     park = BuildingPark(name="p")
-    park.new_building(RNB_A)
+    park.new_building(rnb_id=RNB_A)
     return park
 
 

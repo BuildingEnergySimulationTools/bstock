@@ -34,9 +34,9 @@ def park():
     park = BuildingPark(name="Ville de Bayonne")
     client = park.new_site("site-ecole-A", name="Groupe scolaire A", usage="tertiary")
     park.new_site(GROUP, parent=client, bdnb_batiment_groupe_id=GROUP)
-    park.new_building(RNB_A, parent=GROUP, construction_year=1972, source="bdnb")
-    park.new_building(RNB_B, parent=GROUP)
-    park.new_building(RNB_C, parent="site-ecole-A")
+    park.new_building(rnb_id=RNB_A, parent=GROUP, construction_year=1972, source="bdnb")
+    park.new_building(rnb_id=RNB_B, parent=GROUP)
+    park.new_building(rnb_id=RNB_C, parent="site-ecole-A")
     park.new_building(id="bldg-isolated")
     return park
 
@@ -130,7 +130,7 @@ def test_deprecated_aliases_are_removed(cls, name):
 
 def test_duplicate_rnb_id_is_rejected(park):
     with pytest.raises(DuplicateIdError, match="RNB"):
-        park.new_building(RNB_A, id="other-id")
+        park.new_building(rnb_id=RNB_A, id="other-id")
 
 
 def test_rnb_lookup_and_change_accept_any_form(park):
@@ -139,7 +139,7 @@ def test_rnb_lookup_and_change_accept_any_form(park):
     a.rnb_id = "zzzz-zzzz-zzzz"
     assert park.get_by_rnb("ZZZZZZZZZZZZ") is a
     with pytest.raises(DuplicateIdError):
-        park.new_building("b1b2c3d4e5f6", id="other-id")
+        park.new_building(rnb_id="b1b2c3d4e5f6", id="other-id")
 
 
 def test_changing_rnb_id_keeps_index_consistent(park):
@@ -165,13 +165,18 @@ def test_failed_registration_indexes_nothing(park):
     assert "fresh" not in park
 
 
+def test_new_building_arguments_are_keywords(park):
+    with pytest.raises(TypeError):
+        park.new_building(RNB_A)
+
+
 def test_entity_methods_update_park_index(park):
     group = park[GROUP]
     group.add_building(Building(id="added-via-site"))
     assert "added-via-site" in park
     with pytest.raises(DuplicateIdError):
         group.add_building(Building(id="bldg-isolated"))
-    group.detach("added-via-site")
+    group.remove_building("added-via-site")
     assert "added-via-site" not in park
 
 
@@ -189,7 +194,7 @@ def test_systems_are_indexed(park):
 def test_new_entities_use_project_classes():
     park = BuildingPark(name="Bayonne", site_cls=BayonneSite, building_cls=BayonneBuilding)
     site = park.new_site("s1", secteur="Nord", source="bayonne_xlsx")
-    building = park.new_building(RNB_A, parent=site, code_patrimoine="BAT-0042")
+    building = park.new_building(rnb_id=RNB_A, parent=site, code_patrimoine="BAT-0042")
     assert type(site) is BayonneSite
     assert type(building) is BayonneBuilding
     assert building.code_patrimoine == "BAT-0042"
@@ -255,8 +260,8 @@ def test_invalid_class_is_rejected():
 
 def test_add_shared_system_checks_served_buildings(park):
     plant = park.add_system(HeatingGenerator(id="plant", serves=[RNB_A, RNB_C]), "site-ecole-A")
-    assert park[RNB_A].serving_systems("heating") == [plant]
-    assert park["bldg-isolated"].serving_systems("heating") == []
+    assert park[RNB_A].find_serving_systems("heating") == [plant]
+    assert park["bldg-isolated"].find_serving_systems("heating") == []
     with pytest.raises(UnknownIdError):
         park.add_system(HeatingGenerator(serves=["bldg-isolated"]), "site-ecole-A")
     with pytest.raises(HierarchyError, match="serves"):
@@ -340,7 +345,7 @@ def test_move_inside_serving_site_keeps_references(park):
     plant = park.add_system(HeatingGenerator(id="plant", serves=[RNB_A]), "site-ecole-A")
     park.move(RNB_A, "site-ecole-A")
     assert plant.serves == [RNB_A]
-    assert park[RNB_A].serving_systems("heating") == [plant]
+    assert park[RNB_A].find_serving_systems("heating") == [plant]
     park.move(RNB_A, GROUP)
     group_boiler = park.add_system(HeatingGenerator(id="group-boiler", serves=[RNB_A]), GROUP)
     park.move(GROUP, None, force=True)  # the group boiler moves with its buildings
@@ -393,19 +398,19 @@ def test_references_inside_removed_subtree_do_not_block(park):
     assert "group-boiler" not in park
 
 
-def test_detach_referenced_building_is_refused(park):
+def test_remove_referenced_building_from_site_is_refused(park):
     plant = park.add_system(HeatingGenerator(id="plant", serves=[RNB_A]), "site-ecole-A")
     with pytest.raises(EntityInUseError, match="plant"):
-        park[GROUP].detach(RNB_A)
+        park[GROUP].remove_building(RNB_A)
     assert RNB_A in park
     assert park[RNB_A].parent is park[GROUP]
     assert plant.serves == [RNB_A]
 
 
-def test_detach_measured_building_is_refused_and_park_stays_reloadable(park):
+def test_remove_measured_building_from_site_is_refused_and_park_stays_reloadable(park):
     park.add_meter(Meter(id="m", scope=[RNB_A], channels=[Channel(name="e", unit="kWh")]))
     with pytest.raises(EntityInUseError, match="'m'"):
-        park[GROUP].detach(RNB_A)
+        park[GROUP].remove_building(RNB_A)
     assert BuildingPark.from_json(park.to_json()) == park
 
 

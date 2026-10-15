@@ -352,11 +352,10 @@ class BuildingPark(BaseModel):
         for entity in [*self.iter_sites(), *self.iter_buildings()]:
             yield from entity.iter_systems(kind)
 
-    def meters_for(self, entity: Site | Building | str) -> list[Meter]:
+    def _meters_for(self, entity: Site | Building | str) -> list[Meter]:
         """Return the meters whose scope contains ``entity`` or one of its own systems.
 
-        Unlike :attr:`meters`, the list of every meter of the park, this is a query; it is also
-        available as ``entity.find_meters()``.
+        Public as ``entity.find_meters()``.
         """
         target = self._resolve(entity, (Site, Building))
         ids = {target.id, *(s.id for s in target.iter_systems())}
@@ -495,9 +494,9 @@ class BuildingPark(BaseModel):
 
     def new_building(
         self,
-        rnb_id: str | None = None,
         *,
         id: str | None = None,
+        rnb_id: str | None = None,
         parent: Site | str | None = None,
         source: str | None = None,
         **attrs: Any,
@@ -506,10 +505,10 @@ class BuildingPark(BaseModel):
 
         Parameters
         ----------
-        rnb_id
-            RNB id; also the building id when ``id`` is omitted.
         id
-            Explicit building id.
+            Building id; defaults to ``rnb_id`` when given, else a generated id.
+        rnb_id
+            RNB id.
         parent
             Site (object or id) receiving the building; ``None`` attaches it to the park.
         source
@@ -684,7 +683,7 @@ class BuildingPark(BaseModel):
             selected = [m for m in selected if m.energy_type in energies]
         if buildings is not None or sites is not None:
             entities = [*(buildings or []), *(sites or [])]
-            keep = {m.id for entity in entities for m in self.meters_for(entity)}
+            keep = {m.id for entity in entities for m in self._meters_for(entity)}
             selected = [m for m in selected if m.id in keep]
         return selected
 
@@ -780,8 +779,9 @@ class BuildingPark(BaseModel):
     def _release(self, entity: Entity, *, force: bool = False) -> None:
         """Check, before taking ``entity`` out, that nothing outside its subtree references it.
 
-        Also called by ``site.detach`` and ``entity.remove_system``, so that no way of taking an
-        entity out of the park leaves dangling ``serves`` or ``scope`` ids.
+        Also called by ``site.remove_site``, ``site.remove_building`` and ``entity.remove_system``,
+        so that no way of taking an entity out of the park leaves dangling ``serves`` or ``scope``
+        ids.
 
         Raises
         ------
