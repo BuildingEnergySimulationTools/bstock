@@ -426,9 +426,9 @@ def test_remove_system_referenced_by_meter_is_refused(park):
 
 def test_json_schema_on_a_park_uses_its_classes():
     park = BuildingPark(name="p", site_cls=BayonneSite, building_cls=BayonneBuilding)
-    attributes = park.json_schema()["x-bstock-sourced-attributes"]
+    attributes = park.json_schema()["x-bstock-sourced-fields"]
     assert {"BayonneSite", "BayonneBuilding"} <= set(attributes)
-    assert "Building" in BuildingPark.json_schema()["x-bstock-sourced-attributes"]
+    assert "Building" in BuildingPark.json_schema()["x-bstock-sourced-fields"]
 
 
 def test_remove_unknown_id(park):

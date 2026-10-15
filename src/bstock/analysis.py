@@ -26,14 +26,14 @@ __all__: list[str] = []
 PARK_ROW = "__park__"
 """Index of the park total row; ids cannot contain ``__``, so it never clashes with a site id."""
 FIELD_MEASURES = ("buildings", "site", "delta", "coverage", "total")
-"""Measures of an extensive attribute in the hierarchical aggregation."""
+"""Measures of an extensive field in the hierarchical aggregation."""
 POWERS: dict[str, tuple[SystemKind, str]] = {
     "heating_power": (SystemKind.HEATING, "nominal_power"),
     "cooling_power": (SystemKind.COOLING, "nominal_power"),
     "dhw_power": (SystemKind.DHW, "nominal_power"),
     "pv_peak_power": (SystemKind.PV, "peak_power"),
 }
-"""Power columns: system kind and summed attribute (kW, or kWp for PV)."""
+"""Power columns: system kind and summed field (kW, or kWp for PV)."""
 
 Prefer = Literal["buildings", "site"]
 Container = Any  # BuildingPark or Site
@@ -46,12 +46,12 @@ def aggregate(
     by: str | None = None,
     prefer: Prefer = "buildings",
 ) -> pd.DataFrame:
-    """Aggregate the extensive attributes of a selection; see :meth:`Selection.aggregate`."""
+    """Aggregate the extensive fields of a selection; see :meth:`Selection.aggregate`."""
     if prefer not in ("buildings", "site"):
         raise InvalidArgumentError(f"prefer must be 'buildings' or 'site', not {prefer!r}")
     names = _extensive_fields(selection.park, fields)
     if by is not None:
-        if selection.kind != "building":
+        if selection.entity != "building":
             raise InvalidArgumentError("by= only applies to a selection of buildings")
         return _aggregate_by(selection, names, by)
     scope = _Scope(selection)
@@ -69,7 +69,7 @@ def _extensive_fields(park: BuildingPark, fields: Sequence[str] | None) -> list[
         return [name for name, field in available.items() if field.extensive]
     for name in fields:
         if name not in available:
-            raise UnknownFieldError(f"{name!r} is not an attribute of the buildings of this park")
+            raise UnknownFieldError(f"{name!r} is not a field of the buildings of this park")
         if not available[name].extensive:
             raise InvalidArgumentError(f"{name!r} is not extensive: it cannot be summed")
     return list(fields)
@@ -84,9 +84,9 @@ class _Scope:
 
     def __init__(self, selection: Selection) -> None:
         self.park = selection.park
-        self.kind = selection.kind
+        self.entity_type = selection.entity
         entities = selection._entities()
-        if self.kind == "building":
+        if self.entity_type == "building":
             self.roots: list[Any] = []
             self.buildings = {b.id for b in entities}
             self.sites = {s.id for b in entities for s in b._ancestor_sites()}
@@ -98,17 +98,17 @@ class _Scope:
             subtree_sites = [x for s in entities for x in s.iter_sites()]
             self.sites = selected | {s.id for s in subtree_sites}
             self.buildings = {b.id for s in entities for b in s.iter_buildings()}
-        self._selected_sites = entities if self.kind == "site" else []
+        self._selected_sites = entities if self.entity_type == "site" else []
 
     def row_sites(self) -> list[Site]:
         """Return the sites that get a row."""
-        if self.kind == "site":
+        if self.entity_type == "site":
             return list(self._selected_sites)
         return [s for s in self.park.iter_sites() if s.id in self.sites]
 
     def top_items(self) -> list[Any]:
         """Return the counted sites and buildings that have no counted ancestor."""
-        if self.kind == "site":
+        if self.entity_type == "site":
             return list(self.roots)
         return [*self.child_sites(self.park), *self.child_buildings(self.park)]
 
@@ -136,7 +136,9 @@ class _Scope:
 
     def site_value_counts(self, site: Site) -> bool:
         """Whether the own value of ``site`` may enter a total: it covers counted buildings only."""
-        return self.kind == "site" or all(b.id in self.buildings for b in site.iter_buildings())
+        return self.entity_type == "site" or all(
+            b.id in self.buildings for b in site.iter_buildings()
+        )
 
     def systems(self, sites: list[Site], buildings: list[Building]) -> list[System]:
         """Return the systems owned by ``sites`` and ``buildings`` that serve counted buildings."""
@@ -146,7 +148,7 @@ class _Scope:
         return found
 
     def _serves_counted(self, site: Site, system: System) -> bool:
-        if self.kind == "site":
+        if self.entity_type == "site":
             return True
         if system.serves is None:
             return any(b.id in self.buildings for b in site.iter_buildings())
@@ -212,8 +214,8 @@ def _total(scope: _Scope, item: Any, name: str, prefer: Prefer) -> float:
 def _system_columns(scope: _Scope, sites: list[Site], buildings: list[Building]) -> dict[Any, Any]:
     systems = scope.systems(sites, buildings)
     columns: dict[Any, Any] = {}
-    for column, (kind, attribute) in POWERS.items():
-        values = [getattr(s, attribute) for s in systems if s.kind == kind]
+    for column, (kind, field_name) in POWERS.items():
+        values = [getattr(s, field_name) for s in systems if s.kind == kind]
         summed, coverage = _sum(math.nan if v is None else float(v) for v in values)
         columns[(column, "value")] = summed
         columns[(column, "coverage")] = coverage
@@ -244,14 +246,14 @@ def _sum(values: Iterable[float]) -> tuple[float, float]:
     return total, coverage
 
 
-# --- grouping by attribute -----------------------------------------------------------------------
+# --- grouping by field -----------------------------------------------------------------------
 
 
 def _aggregate_by(selection: Selection, names: list[str], by: str) -> pd.DataFrame:
     park = selection.park
     field: SourcedField[Any] | None = park.building_cls.sourced_fields().get(by)
     if field is None:
-        raise UnknownFieldError(f"{by!r} is not an attribute of the buildings of this park")
+        raise UnknownFieldError(f"{by!r} is not a field of the buildings of this park")
     buildings = selection._entities()
     groups: dict[Any, list[Building]] = {}
     for building in buildings:
@@ -302,7 +304,7 @@ def _warn_ignored_site_values(buildings: list[Building], names: list[str]) -> No
     )
     if ignored:
         warnings.warn(
-            f"own values of sites {ignored} are ignored when grouping buildings by attribute",
+            f"own values of sites {ignored} are ignored when grouping buildings by field",
             NoDataWarning,
             stacklevel=5,
         )
@@ -311,21 +313,21 @@ def _warn_ignored_site_values(buildings: list[Building], names: list[str]) -> No
 # --- completeness and provenance (SPEC §14.4) ----------------------------------------------------
 
 CONFLICT_EXCLUDED = ("footprint",)
-"""Attributes left out of :func:`conflicts` by default: two geometries never match exactly."""
+"""Fields left out of :func:`conflicts` by default: two geometries never match exactly."""
 
 
 def completeness(
     selection: Selection,
     *,
-    by: Literal["attribute", "entity"] = "attribute",
+    per: Literal["field", "entity"] = "field",
     fields: Sequence[str] | None = None,
 ) -> pd.DataFrame:
-    """Return the share of filled attributes; see :meth:`Selection.completeness`."""
-    if by not in ("attribute", "entity"):
-        raise InvalidArgumentError(f"by must be 'attribute' or 'entity', not {by!r}")
+    """Return the share of filled fields; see :meth:`Selection.completeness`."""
+    if per not in ("field", "entity"):
+        raise InvalidArgumentError(f"per must be 'field' or 'entity', not {per!r}")
     entities = selection._entities()
     names = _sourced_names(selection, entities, fields)
-    if by == "entity":
+    if per == "entity":
         rows = []
         for entity in entities:
             own = [name for name in names if name in entity.sourced_fields()]
@@ -354,7 +356,7 @@ def completeness(
                 "rate": _rate(filled, len(concerned)),
             }
         )
-    index = pd.Index(names, name="attribute")
+    index = pd.Index(names, name="field")
     return pd.DataFrame(rows, index=index, columns=["filled", "inherited", "total", "rate"])
 
 
@@ -389,7 +391,7 @@ def provenance(
     sources = sorted(overall, key=lambda source: (-overall[source], source))
     rows = [{**{s: counts[name].get(s, 0) for s in sources}, **extra[name]} for name in names]
     frame = pd.DataFrame(
-        rows, index=pd.Index(names, name="attribute"), columns=[*sources, "inherited", "missing"]
+        rows, index=pd.Index(names, name="field"), columns=[*sources, "inherited", "missing"]
     )
     if normalize:
         frame = frame.div(pd.Series(totals).replace(0, math.nan), axis=0)
@@ -399,7 +401,7 @@ def provenance(
 def conflicts(
     selection: Selection, *, fields: Sequence[str] | None = None, rtol: float = 0.05
 ) -> pd.DataFrame:
-    """Return the attributes whose own candidates disagree; see :meth:`Selection.conflicts`."""
+    """Return the fields whose own candidates disagree; see :meth:`Selection.conflicts`."""
     if rtol < 0:
         raise InvalidArgumentError(f"rtol must be positive, not {rtol!r}")
     entities = selection._entities()
@@ -419,20 +421,20 @@ def conflicts(
             rows.append(
                 {
                     "entity": entity.id,
-                    "attribute": name,
+                    "field": name,
                     "values": {c.source: _plain(c.value) for c in candidates},
                     "retained": None if retained is None else retained.source,
                 }
             )
-    return pd.DataFrame(rows, columns=["entity", "attribute", "values", "retained"])
+    return pd.DataFrame(rows, columns=["entity", "field", "values", "retained"])
 
 
 def _sourced_names(
     selection: Selection, entities: list[Any], fields: Sequence[str] | None
 ) -> list[str]:
-    """Return ``fields``, checked, or every sourced attribute of the selected entities."""
+    """Return ``fields``, checked, or every sourced field of the selected entities."""
     park = selection.park
-    base = park.building_cls if selection.kind == "building" else park.site_cls
+    base = park.building_cls if selection.entity == "building" else park.site_cls
     available = list(base.sourced_fields())
     for entity in entities:
         available += [n for n in type(entity).sourced_fields() if n not in available]
@@ -440,7 +442,7 @@ def _sourced_names(
         return available
     unknown = ", ".join(repr(name) for name in fields if name not in available)
     if unknown:
-        raise UnknownFieldError(f"unknown attribute(s) of the {selection.kind}s: {unknown}")
+        raise UnknownFieldError(f"unknown field(s) of the {selection.entity}s: {unknown}")
     return list(fields)
 
 

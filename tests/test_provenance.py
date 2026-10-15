@@ -9,7 +9,7 @@ from pydantic import BaseModel, ValidationError
 
 import bstock
 from bstock.enums import EnergyType
-from bstock.exceptions import InvalidArgumentError, UnknownAttributeWarning, UnknownFieldError
+from bstock.exceptions import InvalidArgumentError, UnknownFieldError, UnknownFieldWarning
 from bstock.provenance import (
     COMPUTED_SOURCE,
     DEFAULT_SOURCE_PRIORITY,
@@ -53,7 +53,7 @@ def test_sourced_fields_include_subclass_fields():
     assert set(ProjectThing.sourced_fields()) == {"area", "year", "energy", "code"}
 
 
-def test_sourced_attributes_are_not_pydantic_fields():
+def test_sourced_fields_are_not_pydantic_fields():
     assert set(Thing.model_fields) == {"id", "values"}
 
 
@@ -222,7 +222,7 @@ def test_loaded_values_are_validated():
 
 def test_unknown_loaded_attribute_is_kept_with_warning():
     data = {"values": {"code": [{"value": "BAT-0042", "source": "bayonne_xlsx"}]}}
-    with pytest.warns(UnknownAttributeWarning):
+    with pytest.warns(UnknownFieldWarning):
         thing = Thing.model_validate(data)
     assert thing.candidates("code")[0].value == "BAT-0042"
     assert json.loads(thing.model_dump_json(exclude_none=True)) == {"id": "thing", **data}
@@ -265,7 +265,7 @@ def test_unlisted_source_without_wildcard_comes_last():
 
 
 def test_per_attribute_override():
-    priority = SourcePriority(per_attribute={"area": ["bayonne_xlsx", "audit"]})
+    priority = SourcePriority(per_field={"area": ["bayonne_xlsx", "audit"]})
     specs = (("audit", None), ("bayonne_xlsx", None))
     assert priority.select("area", candidates(*specs)).source == "bayonne_xlsx"
     assert priority.select("year", candidates(*specs)).source == "audit"
@@ -288,22 +288,22 @@ def test_tie_broken_by_most_recent_date_then_last_added():
     [
         (lambda p: setattr(p, "default", ("dpe",)), ValidationError),
         (lambda p: p.default.append("dpe"), AttributeError),
-        (lambda p: p.per_attribute.__setitem__("area", ("dpe",)), TypeError),
-        (lambda p: p.per_attribute.update(area=("dpe",)), TypeError),
+        (lambda p: p.per_field.__setitem__("area", ("dpe",)), TypeError),
+        (lambda p: p.per_field.update(area=("dpe",)), TypeError),
     ],
 )
 def test_source_priority_is_immutable(mutate, error):
-    priority = SourcePriority(per_attribute={"year": ["bdnb"]})
+    priority = SourcePriority(per_field={"year": ["bdnb"]})
     with pytest.raises(error):
         mutate(priority)
-    assert priority == SourcePriority(per_attribute={"year": ["bdnb"]})
+    assert priority == SourcePriority(per_field={"year": ["bdnb"]})
 
 
 def test_source_priority_copies_pickles_and_serialises():
-    priority = SourcePriority(per_attribute={"year": ["bdnb", "dpe"]})
+    priority = SourcePriority(per_field={"year": ["bdnb", "dpe"]})
     assert copy.deepcopy(priority) == priority
     assert pickle.loads(pickle.dumps(priority)) == priority
-    assert json.loads(priority.model_dump_json())["per_attribute"] == {"year": ["bdnb", "dpe"]}
+    assert json.loads(priority.model_dump_json())["per_field"] == {"year": ["bdnb", "dpe"]}
     assert SourcePriority.model_validate_json(priority.model_dump_json()) == priority
 
 

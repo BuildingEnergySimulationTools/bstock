@@ -54,7 +54,7 @@ class ProjectClassError(BstockError, TypeError):
 
 
 class UnknownFieldError(BstockError, AttributeError):
-    """The requested name is not a sourced attribute of the model."""
+    """The requested name is not a sourced field of the model."""
 
 
 class IncompleteDataError(BstockError, ValueError):
@@ -85,8 +85,8 @@ class BstockWarning(UserWarning):
     """Base class for all bstock warnings."""
 
 
-class UnknownAttributeWarning(BstockWarning):
-    """Loaded data contains a sourced attribute unknown to the model class; it is kept as is."""
+class UnknownFieldWarning(BstockWarning):
+    """Loaded data contains a sourced field unknown to the model class; it is kept as is."""
 
 
 class PerformanceRatioWarning(BstockWarning):

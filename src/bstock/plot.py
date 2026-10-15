@@ -77,19 +77,19 @@ class SelectionPlot:
 
     def completeness(
         self,
-        by: Literal["attribute", "entity"] = "attribute",
+        per: Literal["field", "entity"] = "field",
         *,
         fields: Sequence[str] | None = None,
     ) -> Figure:
-        """Plot the share of filled attributes (horizontal bars, 0 to 100 %).
+        """Plot the share of filled fields (horizontal bars, 0 to 100 %).
 
         Parameters
         ----------
-        by
-            ``"attribute"``: one bar per attribute, own and inherited values stacked.
+        per
+            ``"field"``: one bar per sourced field, own and inherited values stacked.
             ``"entity"``: one bar per entity.
         fields
-            Attributes to look at; see :meth:`Selection.completeness`.
+            Fields to look at; see :meth:`Selection.completeness`.
 
         Returns
         -------
@@ -101,10 +101,10 @@ class SelectionPlot:
             If plotly is not installed.
         """
         go = _plotly()
-        frame = self._selection.completeness(by, fields=fields)
-        count = _plural(len(self._selection), self._selection.kind)
+        frame = self._selection.completeness(per, fields=fields)
+        count = _plural(len(self._selection), self._selection.entity)
         fig = go.Figure()
-        if by == "attribute":
+        if per == "field":
             total = frame["total"].where(frame["total"] > 0)
             own = 100 * (frame["filled"] - frame["inherited"]) / total
             inherited = 100 * frame["inherited"] / total
@@ -151,12 +151,12 @@ class SelectionPlot:
         Parameters
         ----------
         fields
-            Attributes to look at; see :meth:`Selection.provenance`.
+            Fields to look at; see :meth:`Selection.provenance`.
 
         Returns
         -------
         plotly.graph_objects.Figure
-            One bar per attribute, one colour per source (the most frequent first), missing
+            One bar per field, one colour per source (the most frequent first), missing
             values in grey; the hover gives the inherited share.
 
         Raises
@@ -189,7 +189,7 @@ class SelectionPlot:
                     ),
                 )
             )
-        title = f"Sources of the values of {_plural(len(self._selection), self._selection.kind)}"
+        title = f"Sources of the values of {_plural(len(self._selection), self._selection.entity)}"
         _style(fig, title, None, x_title="Share of the entities (%)", stacked=True, value_axis="x")
         fig.update_yaxes(autorange="reversed")
         fig.update_xaxes(range=[0, 100])
@@ -202,12 +202,12 @@ class SelectionPlot:
         by: str | None = None,
         prefer: Literal["buildings", "site"] = "buildings",
     ) -> Figure:
-        """Plot an extensive attribute summed per site, or per value of ``by`` (bars).
+        """Plot an extensive field summed per site, or per value of ``by`` (bars).
 
         Parameters
         ----------
         field
-            Extensive attribute; see :meth:`Selection.aggregate`.
+            Extensive field; see :meth:`Selection.aggregate`.
         by, prefer
             As :meth:`Selection.aggregate`. Without ``by``, the bars show the ``total`` of each
             site and the park total is given in the subtitle.
@@ -255,12 +255,12 @@ class SelectionPlot:
     # --- values -------------------------------------------------------------------------------
 
     def distribution(self, field: str, *, bins: int | None = None) -> Figure:
-        """Plot the distribution of the effective values of an attribute.
+        """Plot the distribution of the effective values of a field.
 
         Parameters
         ----------
         field
-            Sourced attribute with single values (number, enum or string).
+            Sourced field with single values (number, enum or string).
         bins
             Number of bins of the histogram of a number (plotly chooses by default).
 
@@ -273,7 +273,7 @@ class SelectionPlot:
         Raises
         ------
         UnknownFieldError
-            If ``field`` is not a sourced attribute of the selected entities.
+            If ``field`` is not a sourced field of the selected entities.
         InvalidArgumentError
             If its values are lists or dicts.
         MissingDependencyError
@@ -287,7 +287,7 @@ class SelectionPlot:
         if any(isinstance(v, list | dict) for v in known):
             raise InvalidArgumentError(f"{field!r} has list or dict values: no distribution")
         unit = _unit_of(self._selection, field)
-        subtitle = f"{len(known)} / {len(entities)} {self._selection.kind}s with a value"
+        subtitle = f"{len(known)} / {len(entities)} {self._selection.entity}s with a value"
         if known and all(isinstance(v, int | float) and not isinstance(v, bool) for v in known):
             fig = go.Figure(
                 go.Histogram(
@@ -329,7 +329,7 @@ class SelectionPlot:
             ``"footprint"``: the effective ``footprint`` (GeoJSON in WGS84; no ``[geo]`` extra
             needed).
         color
-            Sourced attribute colouring the entities: a number on a blue ramp, other values in
+            Sourced field colouring the entities: a number on a blue ramp, other values in
             categorical colours (the three most frequent, the rest in grey as "Other").
 
         Returns
@@ -342,7 +342,7 @@ class SelectionPlot:
         InvalidArgumentError
             If ``geometry`` is invalid.
         UnknownFieldError
-            If ``color`` is not a sourced attribute of the selected entities.
+            If ``color`` is not a sourced field of the selected entities.
         MissingDependencyError
             If plotly is not installed.
         """
@@ -403,8 +403,8 @@ class SelectionPlot:
                     trace.update(showscale=False, showlegend=color is not None, name=name)
                     fig.add_trace(trace)
             center, zoom = _view([p for _, g in shapes for p in _positions(g)])
-        subtitle = f"{len(shapes)} / {len(entities)} {self._selection.kind}s located"
-        _style(fig, f"Map of {_plural(len(entities), self._selection.kind)}", subtitle)
+        subtitle = f"{len(shapes)} / {len(entities)} {self._selection.entity}s located"
+        _style(fig, f"Map of {_plural(len(entities), self._selection.entity)}", subtitle)
         fig.update_layout(
             map={"style": "open-street-map", "center": center, "zoom": zoom},
             margin={"l": 0, "r": 0, "t": 100, "b": 0},
@@ -738,12 +738,12 @@ def _hover_name(entity: Any) -> str:
 
 def _check_field(selection: Selection, name: str) -> None:
     park = selection.park
-    base = park.building_cls if selection.kind == "building" else park.site_cls
+    base = park.building_cls if selection.entity == "building" else park.site_cls
     known = set(base.sourced_fields())
     for entity in selection:
         known.update(entity.sourced_fields())
     if name not in known:
-        raise UnknownFieldError(f"{name!r} is not an attribute of the {selection.kind}s")
+        raise UnknownFieldError(f"{name!r} is not a field of the {selection.entity}s")
 
 
 def _check_stack(by: str) -> None:
@@ -753,7 +753,7 @@ def _check_stack(by: str) -> None:
 
 def _unit_of(selection: Selection, name: str) -> str | None:
     park = selection.park
-    base = park.building_cls if selection.kind == "building" else park.site_cls
+    base = park.building_cls if selection.entity == "building" else park.site_cls
     field = base.sourced_fields().get(name)
     return None if field is None else field.unit
 

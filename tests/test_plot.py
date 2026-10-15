@@ -68,7 +68,7 @@ def subtitle(fig):
     ("method", "kwargs"),
     [
         ("completeness", {}),
-        ("completeness", {"by": "entity"}),
+        ("completeness", {"per": "entity"}),
         ("provenance", {}),
         ("aggregate", {"field": "heated_area"}),
         ("distribution", {"field": "usage"}),
@@ -209,7 +209,7 @@ def test_map_refuses_an_unknown_geometry(park):
 
 @requires_plotly
 def test_consumption_stacks_energies_per_entity(park):
-    fig = park.select(kind="site").plot.consumption(**YEAR)
+    fig = park.select(entity="site").plot.consumption(**YEAR)
     assert trace_names(fig) == ["natural_gas", "electricity"]
     assert list(fig.data[0].x) == ["s0", "s1"]
     assert list(fig.data[0].y) == [366, 366]
@@ -218,7 +218,7 @@ def test_consumption_stacks_energies_per_entity(park):
 
 @requires_plotly
 def test_consumption_by_end_use_and_per_month(park):
-    fig = park.select(kind="site").plot.consumption(**YEAR, by="end_use", freq="MS")
+    fig = park.select(entity="site").plot.consumption(**YEAR, by="end_use", freq="MS")
     assert trace_names(fig) == ["heating", "other"]
     assert len(fig.data[0].x) == 12
     assert fig.data[0].y[0] == 62  # two gas meters, 31 days
@@ -232,7 +232,7 @@ def test_consumption_refuses_another_stack(park):
 
 @requires_plotly
 def test_intensity_per_entity(park):
-    fig = park.select(kind="site").plot.intensity(**YEAR)
+    fig = park.select(entity="site").plot.intensity(**YEAR)
     assert list(fig.data[0].x) == ["s0", "s1"]
     assert list(fig.data[0].y) == [pytest.approx(366 / 600), pytest.approx(366 / 900)]
     assert fig.layout.yaxis.title.text == "Intensity (kWh/m²)"
@@ -240,6 +240,6 @@ def test_intensity_per_entity(park):
 
 @requires_plotly
 def test_intensity_per_period_divides_by_the_total_area(park):
-    fig = park.select(kind="site").plot.intensity(**YEAR, freq="YS")
+    fig = park.select(entity="site").plot.intensity(**YEAR, freq="YS")
     gas = dict(zip(trace_names(fig), fig.data, strict=True))["natural_gas"]
     assert list(gas.y) == [pytest.approx(2 * 366 / 1500)]

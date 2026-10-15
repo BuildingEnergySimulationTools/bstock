@@ -274,7 +274,7 @@ def test_point_can_be_inherited_from_site(park, client):
 
 
 def test_address_suggestions_carry_the_ban_score(park, client, unmatched):
-    frame = rnb.suggest_matches(park, client=client, by="address", assign="unique")
+    frame = rnb.suggest_matches(park, client=client, method="address", assign="unique")
     assert frame.iloc[0]["rnb_id"] == GABARRE
     assert frame.iloc[0]["score"] == pytest.approx(0.967, abs=1e-3)
     assert unmatched.rnb_id == GABARRE
@@ -283,15 +283,15 @@ def test_address_suggestions_carry_the_ban_score(park, client, unmatched):
 
 def test_low_geocoding_score_gives_no_candidate(park, recorded, unmatched):
     client = FakeRnbClient(recorded, address=recorded("rnb/address_search_low_score.json"))
-    assert rnb.suggest_matches(park, client=client, by="address").empty
+    assert rnb.suggest_matches(park, client=client, method="address").empty
 
 
 @pytest.mark.parametrize(
     "kwargs",
-    [{"radius": 0}, {"radius": 1500}, {"by": "cadastre"}, {"assign": "all"}],
+    [{"radius": 0}, {"radius": 1500}, {"method": "cadastre"}, {"assign": "all"}],
 )
 def test_invalid_suggestion_options_are_rejected(park, client, kwargs):
-    with pytest.raises(InvalidArgumentError, match=r"^(by|radius|assign) must"):
+    with pytest.raises(InvalidArgumentError, match=r"^(method|radius|assign) must"):
         rnb.suggest_matches(park, client=client, **kwargs)
 
 

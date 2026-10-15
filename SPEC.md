@@ -105,6 +105,12 @@ Toutes les entités (`Site`, `Building`, `Envelope`, systèmes, `Meter`) hérite
 
 ### 3.3 Conventions
 
+- **Vocabulaire** : la SPEC dit « attribut sourcé » ; le code dit *sourced field* (`SourcedField`,
+  `sourced_fields()`, paramètres `fields=` / `field=`, `UnknownFieldError`, `UnknownFieldWarning`,
+  `SourcePriority.per_field`, colonne ou index `field` des tableaux d'analyse). Trois mots ont un sens
+  fixe dans l'API : `entity=` désigne le type d'entité (`"building"` ou `"site"`) ; `kind=` une catégorie
+  typée par une énumération (`SystemKind`, `ComponentKind`) ; `by=` un regroupement (`aggregate(by=)`,
+  `plot.consumption(by=)`).
 - **Unité fixée par champ**, sans bibliothèque d'unités : SI, ou unité usuelle du métier telle que la
   donnent les sources (kW, kWp, L, °, m³/(h.m²)), pour éviter des conversions dans les connecteurs. L'unité
   est déclarée dans les métadonnées du champ : elle apparaît dans le JSON Schema, dans `Building.sourced_fields()["heated_area"].unit` et dans
@@ -472,20 +478,20 @@ Règles :
 ```python
 park.source_priority = SourcePriority(
     default=["manual", "audit", "computed", "dpe", "bdnb", "rnb", "*", "assumption"],
-    per_attribute={
+    per_field={
         "heated_area": ["bayonne_xlsx_2024", "audit", "dpe", "bdnb"],
     },
 )
 ```
 
 Algorithme pour un attribut :
-1. On prend la liste `per_attribute[attr]` si elle existe, sinon `default`.
+1. On prend la liste `per_field[attr]` si elle existe, sinon `default`.
 2. Le candidat retenu est celui dont la source est la mieux classée.
 3. Les sources absentes de la liste (ex. `"bayonne_xlsx_2024"`) prennent le rang du joker `"*"`. Sans
    joker, elles passent après toutes les sources listées.
 4. En cas d'égalité, la date la plus récente l'emporte, puis le candidat ajouté en dernier.
 
-`SourcePriority` est **immuable** (listes stockées en tuples, `per_attribute` en lecture seule) : on change
+`SourcePriority` est **immuable** (listes stockées en tuples, `per_field` en lecture seule) : on change
 la priorité d'un parc en lui affectant une nouvelle instance. `DEFAULT_SOURCE_PRIORITY`, utilisée hors parc,
 ne peut donc pas être modifiée par accident. Les noms de sources réservés sont exportés : `MANUAL_SOURCE`
 (`"manual"`), `COMPUTED_SOURCE` (`"computed"`) et `WILDCARD_SOURCE` (`"*"`).
@@ -537,7 +543,7 @@ b.set("construction_year", 1985, source="audit")   # valeur propre : masque l'h�
   la définition du champ (`Building.heated_area.unit == "m²"`).
 - Les candidats sont stockés dans un vrai champ Pydantic `values: dict[str, list[SourcedValue]]`, qui est
   directement le format JSON du §7.2. Les noms inconnus de la classe y sont conservés tels quels, avec un
-  avertissement `UnknownAttributeWarning`.
+  avertissement `UnknownFieldWarning`.
 - Les attributs sourcés ne sont pas des champs Pydantic : `SourcedModel` déclare `SourcedField` dans
   `ignored_types`, surcharge `__setattr__` pour l'affectation directe, et convertit les kwargs du
   constructeur en candidats dans un validateur `mode="before"`.
@@ -848,11 +854,11 @@ park.json_schema()                        # classes du parc par défaut
   À la sauvegarde, les chemins relatifs au répertoire courant sont donc rendus absolus. Un dossier de parc
   sauvegardé avec `include_data=True` peut être déplacé.
 - Un fichier écrit avec une autre version du format (`schema_version`) lève `UnsupportedSchemaError`.
-  Le format est en version 2 depuis le renommage `data_source` → `reader` ; les fichiers v1 ne
-  sont pas migrés.
+  Le format est en version 2 depuis les renommages `data_source` → `reader` et `per_attribute` →
+  `per_field` ; les fichiers v1 ne sont pas migrés.
   Des classes différentes de celles de la sauvegarde émettent un `ClassMismatchWarning`.
 - Les attributs sourcés n'étant pas des champs Pydantic, le JSON Schema les décrit à part, dans
-  `x-bstock-sourced-attributes` : type, unité, héritage et description par classe.
+  `x-bstock-sourced-fields` : type, unité, héritage et description par classe.
 - Les méthodes Pydantic `model_dump_json` / `model_validate_json` du parc ne sont pas surchargées : elles
   ignorent les métadonnées (version du format, classes). La docstring de `BuildingPark` renvoie vers
   `to_json` / `from_json`.
@@ -878,7 +884,7 @@ traçabilité. Le parc sauvegardé est alors **autonome**.
   "building_cls": "projet_bayonne.model.BayonneBuilding",
   "name": "Ville de Bayonne",
   "source_priority": {"default": ["manual", "audit", "computed", "dpe", "bdnb", "rnb", "*", "assumption"],
-                      "per_attribute": {}},
+                      "per_field": {}},
   "sites": [{
     "id": "site-ecole-A",
     "values": {"name": [{"value": "Groupe scolaire A", "source": "bayonne_xlsx_2024"}]},
@@ -1002,9 +1008,9 @@ géographiques (§9). Un extra manquant lève `MissingDependencyError` avec la c
   démoli (`status`), id désactivé après une fusion ou une scission (`is_active: false` ; le rapport
   donne le ou les ids successeurs lus dans l'historique du bâtiment).
 
-**Bâtiments sans `rnb_id`.** `rnb.suggest_matches(park, buildings=None, *, by="point", radius=...,
+**Bâtiments sans `rnb_id`.** `rnb.suggest_matches(park, buildings=None, *, method="point", radius=...,
 assign=None, client=None) -> pd.DataFrame` propose des bâtiments RNB candidats, cherchés autour du point
-(`lat` / `lon`, rayon ≤ 1000 m) ou à partir de l'adresse (`by="address"`). Le DataFrame a une ligne par
+(`lat` / `lon`, rayon ≤ 1000 m) ou à partir de l'adresse (`method="address"`). Le DataFrame a une ligne par
 couple (bâtiment, candidat) : id du bâtiment, `rnb_id` candidat, distance (m, 0 si le point est dans
 l'emprise) ou score de géocodage de l'adresse, adresse RNB. L'utilisateur valide puis pose
 `building.rnb_id`. Aucune affectation automatique, sauf `assign="unique"` : le `rnb_id` est posé quand il
@@ -1139,10 +1145,10 @@ Précisions d'implémentation :
 ## 9. Exports (v2)
 
 ```python
-park.to_dataframe(kind="building", provenance=False) -> pd.DataFrame        # ou kind="site"
-park.to_geodataframe(kind="building", geometry="footprint")                 # extra [geo]
+park.to_dataframe(entity="building", provenance=False) -> pd.DataFrame      # ou entity="site"
+park.to_geodataframe(entity="building", geometry="footprint")               # extra [geo]
 park.to_geopackage("parc.gpkg", geometry="footprint")                       # couches sites et buildings
-park.to_geoparquet("batiments.parquet", kind="building", geometry="footprint")
+park.to_geoparquet("batiments.parquet", entity="building", geometry="footprint")
 ```
 
 - Une ligne par entité, indexée par `id`. Colonnes : `rnb_id`, identifiants BDNB, `dpe_ids`,
@@ -1345,13 +1351,13 @@ est repliable. Les entités feuilles n'ont pas de HTML propre : Jupyter affiche 
 ```python
 sel = park.select(usage="tertiary", construction_year__lt=1975, within="gs-a")
 sel = sel.filter(heated_area__isnull=False)
-sel = park.select(lambda b: b.height is not None and b.height > 2 * b.level_count, kind="building")
+sel = park.select(lambda b: b.height is not None and b.height > 2 * b.level_count, entity="building")
 tertiaire_sans_rnb = park.select(usage="tertiary") - park.select(has_rnb_id=True)
-len(sel); list(sel); "A1B2C3D4E5F6" in sel; sel.ids; sel.kind
+len(sel); list(sel); "A1B2C3D4E5F6" in sel; sel.ids; sel.entity
 sel.to_dataframe(provenance=True); sel.tree(fields=["usage"])
 ```
 
-`park.select(predicate=None, *, kind="building", **criteria)` renvoie une `Selection`. Sans critère, la
+`park.select(predicate=None, *, entity="building", **criteria)` renvoie une `Selection`. Sans critère, la
 sélection contient toutes les entités du `kind` : `park.select()` est le point d'entrée des analyses sur
 tout le parc. `kind` vaut `"building"` ou `"site"` : une sélection ne mélange jamais les deux. Un autre
 `kind` lève `UnknownKindError`. Les systèmes et les compteurs ne se sélectionnent pas : leurs filtres
@@ -1373,7 +1379,7 @@ existent déjà (`iter_systems(kind)`, `timeseries(...)`).
   son sous-arbre, ou tous ses bâtiments dans une sélection de sites, qui ne montre pas les bâtiments ;
   l'en-tête est le repr de la sélection suivi du parc), `aggregate`, `completeness`, `provenance`,
   `conflicts` (§14.3, §14.4), `consumption`, `intensity` (§6.5) et l'accesseur `plot` (§14.5).
-- Repr sur une ligne : `Selection(kind='building', 42 entities)`. En HTML, c'est l'arbre de la sélection.
+- Repr sur une ligne : `Selection(entity='building', 42 entities)`. En HTML, c'est l'arbre de la sélection.
 
 **Critères.** Tous les critères se combinent par ET, et le prédicat aussi. Ils portent sur la **valeur
 effective**, héritage compris : un bâtiment qui hérite `usage="tertiary"` de son site est retenu.
@@ -1385,7 +1391,7 @@ effective**, héritage compris : un bâtiment qui hérite `usage="tertiary"` de 
 | `attr__lt`, `__le`, `__gt`, `__ge` | Comparaison |
 | `attr__isnull=True / False` | Valeur absente / présente |
 | `attr__contains=v` | Attribut liste (`sub_usages`, `dpe_ids`) qui contient `v` |
-| `within=site` | Dans le sous-arbre du site (objet ou id), à toute profondeur. Pour `kind="site"`, il s'agit des descendants stricts |
+| `within=site` | Dans le sous-arbre du site (objet ou id), à toute profondeur. Pour `entity="site"`, il s'agit des descendants stricts |
 | `parent=site` | Parent direct égal à `site` ; `parent=None` désigne le premier niveau |
 | `has_rnb_id=True / False` | Bâtiments seulement |
 | `has_meter=True / False` | `find_meters()` non vide / vide |
@@ -1480,7 +1486,7 @@ signale. `by` n'est accepté que pour une sélection de bâtiments.
 ### 14.4 Complétude et provenance (v3.c)
 
 ```python
-sel.completeness()                    # par attribut
+sel.completeness()                    # par attribut (field)
 sel.completeness("entity")            # par entité
 sel.provenance(normalize=True)        # répartition des sources
 sel.conflicts(rtol=0.05)              # candidats en désaccord
@@ -1489,15 +1495,15 @@ sel.conflicts(rtol=0.05)              # candidats en désaccord
 Par défaut, `fields` contient tous les attributs sourcés de la classe des entités sélectionnées (projet
 compris, `footprint` compris). L'enveloppe et les systèmes ne sont pas couverts en v3.
 
-Signatures : `completeness(by="attribute", *, fields=None)`, `provenance(fields=None, *,
+Signatures : `completeness(per="field", *, fields=None)`, `provenance(fields=None, *,
 normalize=False)`, `conflicts(fields=None, *, rtol=0.05)`. Un attribut inconnu lève `UnknownFieldError`.
 Une entité dont la classe ne déclare pas un attribut (champ d'une autre sous-classe projet) n'est pas
 comptée pour lui. Un taux sans entité concernée est manquant (NaN).
 
-**`completeness(by="attribute", fields=None)`.** Une valeur héritée compte comme renseignée.
-- `by="attribute"` : une ligne par attribut. Colonnes `filled` (nombre d'entités avec une valeur
+**`completeness(per="field", fields=None)`.** Une valeur héritée compte comme renseignée.
+- `per="field"` : une ligne par attribut (index `field`). Colonnes `filled` (nombre d'entités avec une valeur
   effective), `inherited` (dont valeurs héritées), `total` et `rate` (`filled / total`).
-- `by="entity"` : une ligne par entité. Colonnes `filled`, `total`, `rate` et `missing` (liste des
+- `per="entity"` : une ligne par entité. Colonnes `filled`, `total`, `rate` et `missing` (liste des
   attributs sans valeur).
 
 **`provenance(fields=None, normalize=False)`.** Une ligne par attribut et une colonne par source retenue
@@ -1513,7 +1519,7 @@ conflit.
   est donc un conflit.
 - Les flottants sont comparés avec la tolérance relative `rtol` (rapportée à la plus grande valeur
   absolue).
-- Colonnes : `entity`, `attribute`, `values` (dict source → valeur, enums par leur valeur), `retained`
+- Colonnes : `entity`, `field`, `values` (dict source → valeur, enums par leur valeur), `retained`
   (source retenue). Sans conflit, le DataFrame est vide avec ces colonnes.
 - Par défaut, `footprint` n'est pas comparé : deux emprises de sources différentes (RNB, BDNB) ne sont
   presque jamais identiques au point près. On le compare en le nommant dans `fields`.
@@ -1527,7 +1533,7 @@ On la personnalise ensuite avec `fig.update_layout(...)`.
 
 | Méthode | Graphique | Données |
 |---|---|---|
-| `plot.completeness(by="attribute", *, fields=None)` | Barres horizontales du taux, avec la part héritée en couleur distincte | §14.4 |
+| `plot.completeness(per="field", *, fields=None)` | Barres horizontales du taux, avec la part héritée en couleur distincte | §14.4 |
 | `plot.provenance(fields=None)` | Barres empilées des sources par attribut (parts) | §14.4 |
 | `plot.aggregate(field, *, by=None, prefer="buildings")` | Barres de `total` par site (ou par groupe `by`), avec la couverture au survol | §14.3 |
 | `plot.distribution(field, *, bins=None)` | Histogramme pour un nombre ; barres de fréquence pour une enum ou une chaîne | Valeurs effectives |

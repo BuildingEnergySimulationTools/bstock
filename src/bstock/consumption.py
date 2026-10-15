@@ -122,7 +122,7 @@ def _consumption(
     park = selection.park
     periods = _periods(start, end, freq, tz)
     if split is not None:
-        if selection.kind != "building":
+        if selection.entity != "building":
             raise InvalidArgumentError("split= only applies to a selection of buildings")
         _check_extensive(park, split, "split")
     notes: list[str] = []
@@ -182,7 +182,7 @@ def _rows(selection: Selection) -> Iterable[tuple[str, list[Owner], Meter]]:
     park = selection.park
     heads = [m for m in park.meters if m.parent_meter is None and m.scope]
     entities = selection._entities()
-    if selection.kind == "building":
+    if selection.entity == "building":
         relevant = {b.id for b in entities} | {s.id for b in entities for s in b._ancestor_sites()}
         for meter in heads:
             owners = _owners(park, meter)
@@ -420,7 +420,7 @@ def _frame(lines: list[_Line], *, with_period: bool) -> pd.DataFrame:
 def _check_extensive(park: BuildingPark, name: str, argument: str) -> None:
     field_ = park.building_cls.sourced_fields().get(name)
     if field_ is None:
-        raise UnknownFieldError(f"{argument}: {name!r} is not an attribute of the buildings")
+        raise UnknownFieldError(f"{argument}: {name!r} is not a field of the buildings")
     if not field_.extensive:
         raise InvalidArgumentError(f"{argument}: {name!r} is not extensive")
 

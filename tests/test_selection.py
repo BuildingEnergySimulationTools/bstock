@@ -38,18 +38,18 @@ def park():
 def test_select_without_criteria_returns_every_building_in_tree_order(park):
     selection = park.select()
     assert isinstance(selection, Selection)
-    assert selection.kind == "building"
+    assert selection.entity == "building"
     assert selection.ids == tuple(b.id for b in park.iter_buildings())
     assert list(selection) == list(park.iter_buildings())
 
 
 def test_select_sites(park):
-    assert park.select(kind="site").ids == ("gs", "group", "other")
+    assert park.select(entity="site").ids == ("gs", "group", "other")
 
 
-def test_unknown_kind_is_refused(park):
-    with pytest.raises(UnknownKindError):
-        park.select(kind="meter")
+def test_unknown_entity_type_is_refused(park):
+    with pytest.raises(InvalidArgumentError, match="entity must be"):
+        park.select(entity="meter")
 
 
 def test_inherited_value_matches(park):
@@ -132,12 +132,12 @@ def test_within_accepts_a_site_object(park):
     ],
 )
 def test_criteria_on_sites(park, criteria, expected):
-    assert park.select(kind="site", **criteria).ids == expected
+    assert park.select(entity="site", **criteria).ids == expected
 
 
 def test_has_rnb_id_does_not_apply_to_sites(park):
     with pytest.raises(InvalidArgumentError, match="has_rnb_id"):
-        park.select(kind="site", has_rnb_id=True)
+        park.select(entity="site", has_rnb_id=True)
 
 
 def test_unknown_system_kind_is_refused(park):
@@ -183,7 +183,7 @@ def test_misused_operators_are_refused(park, criteria, match):
 
 def test_filter_narrows_a_selection(park):
     narrowed = park.select(usage="tertiary").filter(heated_area__isnull=False)
-    assert (narrowed.kind, narrowed.ids) == ("building", ("b3", "b1"))
+    assert (narrowed.entity, narrowed.ids) == ("building", ("b3", "b1"))
 
 
 def test_len_and_membership(park):
@@ -209,7 +209,7 @@ def test_set_operations_keep_the_tree_order(park, operation, expected):
 
 def test_set_operations_need_same_kind_and_park(park):
     with pytest.raises(InvalidArgumentError):
-        park.select() | park.select(kind="site")
+        park.select() | park.select(entity="site")
     other = BuildingPark(name="Q")
     with pytest.raises(InvalidArgumentError):
         park.select() & other.select()
@@ -229,13 +229,13 @@ def test_to_dataframe_is_restricted_to_the_selection(park):
 
 
 def test_site_selection_to_dataframe(park):
-    frame = park.select(kind="site", parent=None).to_dataframe()
+    frame = park.select(entity="site", parent=None).to_dataframe()
     assert list(frame.index) == ["gs", "other"]
 
 
 def test_tree_shows_selection_and_ancestors(park):
     assert park.select(heated_area__gt=0).tree().lines() == [
-        "Selection(kind='building', 2 entities) of BuildingPark 'P'",
+        "Selection(entity='building', 2 entities) of BuildingPark 'P'",
         "└── [site] gs  (2 buildings)",
         "    ├── [site] group  (1 building)",
         "    │   └── [building] b1",
@@ -244,8 +244,8 @@ def test_tree_shows_selection_and_ancestors(park):
 
 
 def test_site_selection_tree_counts_every_building(park):
-    assert park.select(kind="site", within="gs").tree().lines() == [
-        "Selection(kind='site', 1 entity) of BuildingPark 'P'",
+    assert park.select(entity="site", within="gs").tree().lines() == [
+        "Selection(entity='site', 1 entity) of BuildingPark 'P'",
         "└── [site] gs  (3 buildings)",
         "    └── [site] group  (2 buildings)",
     ]
@@ -253,5 +253,5 @@ def test_site_selection_tree_counts_every_building(park):
 
 def test_repr_is_one_line_and_html_is_the_tree(park):
     selection = park.select(has_rnb_id=True)
-    assert repr(selection) == "Selection(kind='building', 1 entity)"
+    assert repr(selection) == "Selection(entity='building', 1 entity)"
     assert "[building] b1" in selection._repr_html_()

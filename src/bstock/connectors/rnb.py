@@ -125,7 +125,7 @@ def format_address(address: dict[str, Any]) -> str | None:
 
 
 def building_candidates(record: dict[str, Any]) -> dict[str, SourcedValue]:
-    """Translate an RNB building into ``"rnb"`` candidates, by attribute name.
+    """Translate an RNB building into ``"rnb"`` candidates, by field name.
 
     ``point`` gives ``lat`` / ``lon``, ``shape`` the ``footprint`` (only a valid ``Polygon`` or
     ``MultiPolygon``), the first address ``address``, ``municipality`` and ``insee_code``. Each
@@ -303,7 +303,7 @@ def suggest_matches(
     park: BuildingPark,
     buildings: Iterable[Building | str] | None = None,
     *,
-    by: Literal["point", "address"] = "point",
+    method: Literal["point", "address"] = "point",
     radius: float = 30.0,
     assign: Literal["unique"] | None = None,
     client: RnbClient | None = None,
@@ -319,7 +319,7 @@ def suggest_matches(
         Park whose buildings are matched.
     buildings
         Buildings (objects or ids) to match; every building without ``rnb_id`` when ``None``.
-    by
+    method
         ``"point"``: RNB buildings within ``radius`` of the effective ``lat`` / ``lon`` (inherited
         from the site when the building has none). ``"address"``: the RNB buildings at the
         effective ``address``, geocoded by the RNB with the BAN.
@@ -344,14 +344,14 @@ def suggest_matches(
     Raises
     ------
     InvalidArgumentError
-        If ``by``, ``radius`` or ``assign`` is invalid.
+        If ``method``, ``radius`` or ``assign`` is invalid.
     UnknownIdError
         If a building id is not in the park.
     ConnectorError
         If the API fails persistently.
     """
-    if by not in ("point", "address"):
-        raise InvalidArgumentError(f"by must be 'point' or 'address', not {by!r}")
+    if method not in ("point", "address"):
+        raise InvalidArgumentError(f"method must be 'point' or 'address', not {method!r}")
     if not 0 < radius <= MAX_RADIUS:
         raise InvalidArgumentError(f"radius must be in ]0, {MAX_RADIUS:g}] m, not {radius!r}")
     if assign not in (None, "unique"):
@@ -364,7 +364,7 @@ def suggest_matches(
     )
     rows: list[dict[str, Any]] = []
     for building in targets:
-        found = list(_candidates(client, building, by, radius))
+        found = list(_candidates(client, building, method, radius))
         for candidate in found:
             used = _find(park, candidate["rnb_id"])
             candidate.update(building_id=building.id, used_by=used and used.id, assigned=False)
@@ -419,9 +419,9 @@ def _find(park: BuildingPark, rnb_id: str) -> Building | None:
 
 
 def _candidates(
-    client: RnbClient, building: Building, by: str, radius: float
+    client: RnbClient, building: Building, method: str, radius: float
 ) -> Iterator[dict[str, Any]]:
-    if by == "point":
+    if method == "point":
         if building.lat is None or building.lon is None:
             logger.info("%s: no lat/lon, no RNB suggestion", building.id)
             return

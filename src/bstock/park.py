@@ -44,7 +44,7 @@ from bstock.exceptions import (
 )
 from bstock.meters import Meter
 from bstock.provenance import SourcePriority
-from bstock.selection import Predicate, Selection, SelectionKind, select
+from bstock.selection import EntityType, Predicate, Selection, select
 from bstock.site import Site, build_children
 from bstock.systems import System
 
@@ -229,19 +229,19 @@ class BuildingPark(BaseModel):
     # --- exports (implemented in bstock.export) -------------------------------------------------
 
     def to_dataframe(
-        self, kind: Literal["building", "site"] = "building", *, provenance: bool = False
+        self, entity: EntityType = "building", *, provenance: bool = False
     ) -> pd.DataFrame:
-        """Return one row per building (or site) with the effective attribute values (SPEC §9).
+        """Return one row per building (or site) with the effective field values (SPEC §9).
 
         See :func:`bstock.export.to_dataframe`.
         """
         from bstock import export  # circular import
 
-        return export.to_dataframe(self, kind, provenance=provenance)
+        return export.to_dataframe(self, entity, provenance=provenance)
 
     def to_geodataframe(
         self,
-        kind: Literal["building", "site"] = "building",
+        entity: EntityType = "building",
         *,
         geometry: Literal["footprint", "point"] = "footprint",
         provenance: bool = False,
@@ -252,7 +252,7 @@ class BuildingPark(BaseModel):
         """
         from bstock import export  # circular import
 
-        return export.to_geodataframe(self, kind, geometry=geometry, provenance=provenance)
+        return export.to_geodataframe(self, entity, geometry=geometry, provenance=provenance)
 
     def to_geopackage(
         self,
@@ -272,7 +272,7 @@ class BuildingPark(BaseModel):
     def to_geoparquet(
         self,
         path: str | Path,
-        kind: Literal["building", "site"] = "building",
+        entity: EntityType = "building",
         *,
         geometry: Literal["footprint", "point"] = "footprint",
         provenance: bool = False,
@@ -283,7 +283,7 @@ class BuildingPark(BaseModel):
         """
         from bstock import export  # circular import
 
-        return export.to_geoparquet(self, path, kind, geometry=geometry, provenance=provenance)
+        return export.to_geoparquet(self, path, entity, geometry=geometry, provenance=provenance)
 
     # --- lookup -------------------------------------------------------------------------------
 
@@ -367,14 +367,14 @@ class BuildingPark(BaseModel):
         self,
         predicate: Predicate | None = None,
         *,
-        kind: SelectionKind = "building",
+        entity: EntityType = "building",
         **criteria: Any,
     ) -> Selection:
         """Return the buildings (or sites) that match every criterion (SPEC §14.2).
 
         Criteria apply to the effective values, inheritance included: a building inheriting
         ``usage="tertiary"`` from its site matches ``usage="tertiary"``. A missing value matches
-        no comparison, except ``__isnull=True``. Without criterion, every entity of ``kind`` is
+        no comparison, except ``__isnull=True``. Without criterion, every ``entity`` is
         selected.
 
         Parameters
@@ -382,13 +382,14 @@ class BuildingPark(BaseModel):
         predicate
             Function called with each entity; the entity is kept when it returns a true value.
             Its exceptions are not caught.
-        kind
-            ``"building"`` or ``"site"``; a selection never mixes them.
+        entity
+            ``"building"`` or ``"site"``: the type of the selected entities; a selection never
+            mixes them.
         **criteria
-            Value criteria on a sourced attribute (project ones included), ``rnb_id``, the BDNB
+            Value criteria on a sourced field (project ones included), ``rnb_id``, the BDNB
             ids or ``dpe_ids``: ``attr=v`` (equality; an enum accepts its value), ``attr__in``,
             ``attr__lt``, ``attr__le``, ``attr__gt``, ``attr__ge``, ``attr__isnull=True/False``
-            and ``attr__contains`` (list attributes). Structure criteria: ``within=site`` (in
+            and ``attr__contains`` (list fields). Structure criteria: ``within=site`` (in
             the subtree of the site, object or id), ``parent=site`` (``None``: top level),
             ``has_rnb_id`` (buildings), ``has_meter``, and ``has_system=True/False`` or a system
             kind (for a building, shared systems serving it count).
@@ -401,17 +402,16 @@ class BuildingPark(BaseModel):
         Raises
         ------
         UnknownKindError
-            If ``kind`` is neither ``"building"`` nor ``"site"``, or ``has_system`` names an
-            unknown system kind.
+            If ``has_system`` names an unknown system kind.
         UnknownFieldError
-            If a criterion names an unknown attribute.
+            If a criterion names an unknown field.
         InvalidArgumentError
-            If an operator does not apply to the value or a criterion to ``kind``, or an enum
-            value is invalid.
+            If ``entity`` is neither ``"building"`` nor ``"site"``, an operator does not apply to
+            the value or a criterion to ``entity``, or an enum value is invalid.
         UnknownIdError
             If ``within`` or ``parent`` is not a site of the park.
         """
-        return select(self, predicate, kind=kind, **criteria)
+        return select(self, predicate, entity=entity, **criteria)
 
     # --- display ------------------------------------------------------------------------------
 
@@ -439,7 +439,7 @@ class BuildingPark(BaseModel):
             Number of levels shown (``None``: all; 1: top level only); deeper content is counted
             on one line.
         fields
-            Sourced attributes whose effective value (inheritance included) is shown on each
+            Sourced fields whose effective value (inheritance included) is shown on each
             line, with its unit, e.g. ``["usage", "heated_area"]``.
 
         Returns
@@ -450,7 +450,7 @@ class BuildingPark(BaseModel):
         Raises
         ------
         UnknownFieldError
-            If a name of ``fields`` is not a sourced attribute of the sites or buildings.
+            If a name of ``fields`` is not a sourced field of the sites or buildings.
         InvalidArgumentError
             If ``max_depth`` is negative.
         """
@@ -485,9 +485,9 @@ class BuildingPark(BaseModel):
         parent
             Parent site (object or id); ``None`` for a top-level site.
         source
-            Source of the sourced attributes given in ``attrs`` (``"manual"`` by default).
+            Source of the sourced fields given in ``attrs`` (``"manual"`` by default).
         **attrs
-            Site fields and sourced attributes.
+            Site fields and sourced fields.
         """
         site = self.site_cls(id=id, source=source, **attrs)
         return self.add_site(site, parent)
@@ -512,9 +512,9 @@ class BuildingPark(BaseModel):
         parent
             Site (object or id) receiving the building; ``None`` attaches it to the park.
         source
-            Source of the sourced attributes given in ``attrs`` (``"manual"`` by default).
+            Source of the sourced fields given in ``attrs`` (``"manual"`` by default).
         **attrs
-            Building fields and sourced attributes.
+            Building fields and sourced fields.
         """
         building = self.building_cls(rnb_id=rnb_id, id=id, source=source, **attrs)
         return self.add_building(building, parent)

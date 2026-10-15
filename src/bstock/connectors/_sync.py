@@ -33,7 +33,7 @@ __all__ = [
 ]
 
 Candidates = Mapping[str, SourcedValue]
-"""Candidates produced by a correspondence function, by sourced attribute name."""
+"""Candidates produced by a correspondence function, by sourced field name."""
 
 
 def put(model: SourcedModel, candidates: Candidates, *, source: str, clear: bool = False) -> None:
@@ -44,11 +44,11 @@ def put(model: SourcedModel, candidates: Candidates, *, source: str, clear: bool
     model
         Entity, system, envelope or component receiving the values.
     candidates
-        Candidates by attribute name; each one must come from ``source``.
+        Candidates by field name; each one must come from ``source``.
     source
         Source of the connector.
     clear
-        Also remove the ``source`` candidates of the attributes absent from ``candidates``, so
+        Also remove the ``source`` candidates of the fields absent from ``candidates``, so
         that a value the source no longer gives disappears.
 
     Raises

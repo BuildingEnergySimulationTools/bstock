@@ -201,7 +201,7 @@ def test_site_selection_adds_up_the_head_meters_of_the_subtree(park):
     add_meter(park, "m-site", ["s"], 1.0)
     add_meter(park, "m-b1", ["b1"], 2.0)
     add_meter(park, "m-b3", ["b3"], 4.0)
-    frame = park.select(kind="site").consumption(**YEAR)
+    frame = park.select(entity="site").consumption(**YEAR)
     assert frame.to_dict("records") == [
         {
             "entity": "s",
@@ -274,7 +274,7 @@ def test_invalid_arguments_are_refused(park, kwargs, error):
 
 def test_split_does_not_apply_to_sites(park):
     with pytest.raises(InvalidArgumentError, match="buildings"):
-        park.select(kind="site").consumption(**YEAR, split="heated_area")
+        park.select(entity="site").consumption(**YEAR, split="heated_area")
 
 
 def test_intensity_of_a_building(park):

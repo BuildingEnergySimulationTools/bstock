@@ -21,7 +21,7 @@ class Site(DescribedEntity):
     """A client site (school group, campus...) or a BDNB building group.
 
     Sites nest freely. The descriptive values of a site are inherited by its buildings and
-    sub-sites for intensive attributes, and its systems may serve several buildings.
+    sub-sites for intensive fields, and its systems may serve several buildings.
 
     Parameters
     ----------
@@ -109,7 +109,7 @@ class Site(DescribedEntity):
             Number of levels shown below the site (``None``: all); deeper content is counted on
             one line.
         fields
-            Sourced attributes whose effective value is shown on each line, with its unit.
+            Sourced fields whose effective value is shown on each line, with its unit.
 
         Returns
         -------
@@ -119,7 +119,7 @@ class Site(DescribedEntity):
         Raises
         ------
         UnknownFieldError
-            If a name of ``fields`` is not a sourced attribute of the sites or buildings.
+            If a name of ``fields`` is not a sourced field of the sites or buildings.
         InvalidArgumentError
             If ``max_depth`` is negative.
         """

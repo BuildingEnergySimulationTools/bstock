@@ -318,7 +318,7 @@ def dpe_date(value: str | None) -> datetime.date | None:
 def _add(
     found: dict[str, SourcedValue], name: str, value: Any, ref: str | None, raw: Any = None
 ) -> None:
-    """Add a candidate when ``value`` is set and valid for the attribute."""
+    """Add a candidate when ``value`` is set and valid for the field."""
     if value is None:
         return
     try:

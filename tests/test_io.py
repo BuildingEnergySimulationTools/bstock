@@ -7,7 +7,7 @@ import pytest
 from bstock.building import Building
 from bstock.enums import Inertia
 from bstock.envelope import EnvelopeComponent, Window
-from bstock.exceptions import ClassMismatchWarning, UnknownAttributeWarning, UnsupportedSchemaError
+from bstock.exceptions import ClassMismatchWarning, UnknownFieldWarning, UnsupportedSchemaError
 from bstock.io import class_path
 from bstock.meters import Channel, Meter
 from bstock.park import BuildingPark
@@ -41,7 +41,7 @@ def park():
         name="Ville de Bayonne",
         site_cls=BayonneSite,
         building_cls=BayonneBuilding,
-        source_priority=SourcePriority(per_attribute={"heated_area": ["bayonne_xlsx", "dpe"]}),
+        source_priority=SourcePriority(per_field={"heated_area": ["bayonne_xlsx", "dpe"]}),
     )
     client = park.new_site("site-ecole-A", secteur="Nord", usage="tertiary", source="bayonne_xlsx")
     group = park.new_site(GROUP, parent=client, bdnb_batiment_groupe_id=GROUP)
@@ -123,7 +123,7 @@ def test_round_trip_keeps_source_priority(park):
 
 def test_loading_with_base_classes_keeps_project_attributes(park):
     text = park.to_json()
-    with pytest.warns(UnknownAttributeWarning), pytest.warns(ClassMismatchWarning):
+    with pytest.warns(UnknownFieldWarning), pytest.warns(ClassMismatchWarning):
         plain = BuildingPark.from_json(text)
     assert type(plain[RNB_A]) is Building
     assert plain[RNB_A].candidates("code_patrimoine")[0].value == "BAT-0042"
@@ -241,14 +241,14 @@ def test_multi_channel_meter_round_trip(tmp_path):
 
 def test_json_schema_lists_sourced_attributes_with_units():
     schema = BuildingPark.json_schema(site_cls=BayonneSite, building_cls=BayonneBuilding)
-    sourced_attributes = schema["x-bstock-sourced-attributes"]
-    assert sourced_attributes["BayonneBuilding"]["surface_utile_client"]["unit"] == "m²"
-    assert sourced_attributes["BayonneBuilding"]["construction_year"]["inherit"] is True
-    assert sourced_attributes["Envelope"]["inertia"]["schema"]["enum"] == [i.value for i in Inertia]
-    assert sourced_attributes["HeatingGenerator"]["nominal_power"]["unit"] == "kW"
-    assert sourced_attributes["BayonneBuilding"]["heated_area"]["extensive"] is True
-    assert sourced_attributes["BayonneBuilding"]["construction_year"]["extensive"] is False
-    footprint = sourced_attributes["BayonneBuilding"]["footprint"]
+    sourced_fields = schema["x-bstock-sourced-fields"]
+    assert sourced_fields["BayonneBuilding"]["surface_utile_client"]["unit"] == "m²"
+    assert sourced_fields["BayonneBuilding"]["construction_year"]["inherit"] is True
+    assert sourced_fields["Envelope"]["inertia"]["schema"]["enum"] == [i.value for i in Inertia]
+    assert sourced_fields["HeatingGenerator"]["nominal_power"]["unit"] == "kW"
+    assert sourced_fields["BayonneBuilding"]["heated_area"]["extensive"] is True
+    assert sourced_fields["BayonneBuilding"]["construction_year"]["extensive"] is False
+    footprint = sourced_fields["BayonneBuilding"]["footprint"]
     assert footprint["schema"]["properties"]["type"]["enum"] == ["Polygon", "MultiPolygon"]
     assert footprint["inherit"] is False
     assert "sites" in schema["properties"]

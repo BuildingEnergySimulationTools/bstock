@@ -86,17 +86,17 @@ def test_only_sites_containing_selected_buildings_get_a_row(park):
 
 
 def test_selection_of_sites_counts_their_whole_subtree(park):
-    frame = park.select(kind="site", parent=None).aggregate([HEATED], prefer="site")
+    frame = park.select(entity="site", parent=None).aggregate([HEATED], prefer="site")
     assert list(frame.index) == ["res-x", "campus", PARK_ROW]
     assert frame.loc["campus", ("building_count", "value")] == 3
     assert frame.loc[PARK_ROW, (HEATED, "total")] == 4200
 
 
 def test_nested_selected_sites_are_totalled_once(park):
-    frame = park.select(kind="site", within="campus").aggregate([HEATED])
+    frame = park.select(entity="site", within="campus").aggregate([HEATED])
     assert list(frame.index) == ["lab", PARK_ROW]
     assert frame.loc[PARK_ROW, (HEATED, "total")] == 500
-    both = park.select(kind="site", has_system=True) | park.select(kind="site", within="campus")
+    both = park.select(entity="site", has_system=True) | park.select(entity="site", within="campus")
     assert both.aggregate([HEATED]).loc[PARK_ROW, (HEATED, "total")] == 2900 + 500
 
 
@@ -178,7 +178,7 @@ def test_by_does_not_warn_without_site_values(park):
 
 def test_by_applies_to_buildings_only(park):
     with pytest.raises(InvalidArgumentError, match="buildings"):
-        park.select(kind="site").aggregate(by="usage")
+        park.select(entity="site").aggregate(by="usage")
 
 
 def test_aggregation_does_not_modify_the_park(park):
@@ -203,9 +203,9 @@ def sourced_park():
     return park
 
 
-def test_completeness_by_attribute_counts_inherited_values_as_filled(sourced_park):
+def test_completeness_per_field_counts_inherited_values_as_filled(sourced_park):
     frame = sourced_park.select().completeness(fields=["construction_year", "heated_area", "name"])
-    assert frame.index.name == "attribute"
+    assert frame.index.name == "field"
     assert frame.loc["construction_year"].to_dict() == {
         "filled": 2,
         "inherited": 1,
@@ -238,14 +238,14 @@ def test_completeness_of_project_attributes_and_of_sites():
     park.new_building(id="a", code="X")
     park.new_building(id="b")
     assert park.select().completeness(fields=["code"]).loc["code", "rate"] == 0.5
-    assert park.select(kind="site").completeness().loc["name", "total"] == 0
+    assert park.select(entity="site").completeness().loc["name", "total"] == 0
 
 
 @pytest.mark.parametrize(
     ("method", "kwargs", "error"),
     [
         ("completeness", {"fields": ["colour"]}, UnknownFieldError),
-        ("completeness", {"by": "site"}, InvalidArgumentError),
+        ("completeness", {"per": "site"}, InvalidArgumentError),
         ("provenance", {"fields": ["colour"]}, UnknownFieldError),
         ("conflicts", {"fields": ["colour"]}, UnknownFieldError),
         ("conflicts", {"rtol": -0.1}, InvalidArgumentError),
@@ -292,7 +292,7 @@ def test_conflicts_compare_integers_strictly(sourced_park):
     assert frame.to_dict("records") == [
         {
             "entity": "b1",
-            "attribute": "construction_year",
+            "field": "construction_year",
             "values": {"dpe": 1972, "bdnb": 1970},
             "retained": "dpe",
         }
@@ -322,11 +322,11 @@ def test_footprint_is_compared_only_on_request(sourced_park):
     other = {"type": "Polygon", "coordinates": [[[0, 0], [0, 2], [2, 2], [0, 0]]]}
     sourced_park["b2"].set("footprint", square, source="rnb")
     sourced_park["b2"].set("footprint", other, source="bdnb")
-    assert "footprint" not in set(sourced_park.select().conflicts()["attribute"])
+    assert "footprint" not in set(sourced_park.select().conflicts()["field"])
     assert len(sourced_park.select().conflicts(["footprint"])) == 1
 
 
 def test_no_conflict_gives_an_empty_frame(park):
     frame = park.select().conflicts()
     assert frame.empty
-    assert list(frame.columns) == ["entity", "attribute", "values", "retained"]
+    assert list(frame.columns) == ["entity", "field", "values", "retained"]

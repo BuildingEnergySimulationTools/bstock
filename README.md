@@ -6,7 +6,7 @@ Common data structure for building stocks: sites, buildings, envelopes, systems 
   DPE, audit, client files...) and a configurable priority picks the effective one.
 - **Nested sites**: a client site can contain BDNB building groups; buildings inherit intensive
   values (year, usage, U-value...) from their site, never extensive ones (areas, dwellings).
-- **Project extensions**: subclass `Site` and `Building` to add client attributes; the park creates
+- **Project extensions**: subclass `Site` and `Building` to add client fields; the park creates
   and reloads them with your classes.
 - **Metered data** in the [tide](https://github.com/BuildingEnergySimulationTools/tide) column format
   `name__unit__bloc__sub_bloc`, read from CSV, Parquet or your own readers.
@@ -51,7 +51,7 @@ Requires Python ≥ 3.11.
 from bstock import Building, BuildingPark, Channel, CsvReader, Meter, Site, sourced
 
 
-class MyBuilding(Building):            # client attributes, with provenance too
+class MyBuilding(Building):            # client fields, with provenance too
     asset_code = sourced(str)
 
 
@@ -90,7 +90,7 @@ park                                   # tree of the sites and buildings, cut to
 
 park.tree(systems=True, meters=True, fields=["construction_year"])   # full tree, with options
 park["A1B2C3D4E5F6"]                   # MyBuilding(id='A1B2C3D4E5F6', parent='bdnb-bg-1111-1HRT-8SVH')
-park["A1B2C3D4E5F6"].describe()        # value, unit, source, provider, inherited? per attribute
+park["A1B2C3D4E5F6"].describe()        # value, unit, source, provider, inherited? per field
 ```
 
 In Jupyter, the park, its sites and `tree()` display as a foldable HTML tree.
@@ -102,7 +102,7 @@ sel = park.select(usage="tertiary", construction_year__lt=1975)    # effective v
 sel = sel.filter(heated_area__isnull=False)                         # narrow it down
 park.select(within="school-A") - park.select(has_rnb_id=True)     # set operations: | & -
 park.select(lambda b: (b.height or 0) > 10, has_system="heating")  # any predicate, structure criteria
-park.select(kind="site", parent=None)                              # top-level sites
+park.select(entity="site", parent=None)                              # top-level sites
 
 len(sel), list(sel), sel.ids
 sel.to_dataframe(provenance=True)      # the rows of the selected buildings
@@ -119,8 +119,8 @@ again after changing the park.
 sel = park.select()
 sel.aggregate(["heated_area"])         # per site: sum of the buildings, site value, delta, coverage,
                                        # total (prefer="buildings" or "site"), then a "__park__" row
-sel.aggregate(by="usage")              # extensive attributes summed per usage
-sel.completeness()                     # per attribute: filled, inherited, total, rate
+sel.aggregate(by="usage")              # extensive fields summed per usage
+sel.completeness()                     # per field: filled, inherited, total, rate
 sel.completeness("entity")             # per building: what is missing
 sel.provenance(normalize=True)         # share of each source in the effective values
 sel.conflicts(rtol=0.05)               # own candidates that disagree (floats within 5 %)
@@ -128,7 +128,7 @@ sel.conflicts(rtol=0.05)               # own candidates that disagree (floats wi
 
 A site may have its own value (a DPE of the whole block) and its buildings theirs: the aggregation
 shows both and never adds them up. Missing values are never estimated, the `coverage` shows them.
-Project attributes declared `sourced(..., extensive=True)` are aggregated too.
+Project fields declared `sourced(..., extensive=True)` are aggregated too.
 
 ## Measured consumption
 
@@ -158,13 +158,13 @@ With the `[plot]` extra, `sel.plot` builds plotly figures; each method returns a
 
 ```python
 sel = park.select()
-sel.plot.completeness()                              # filled share per attribute, own / inherited
+sel.plot.completeness()                              # filled share per field, own / inherited
 sel.plot.provenance(["usage", "heated_area"])        # share of each source
 sel.plot.aggregate("heated_area")                    # total per site, park total in the subtitle
 sel.plot.distribution("construction_year", bins=10)  # histogram, or counts for categories
 sel.plot.map(color="usage")                          # points on OpenStreetMap, no API key
 sel.plot.map(geometry="footprint", color="heated_area")
-park.select(kind="site").plot.consumption(start="2024-01-01", end="2025-01-01")
+park.select(entity="site").plot.consumption(start="2024-01-01", end="2025-01-01")
 sel.plot.intensity(start="2024-01-01", end="2025-01-01", freq="MS")
 ```
 
@@ -201,7 +201,7 @@ bdnb.enrich(park)        # year, usage, dwellings, height, generators; BDNB grou
 report = dpe.enrich(park)  # most recent building DPE: areas, envelope, generators
 report.to_dataframe()      # what was created, enriched, not found, and why
 
-rnb.suggest_matches(park, by="address")   # RNB candidates for buildings without rnb_id
+rnb.suggest_matches(park, method="address")   # RNB candidates for buildings without rnb_id
 
 park.to_dataframe(provenance=True)        # effective values with their source and provider
 park.to_geopackage("bayonne.gpkg")        # "sites" and "buildings" layers

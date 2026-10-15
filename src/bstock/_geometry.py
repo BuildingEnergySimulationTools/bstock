@@ -110,7 +110,7 @@ Footprint = Annotated[
         }
     ),
 ]
-"""Type of the ``footprint`` sourced attribute."""
+"""Type of the ``footprint`` sourced field."""
 
 
 def geometry_area(geometry: dict[str, Any]) -> float:

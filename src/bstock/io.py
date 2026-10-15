@@ -86,8 +86,8 @@ def from_json(
 ) -> BuildingPark:
     """Load a park from JSON text, instantiating ``site_cls`` and ``building_cls`` everywhere.
 
-    Attributes unknown to the classes are kept with an
-    :class:`~bstock.exceptions.UnknownAttributeWarning`, and a :class:`ClassMismatchWarning` is
+    Fields unknown to the classes are kept with an
+    :class:`~bstock.exceptions.UnknownFieldWarning`, and a :class:`ClassMismatchWarning` is
     emitted when the file was saved with other classes.
 
     Raises
@@ -109,7 +109,7 @@ def from_json(
         if saved is not None and saved != class_path(cls):
             warnings.warn(
                 f"the park was saved with {key}={saved}, loaded with {class_path(cls)}; "
-                f"import that class and pass {key}= to load it with its project attributes",
+                f"import that class and pass {key}= to load it with its project fields",
                 ClassMismatchWarning,
                 stacklevel=3,
             )
@@ -205,8 +205,8 @@ def json_schema(
 ) -> dict[str, Any]:
     """Return the JSON Schema of ``park.json``.
 
-    Sourced attributes are stored in the ``values`` object of each entity, so the schema lists
-    them separately in ``x-bstock-sourced-attributes``: for each class, the attribute type (as a
+    Sourced fields are stored in the ``values`` object of each entity, so the schema lists
+    them separately in ``x-bstock-sourced-fields``: for each class, the field type (as a
     JSON Schema), unit, inheritance and extensive flags and description.
     """
     from bstock.park import BuildingPark  # circular import
@@ -221,7 +221,7 @@ def json_schema(
         *SYSTEM_CLASSES.values(),
         Meter,
     ]
-    schema["x-bstock-sourced-attributes"] = {
+    schema["x-bstock-sourced-fields"] = {
         cls.__name__: {
             name: {
                 "schema": TypeAdapter(field.type_).json_schema(),

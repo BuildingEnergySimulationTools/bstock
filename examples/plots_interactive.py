@@ -73,7 +73,7 @@ for n, site_id in enumerate(SITES, start=1):
         )
         meter.data = pd.DataFrame({"energy": daily}, index=days)
 
-buildings, sites = park.select(), park.select(kind="site")
+buildings, sites = park.select(), park.select(entity="site")
 year = {"start": "2024-01-01", "end": "2025-01-01"}
 park.tree(systems=True, meters=True)
 

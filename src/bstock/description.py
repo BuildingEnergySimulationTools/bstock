@@ -1,4 +1,4 @@
-"""Attributes and behaviour shared by sites and buildings (SPEC §3.5, §3.6)."""
+"""Fields and behaviour shared by sites and buildings (SPEC §3.5, §3.6)."""
 
 from __future__ import annotations
 
@@ -45,8 +45,8 @@ __all__ = ["DescribedEntity"]
 class DescribedEntity(SourcedModel):
     """Base class of :class:`~bstock.site.Site` and :class:`~bstock.building.Building`.
 
-    It carries the descriptive attributes common to both, an envelope and the systems owned by
-    the entity. Intensive attributes (``inherit=True``) fall back on the parent site value;
+    It carries the descriptive fields common to both, an envelope and the systems owned by
+    the entity. Intensive fields (``inherit=True``) fall back on the parent site value;
     extensive ones (counts, areas) never do.
     """
 

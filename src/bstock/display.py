@@ -1,7 +1,7 @@
 """Readable representations of the park and its entities (SPEC §14.1).
 
 Containers (park, site) are shown as a tree, the other entities on one line; ``describe()``
-details the sourced attributes of an entity.
+details the sourced fields of an entity.
 """
 
 from __future__ import annotations
@@ -268,7 +268,7 @@ def _check_fields(fields: list[str], entities: list[Any]) -> None:
         known.update(cls.sourced_fields())
     unknown = [name for name in fields if name not in known]
     if unknown:
-        raise UnknownFieldError(f"unknown sourced attribute(s): {', '.join(map(repr, unknown))}")
+        raise UnknownFieldError(f"unknown sourced field(s): {', '.join(map(repr, unknown))}")
 
 
 def _park_header(park: BuildingPark) -> str:
@@ -307,7 +307,7 @@ def one_line_repr(entity: SourcedModel) -> str:
 
 
 def sourced_items(entity: SourcedModel, names: Sequence[str]) -> list[tuple[str, str]]:
-    """Return ``(name, text)`` for the sourced attributes of ``names`` that have a value."""
+    """Return ``(name, text)`` for the sourced fields of ``names`` that have a value."""
     items = []
     for name in names:
         value = getattr(entity, name)
@@ -333,7 +333,7 @@ def _unit(entity: SourcedModel, name: str) -> str | None:
 
 
 def describe(entity: SourcedModel) -> pd.DataFrame:
-    """Return one row per sourced attribute of ``entity``; see :meth:`SourcedModel.describe`."""
+    """Return one row per sourced field of ``entity``; see :meth:`SourcedModel.describe`."""
     rows = []
     for name, field in entity.sourced_fields().items():
         candidate = entity.effective(name)
@@ -341,7 +341,7 @@ def describe(entity: SourcedModel) -> pd.DataFrame:
         value = None if candidate is None else candidate.value
         rows.append(
             {
-                "attribute": name,
+                "field": name,
                 "value": value.value if isinstance(value, Enum) else value,
                 "unit": field.unit,
                 "source": None if candidate is None else candidate.source,
@@ -351,5 +351,5 @@ def describe(entity: SourcedModel) -> pd.DataFrame:
             }
         )
     columns = ["value", "unit", "source", "provider", "inherited", "candidates"]
-    frame = pd.DataFrame(rows, columns=["attribute", *columns]).set_index("attribute")
+    frame = pd.DataFrame(rows, columns=["field", *columns]).set_index("field")
     return frame.astype({"value": object, "inherited": bool, "candidates": int})

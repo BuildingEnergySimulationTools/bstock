@@ -103,7 +103,7 @@ AnyComponent = Annotated[
 class Envelope(SourcedModel):
     """Envelope of a building or of a site.
 
-    The summary attributes are always usable; ``components`` optionally describes the envelope per
+    The summary fields are always usable; ``components`` optionally describes the envelope per
     component kind (as in the DPE open data) or in detail (as in the DPE XML or an audit). The two
     levels are not synchronised: the ``compute_*`` methods add ``"computed"`` candidates explicitly.
     """

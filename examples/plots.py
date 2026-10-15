@@ -82,7 +82,7 @@ def build_park() -> BuildingPark:
 def main(output: Path) -> BuildingPark:
     """Write the figures of the example in ``output`` and return the park."""
     park = build_park()
-    buildings, sites = park.select(), park.select(kind="site")
+    buildings, sites = park.select(), park.select(entity="site")
     year = {"start": "2024-01-01", "end": "2025-01-01"}
     figures = {
         # 1. reports

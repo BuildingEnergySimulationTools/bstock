@@ -4,7 +4,7 @@ import pandas as pd
 import pytest
 
 from bstock.building import Building
-from bstock.exceptions import MissingDependencyError, UnknownKindError
+from bstock.exceptions import InvalidArgumentError, MissingDependencyError
 from bstock.park import BuildingPark
 from bstock.provenance import sourced
 from bstock.site import Site
@@ -128,8 +128,8 @@ def test_empty_park_gives_empty_frame_with_columns(kind):
     assert "construction_year_source" in frame.columns
 
 
-def test_unknown_kind_is_rejected(park):
-    with pytest.raises(UnknownKindError, match="export kind"):
+def test_unknown_entity_type_is_rejected(park):
+    with pytest.raises(InvalidArgumentError, match="entity must be"):
         park.to_dataframe("meter")
 
 

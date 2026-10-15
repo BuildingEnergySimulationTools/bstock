@@ -1,10 +1,10 @@
 """Multi-source provenance of descriptive values (SPEC §4).
 
-A *sourced* attribute keeps a list of candidate values, one per source (``"bdnb"``, ``"dpe"``,
-``"audit"``, ``"manual"``...). Reading the attribute returns the *effective* value, chosen among the
+A *sourced* field keeps a list of candidate values, one per source (``"bdnb"``, ``"dpe"``,
+``"audit"``, ``"manual"``...). Reading the field returns the *effective* value, chosen among the
 candidates by a :class:`SourcePriority`.
 
-Sourced attributes are declared without annotation::
+Sourced fields are declared without annotation::
 
     class Building(SourcedModel):
         heated_area = sourced(float, unit="m²", ge=0, description="Heated area")
@@ -35,8 +35,8 @@ from bstock._children import deepcopy_linked
 from bstock.exceptions import (
     HierarchyError,
     InvalidArgumentError,
-    UnknownAttributeWarning,
     UnknownFieldError,
+    UnknownFieldWarning,
 )
 
 if TYPE_CHECKING:
@@ -67,12 +67,12 @@ WILDCARD_SOURCE = "*"
 
 
 class SourcedValue(BaseModel):
-    """One candidate value of a sourced attribute, with its provenance.
+    """One candidate value of a sourced field, with its provenance.
 
     Parameters
     ----------
     value
-        The value, validated against the attribute type.
+        The value, validated against the field type.
     source
         Origin of the information, e.g. ``"bdnb"``, ``"dpe"``, ``"audit"``, ``"bayonne_xlsx_2024"``.
     date
@@ -109,7 +109,7 @@ class _ReadOnlyDict(dict[str, Any]):
 
 
 class SourcePriority(BaseModel):
-    """Rules choosing the effective value among the candidates of an attribute (SPEC §4.3).
+    """Rules choosing the effective value among the candidates of a field (SPEC §4.3).
 
     Instances are immutable: to change the priority of a park, assign a new one
     (``park.source_priority = SourcePriority(...)``).
@@ -119,8 +119,8 @@ class SourcePriority(BaseModel):
     default
         Sources from the most to the least trusted. ``"*"`` gives its rank to unlisted sources;
         without it, unlisted sources come after every listed one.
-    per_attribute
-        Priority lists overriding ``default`` for given attribute names.
+    per_field
+        Priority lists overriding ``default`` for given field names.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -135,29 +135,27 @@ class SourcePriority(BaseModel):
         WILDCARD_SOURCE,
         "assumption",
     )
-    per_attribute: Mapping[str, tuple[str, ...]] = Field(
-        default_factory=dict, validate_default=True
-    )
+    per_field: Mapping[str, tuple[str, ...]] = Field(default_factory=dict, validate_default=True)
 
-    @field_validator("per_attribute")
+    @field_validator("per_field")
     @classmethod
     def _read_only(cls, value: Mapping[str, tuple[str, ...]]) -> Mapping[str, tuple[str, ...]]:
         return _ReadOnlyDict(value)
 
-    def order_for(self, attribute: str) -> tuple[str, ...]:
-        """Return the priority list that applies to ``attribute``."""
-        return self.per_attribute.get(attribute, self.default)
+    def order_for(self, field: str) -> tuple[str, ...]:
+        """Return the priority list that applies to ``field``."""
+        return self.per_field.get(field, self.default)
 
-    def rank(self, attribute: str, source: str) -> int:
-        """Return the rank of ``source`` for ``attribute`` (lower is more trusted)."""
-        order = self.order_for(attribute)
+    def rank(self, field: str, source: str) -> int:
+        """Return the rank of ``source`` for ``field`` (lower is more trusted)."""
+        order = self.order_for(field)
         if source in order:
             return order.index(source)
         if WILDCARD_SOURCE in order:
             return order.index(WILDCARD_SOURCE)
         return len(order)
 
-    def select(self, attribute: str, candidates: Iterable[SourcedValue]) -> SourcedValue | None:
+    def select(self, field: str, candidates: Iterable[SourcedValue]) -> SourcedValue | None:
         """Return the effective candidate, or ``None`` if there is none.
 
         Ties on the source rank are broken by the most recent ``date`` (a missing date counts as
@@ -167,7 +165,7 @@ class SourcePriority(BaseModel):
         best_key: tuple[int, int, int] | None = None
         for index, candidate in enumerate(candidates):
             date_key = candidate.date.toordinal() if candidate.date is not None else -1
-            key = (self.rank(attribute, candidate.source), -date_key, -index)
+            key = (self.rank(field, candidate.source), -date_key, -index)
             if best_key is None or key < best_key:
                 best, best_key = candidate, key
         return best
@@ -178,13 +176,13 @@ DEFAULT_SOURCE_PRIORITY = SourcePriority()
 
 
 class SourcedField(Generic[T]):
-    """Descriptor of a sourced attribute; create it with :func:`sourced`.
+    """Descriptor of a sourced field; create it with :func:`sourced`.
 
     On an instance it returns the effective value (``T | None``); on the class it returns itself,
     which exposes the field definition (``Building.heated_area.unit``).
 
     Assigning sets the ``"manual"`` candidate. Assigning ``None`` removes that candidate only: the
-    attribute may keep a value from another source. Use :meth:`SourcedModel.unset` without
+    field may keep a value from another source. Use :meth:`SourcedModel.unset` without
     ``source`` to remove every candidate.
     """
 
@@ -199,7 +197,7 @@ class SourcedField(Generic[T]):
         **constraints: Any,
     ) -> None:
         if extensive and inherit:
-            raise InvalidArgumentError("an extensive attribute cannot be inherited")
+            raise InvalidArgumentError("an extensive field cannot be inherited")
         self.type_ = type_
         self.unit = unit
         self.inherit = inherit
@@ -256,7 +254,7 @@ def sourced(
     description: str | None = None,
     **constraints: Any,
 ) -> SourcedField[T]:
-    """Declare a sourced attribute on a :class:`SourcedModel` subclass.
+    """Declare a sourced field on a :class:`SourcedModel` subclass.
 
     Parameters
     ----------
@@ -270,7 +268,7 @@ def sourced(
         only, SPEC §4.4).
     extensive
         Whether the quantity adds up from one entity to another (count, area, power): such
-        attributes are summed by the aggregations (SPEC §3.3, §14.3).
+        fields are summed by the aggregations (SPEC §3.3, §14.3).
     description
         Human readable description.
     **constraints
@@ -297,14 +295,14 @@ def sourced(
 
 
 class SourcedModel(BaseModel):
-    """Base class of every bstock entity carrying sourced attributes.
+    """Base class of every bstock entity carrying sourced fields.
 
-    Constructor keyword arguments named after sourced attributes become candidates of the source
+    Constructor keyword arguments named after sourced fields become candidates of the source
     given by ``source`` (``"manual"`` by default); ``None`` values are ignored::
 
         Building(rnb_id="A1B2C3D4E5F6", construction_year=1970, source="bdnb")
 
-    Reading a sourced attribute returns the effective value; assigning it writes the ``"manual"``
+    Reading a sourced field returns the effective value; assigning it writes the ``"manual"``
     candidate only. In particular ``b.heated_area = None`` removes the manual value, and
     ``b.heated_area`` may still return a value from another source: use ``b.unset("heated_area")``
     to remove every candidate.
@@ -317,7 +315,7 @@ class SourcedModel(BaseModel):
     )
 
     values: dict[str, list[SourcedValue]] = Field(default_factory=dict)
-    """Candidates of every sourced attribute, by attribute name (low-level storage)."""
+    """Candidates of every sourced field, by field name (low-level storage)."""
 
     __sourced_fields__: ClassVar[dict[str, SourcedField[Any]]] = {}
     # Owning object (entity or park); a park exposes ``source_priority``. Set by the owners.
@@ -335,7 +333,7 @@ class SourcedModel(BaseModel):
         reserved = set(cls.model_fields) | set(dir(SourcedModel))
         clashes = sorted(set(fields) & reserved)
         if clashes:
-            raise TypeError(f"{cls.__name__}: sourced attribute names {clashes} are reserved")
+            raise TypeError(f"{cls.__name__}: sourced field names {clashes} are reserved")
         cls.__sourced_fields__ = fields
 
     @classmethod
@@ -374,9 +372,9 @@ class SourcedModel(BaseModel):
             field = fields.get(name)
             if field is None:
                 warnings.warn(
-                    f"{type(self).__name__} has no sourced attribute {name!r}; "
+                    f"{type(self).__name__} has no sourced field {name!r}; "
                     "its values are kept as is",
-                    UnknownAttributeWarning,
+                    UnknownFieldWarning,
                     stacklevel=2,
                 )
                 continue
@@ -405,7 +403,7 @@ class SourcedModel(BaseModel):
     # --- display (bstock.display) ----------------------------------------------------------------
 
     _repr_fields: ClassVar[tuple[str, ...]] = ()
-    """Sourced attributes shown by the one-line repr when they have a value."""
+    """Sourced fields shown by the one-line repr when they have a value."""
 
     def __repr__(self) -> str:
         return display.one_line_repr(self)
@@ -420,13 +418,13 @@ class SourcedModel(BaseModel):
         return items + display.sourced_items(self, self._repr_fields)
 
     def describe(self) -> pd.DataFrame:
-        """Return the effective value and provenance of every sourced attribute.
+        """Return the effective value and provenance of every sourced field.
 
         Returns
         -------
         pandas.DataFrame
-            One row per sourced attribute, in declaration order (project attributes and empty
-            attributes included), indexed by name. Columns: ``value`` (effective value, enums
+            One row per sourced field, in declaration order (project fields and empty
+            fields included), indexed by name. Columns: ``value`` (effective value, enums
             as their value), ``unit``, ``source`` (source of the effective value), ``provider``
             (id of the entity giving it), ``inherited`` (bool) and ``candidates`` (number of own
             candidates).
@@ -438,7 +436,7 @@ class SourcedModel(BaseModel):
             return self.__sourced_fields__[name]
         except KeyError:
             raise UnknownFieldError(
-                f"{type(self).__name__} has no sourced attribute {name!r}"
+                f"{type(self).__name__} has no sourced field {name!r}"
             ) from None
 
     def active_source_priority(self) -> SourcePriority:
@@ -462,12 +460,12 @@ class SourcedModel(BaseModel):
         ref: str | None = None,
         raw: Any = None,
     ) -> SourcedValue | None:
-        """Add or replace the candidate of ``source`` for the attribute ``name``.
+        """Add or replace the candidate of ``source`` for the field ``name``.
 
         Parameters
         ----------
         name
-            Sourced attribute name.
+            Sourced field name.
         value
             New value. ``None`` removes the candidate of ``source`` instead.
         source, date, comment, ref, raw
@@ -481,9 +479,9 @@ class SourcedModel(BaseModel):
         Raises
         ------
         UnknownFieldError
-            If ``name`` is not a sourced attribute.
+            If ``name`` is not a sourced field.
         pydantic.ValidationError
-            If ``value`` does not match the attribute type or constraints.
+            If ``value`` does not match the field type or constraints.
         """
         field = self._field(name)
         if value is None:
@@ -508,7 +506,7 @@ class SourcedModel(BaseModel):
         Raises
         ------
         UnknownFieldError
-            If ``name`` is not a sourced attribute.
+            If ``name`` is not a sourced field.
         """
         self._field(name)
         remaining = (
@@ -531,12 +529,12 @@ class SourcedModel(BaseModel):
         Parameters
         ----------
         name
-            Attribute name. Names unknown to the class but present in loaded data are accepted.
+            Field name. Names unknown to the class but present in loaded data are accepted.
 
         Raises
         ------
         UnknownFieldError
-            If ``name`` is neither a sourced attribute nor present in ``values``.
+            If ``name`` is neither a sourced field nor present in ``values``.
         """
         if name not in self.values:
             self._field(name)
@@ -548,19 +546,19 @@ class SourcedModel(BaseModel):
         Parameters
         ----------
         name
-            Attribute name. Names unknown to the class but present in loaded data are accepted.
+            Field name. Names unknown to the class but present in loaded data are accepted.
 
         Returns
         -------
         list of (str or None, SourcedValue)
             ``(entity_id, candidate)`` pairs: the own candidates first then, for an inherited
-            attribute, those of every ancestor up the chain. For an attribute that is not
+            field, those of every ancestor up the chain. For a field that is not
             inherited, the own candidates only.
 
         Raises
         ------
         UnknownFieldError
-            If ``name`` is neither a sourced attribute nor present in ``values``.
+            If ``name`` is neither a sourced field nor present in ``values``.
         """
         if name not in self.values:
             self._field(name)
@@ -573,13 +571,13 @@ class SourcedModel(BaseModel):
     def effective(self, name: str) -> SourcedValue | None:
         """Return the candidate retained for ``name``, or ``None``.
 
-        The source priority chooses among the own candidates. For an inherited attribute without
+        The source priority chooses among the own candidates. For an inherited field without
         own candidate, the nearest ancestor having one provides the value (SPEC §4.4).
 
         Raises
         ------
         UnknownFieldError
-            If ``name`` is not a sourced attribute.
+            If ``name`` is not a sourced field.
         """
         provider = self._provider(name)
         if provider is None:
@@ -592,7 +590,7 @@ class SourcedModel(BaseModel):
         Raises
         ------
         UnknownFieldError
-            If ``name`` is not a sourced attribute.
+            If ``name`` is not a sourced field.
         """
         provider = self._provider(name)
         return None if provider is None else provider._entity_id()

@@ -16,7 +16,6 @@ from bstock.exceptions import (
     InvalidArgumentError,
     UnknownFieldError,
     UnknownIdError,
-    UnknownKindError,
 )
 from bstock.site import Site
 
@@ -26,7 +25,7 @@ if TYPE_CHECKING:
 
 __all__ = ["Selection"]
 
-SelectionKind = Literal["building", "site"]
+EntityType = Literal["building", "site"]
 TimeLike = str | date | datetime | pd.Timestamp
 Predicate = Callable[[Any], object]
 """Function called with each entity; the entity is kept when it returns a true value."""
@@ -60,9 +59,9 @@ class Selection:
     :meth:`filter` narrows them down.
     """
 
-    def __init__(self, park: BuildingPark, kind: SelectionKind, ids: Sequence[str]) -> None:
+    def __init__(self, park: BuildingPark, entity: EntityType, ids: Sequence[str]) -> None:
         self._park = park
-        self._kind = kind
+        self._entity_type = entity
         self._ids = tuple(ids)
 
     @property
@@ -71,9 +70,9 @@ class Selection:
         return self._park
 
     @property
-    def kind(self) -> SelectionKind:
+    def entity(self) -> EntityType:
         """``"building"`` or ``"site"``."""
-        return self._kind
+        return self._entity_type
 
     @property
     def ids(self) -> tuple[str, ...]:
@@ -92,13 +91,13 @@ class Selection:
 
     def _entities(self) -> list[Any]:
         """Return the selected entities; raise ``UnknownIdError`` if one has left the park."""
-        cls = _ENTITY_CLASSES[self._kind]
+        cls = _ENTITY_CLASSES[self._entity_type]
         entities = []
         for entity_id in self._ids:
             entity = self._park.get(entity_id)
             if not isinstance(entity, cls):
                 raise UnknownIdError(
-                    f"{self._kind} {entity_id!r} is no longer in the park; select again"
+                    f"{self._entity_type} {entity_id!r} is no longer in the park; select again"
                 )
             entities.append(entity)
         return entities
@@ -116,16 +115,16 @@ class Selection:
         Returns
         -------
         Selection
-            A new selection of the same kind.
+            A new selection of the same entity type.
 
         Raises
         ------
         UnknownFieldError, InvalidArgumentError, UnknownIdError
             As :meth:`BuildingPark.select`.
         """
-        tests = _compile(self._park, self._kind, predicate, criteria)
+        tests = _compile(self._park, self._entity_type, predicate, criteria)
         kept = [e.id for e in self._entities() if all(test(e) for test in tests)]
-        return Selection(self._park, self._kind, kept)
+        return Selection(self._park, self._entity_type, kept)
 
     # --- set operations -----------------------------------------------------------------------
 
@@ -143,14 +142,16 @@ class Selection:
     ) -> Selection:
         if not isinstance(other, Selection):
             return NotImplemented
-        if other._park is not self._park or other._kind != self._kind:
+        if other._park is not self._park or other._entity_type != self._entity_type:
             raise InvalidArgumentError(
-                "selections can only be combined when they have the same park and kind"
+                "selections can only be combined when they have the same park and entity type"
             )
         self._entities()
         other._entities()
         ids = operation(set(self._ids), set(other._ids))
-        return Selection(self._park, self._kind, _tree_order(self._park, self._kind, ids))
+        return Selection(
+            self._park, self._entity_type, _tree_order(self._park, self._entity_type, ids)
+        )
 
     # --- analysis -----------------------------------------------------------------------------
 
@@ -161,7 +162,7 @@ class Selection:
         by: str | None = None,
         prefer: Literal["buildings", "site"] = "buildings",
     ) -> pd.DataFrame:
-        """Sum the extensive attributes of the selected buildings, per site (SPEC §14.3).
+        """Sum the extensive fields of the selected buildings, per site (SPEC §14.3).
 
         The model is not modified. A missing value is never estimated: ``coverage`` shows the
         share of buildings having a value.
@@ -169,12 +170,12 @@ class Selection:
         Parameters
         ----------
         fields
-            Extensive attributes of the buildings (``sourced(extensive=True)``); all of them by
+            Extensive fields of the buildings (``sourced(extensive=True)``); all of them by
             default.
         by
             Without it, one row per site concerned (the sites containing selected buildings, or
-            the selected sites) and a total row indexed ``"__park__"``. With an attribute name,
-            one row per effective value of that attribute among the selected buildings, the
+            the selected sites) and a total row indexed ``"__park__"``. With a field name,
+            one row per effective value of that field among the selected buildings, the
             buildings without value last (``<NA>``); the own values of sites are then ignored
             (``NoDataWarning``). Selections of buildings only.
         prefer
@@ -186,22 +187,22 @@ class Selection:
         Returns
         -------
         pandas.DataFrame
-            Columns are a ``MultiIndex`` (quantity, measure). Per attribute: ``buildings`` (sum
+            Columns are a ``MultiIndex`` (quantity, measure). Per field: ``buildings`` (sum
             of the known building values), ``site`` (own value of the site), ``delta``
             (``site - buildings``), ``coverage`` (0 to 1) and ``total``; with ``by``, only
             ``buildings`` and ``coverage``. Then ``heating_power``, ``cooling_power``,
             ``dhw_power`` (kW) and ``pv_peak_power`` (kWp) with ``value`` and ``coverage`` (a
             system counts once, on its owner, and a site system counts if it serves a selected
             building), and the counts ``building_count``, ``<system kind>_count`` and
-            ``meter_count`` (measure ``value``). Values are in the unit of the attribute.
+            ``meter_count`` (measure ``value``). Values are in the unit of the field.
 
         Raises
         ------
         UnknownFieldError
-            If an attribute is unknown.
+            If a field is unknown.
         InvalidArgumentError
-            If an attribute is not extensive, ``prefer`` is invalid, ``by`` is used on a
-            selection of sites or names an attribute with list values.
+            If a field is not extensive, ``prefer`` is invalid, ``by`` is used on a
+            selection of sites or names a field with list values.
         """
         from bstock.analysis import aggregate  # circular import
 
@@ -209,40 +210,40 @@ class Selection:
 
     def completeness(
         self,
-        by: Literal["attribute", "entity"] = "attribute",
+        per: Literal["field", "entity"] = "field",
         *,
         fields: Sequence[str] | None = None,
     ) -> pd.DataFrame:
-        """Return how complete the sourced attributes of the selected entities are (SPEC §14.4).
+        """Return how complete the sourced fields of the selected entities are (SPEC §14.4).
 
         An inherited value counts as filled.
 
         Parameters
         ----------
-        by
-            ``"attribute"``: one row per attribute, with ``filled`` (entities having an effective
-            value), ``inherited`` (of which inherited), ``total`` and ``rate`` (0 to 1).
+        per
+            ``"field"``: one row per sourced field, with ``filled`` (entities having an
+            effective value), ``inherited`` (of which inherited), ``total`` and ``rate`` (0 to 1).
             ``"entity"``: one row per entity, with ``filled``, ``total``, ``rate`` and
-            ``missing`` (names of the attributes without value).
+            ``missing`` (names of the fields without value).
         fields
-            Attributes to look at; by default every sourced attribute of the selected entities,
+            Fields to look at; by default every sourced field of the selected entities,
             project ones and ``footprint`` included.
 
         Returns
         -------
         pandas.DataFrame
-            Indexed by attribute name, or by entity id.
+            Indexed by ``field`` name, or by entity ``id``.
 
         Raises
         ------
         UnknownFieldError
-            If an attribute is unknown.
+            If a field is unknown.
         InvalidArgumentError
-            If ``by`` is neither ``"attribute"`` nor ``"entity"``.
+            If ``per`` is neither ``"field"`` nor ``"entity"``.
         """
         from bstock.analysis import completeness  # circular import
 
-        return completeness(self, by=by, fields=fields)
+        return completeness(self, per=per, fields=fields)
 
     def provenance(
         self, fields: Sequence[str] | None = None, *, normalize: bool = False
@@ -252,14 +253,14 @@ class Selection:
         Parameters
         ----------
         fields
-            Attributes to look at; by default every sourced attribute of the selected entities.
+            Fields to look at; by default every sourced field of the selected entities.
         normalize
             Return shares of the entities (0 to 1) rather than counts.
 
         Returns
         -------
         pandas.DataFrame
-            One row per attribute (index ``attribute``) and one column per source of the
+            One row per field (index ``field``) and one column per source of the
             effective values, the most frequent first, giving the number of entities whose value
             comes from it; then ``inherited`` (values inherited from a site, whatever their
             source) and ``missing``.
@@ -267,14 +268,14 @@ class Selection:
         Raises
         ------
         UnknownFieldError
-            If an attribute is unknown.
+            If a field is unknown.
         """
         from bstock.analysis import provenance  # circular import
 
         return provenance(self, fields=fields, normalize=normalize)
 
     def conflicts(self, fields: Sequence[str] | None = None, *, rtol: float = 0.05) -> pd.DataFrame:
-        """Return the attributes whose own candidates disagree (SPEC §14.4).
+        """Return the fields whose own candidates disagree (SPEC §14.4).
 
         Inherited candidates are not compared: another level is not a conflict. Strings, enums,
         lists and integers are compared strictly; floats agree when they are within ``rtol`` of
@@ -283,7 +284,7 @@ class Selection:
         Parameters
         ----------
         fields
-            Attributes to compare; by default every sourced attribute of the selected entities
+            Fields to compare; by default every sourced field of the selected entities
             except ``footprint`` (two geometries from different sources never match exactly).
         rtol
             Relative tolerance for floats.
@@ -291,13 +292,13 @@ class Selection:
         Returns
         -------
         pandas.DataFrame
-            One row per entity and attribute in conflict, with ``entity``, ``attribute``,
+            One row per entity and field in conflict, with ``entity``, ``field``,
             ``values`` (dict source to value) and ``retained`` (source of the effective value).
 
         Raises
         ------
         UnknownFieldError
-            If an attribute is unknown.
+            If a field is unknown.
         InvalidArgumentError
             If ``rtol`` is negative.
         """
@@ -339,7 +340,7 @@ class Selection:
             Replace a head meter having direct sub-meters by one line per end use of its
             sub-meters, plus an ``"other"`` line for the rest (head minus sub-meters).
         split
-            Extensive attribute (e.g. ``"heated_area"``) used to share the lines of a site or of
+            Extensive field (e.g. ``"heated_area"``) used to share the lines of a site or of
             several buildings between the selected buildings they cover; these lines have
             ``estimated=True``. Selections of buildings only.
         load_data
@@ -402,7 +403,7 @@ class Selection:
         Parameters
         ----------
         area
-            Extensive attribute giving the reference area, ``"heated_area"`` by default.
+            Extensive field giving the reference area, ``"heated_area"`` by default.
         prefer
             For a site row, the area retained by :meth:`aggregate` with this rule.
         start, end, freq, tz, breakdown, split, load_data
@@ -411,7 +412,7 @@ class Selection:
         Returns
         -------
         pandas.DataFrame
-            The columns of :meth:`consumption`, plus ``area`` (in the unit of the attribute, m²
+            The columns of :meth:`consumption`, plus ``area`` (in the unit of the field, m²
             for the core areas) and ``intensity`` (kWh per unit of area). The area of a row
             covering several entities is the sum of their areas; it is missing if one of them
             is, and ``intensity`` is then missing too.
@@ -419,7 +420,7 @@ class Selection:
         Raises
         ------
         UnknownFieldError
-            If ``area`` is not an attribute of the buildings.
+            If ``area`` is not a field of the buildings.
         InvalidArgumentError
             If ``area`` is not extensive, ``prefer`` is invalid, or as :meth:`consumption`.
         """
@@ -456,7 +457,9 @@ class Selection:
         """
         from bstock.export import entities_frame  # circular import
 
-        return entities_frame(self._park, self._kind, self._entities(), provenance=provenance)
+        return entities_frame(
+            self._park, self._entity_type, self._entities(), provenance=provenance
+        )
 
     def tree(
         self,
@@ -504,7 +507,8 @@ class Selection:
 
     def __repr__(self) -> str:
         count = len(self._ids)
-        return f"Selection(kind={self._kind!r}, {count} {'entity' if count == 1 else 'entities'})"
+        noun = "entity" if count == 1 else "entities"
+        return f"Selection(entity={self._entity_type!r}, {count} {noun})"
 
     def _repr_html_(self) -> str:
         return self.tree()._repr_html_()
@@ -514,22 +518,33 @@ def select(
     park: BuildingPark,
     predicate: Predicate | None = None,
     *,
-    kind: SelectionKind = "building",
+    entity: EntityType = "building",
     **criteria: Any,
 ) -> Selection:
     """Return the buildings or sites of ``park`` that match every criterion.
 
     See :meth:`BuildingPark.select`.
     """
-    if kind not in _ENTITY_CLASSES:
-        raise UnknownKindError(f"unknown selection kind {kind!r}; expected 'building' or 'site'")
-    tests = _compile(park, kind, predicate, criteria)
-    entities = park.iter_buildings() if kind == "building" else park.iter_sites()
-    return Selection(park, kind, [e.id for e in entities if all(test(e) for test in tests)])
+    check_entity_type(entity)
+    tests = _compile(park, entity, predicate, criteria)
+    entities = park.iter_buildings() if entity == "building" else park.iter_sites()
+    return Selection(park, entity, [e.id for e in entities if all(test(e) for test in tests)])
 
 
-def _tree_order(park: BuildingPark, kind: str, ids: set[str]) -> list[str]:
-    entities = park.iter_buildings() if kind == "building" else park.iter_sites()
+def check_entity_type(entity: str) -> None:
+    """Check that ``entity`` is ``"building"`` or ``"site"``.
+
+    Raises
+    ------
+    InvalidArgumentError
+        Otherwise.
+    """
+    if entity not in _ENTITY_CLASSES:
+        raise InvalidArgumentError(f"entity must be 'building' or 'site', not {entity!r}")
+
+
+def _tree_order(park: BuildingPark, entity_type: str, ids: set[str]) -> list[str]:
+    entities = park.iter_buildings() if entity_type == "building" else park.iter_sites()
     return [e.id for e in entities if e.id in ids]
 
 
@@ -537,7 +552,7 @@ def _tree_order(park: BuildingPark, kind: str, ids: set[str]) -> list[str]:
 
 
 def _compile(
-    park: BuildingPark, kind: str, predicate: Predicate | None, criteria: dict[str, Any]
+    park: BuildingPark, entity_type: str, predicate: Predicate | None, criteria: dict[str, Any]
 ) -> list[_Test]:
     """Check the criteria and return one test per criterion."""
     tests: list[_Test] = []
@@ -547,15 +562,15 @@ def _compile(
         tests.append(lambda entity: bool(predicate(entity)))
     for key, value in criteria.items():
         if key in STRUCTURE_CRITERIA:
-            tests.append(_structure_test(park, kind, key, value))
+            tests.append(_structure_test(park, entity_type, key, value))
         else:
-            tests.append(_value_test(park, kind, key, value))
+            tests.append(_value_test(park, entity_type, key, value))
     return tests
 
 
-def _value_test(park: BuildingPark, kind: str, key: str, value: Any) -> _Test:
-    base = park.building_cls if kind == "building" else park.site_cls
-    known = {*base.sourced_fields(), *_PLAIN_ATTRIBUTES[kind]}
+def _value_test(park: BuildingPark, entity_type: str, key: str, value: Any) -> _Test:
+    base = park.building_cls if entity_type == "building" else park.site_cls
+    known = {*base.sourced_fields(), *_PLAIN_ATTRIBUTES[entity_type]}
     name, _, operator = key.rpartition("__")
     if not name:
         name, operator = key, "eq"
@@ -566,7 +581,7 @@ def _value_test(park: BuildingPark, kind: str, key: str, value: Any) -> _Test:
             )
         name, operator = key, "eq"
     if name not in known:
-        raise UnknownFieldError(f"{name!r} is not an attribute of the {kind}s of this park")
+        raise UnknownFieldError(f"{name!r} is not a field of the {entity_type}s of this park")
     field = base.sourced_fields().get(name)
     enum = field.type_ if field is not None and _is_enum(field.type_) else None
 
@@ -611,7 +626,7 @@ def _contains(current: Any, value: Any, key: str) -> bool:
     if current is None:
         return False
     if not isinstance(current, list):
-        raise InvalidArgumentError(f"{key} only applies to list attributes")
+        raise InvalidArgumentError(f"{key} only applies to list fields")
     return value in current
 
 
@@ -624,7 +639,7 @@ def _ordered(compare: Callable[[Any, Any], bool], current: Any, target: Any, key
         raise InvalidArgumentError(f"{key}: cannot compare {current!r} with {target!r}") from None
 
 
-def _structure_test(park: BuildingPark, kind: str, key: str, value: Any) -> _Test:
+def _structure_test(park: BuildingPark, entity_type: str, key: str, value: Any) -> _Test:
     if key == "within":
         site = park._resolve_site(value)
         return lambda entity: any(a is site for a in entity._ancestor_sites())
@@ -632,7 +647,7 @@ def _structure_test(park: BuildingPark, kind: str, key: str, value: Any) -> _Tes
         parent = None if value is None else park._resolve_site(value)
         return lambda entity: entity.parent is parent
     if key == "has_rnb_id":
-        if kind != "building":
+        if entity_type != "building":
             raise InvalidArgumentError("has_rnb_id only applies to buildings")
         flag = _flag(key, value)
         return lambda entity: (entity.rnb_id is not None) is flag

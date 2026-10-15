@@ -11,7 +11,8 @@ import pandas as pd
 
 from bstock._deps import require
 from bstock.description import DescribedEntity
-from bstock.exceptions import InvalidArgumentError, UnknownKindError
+from bstock.exceptions import InvalidArgumentError
+from bstock.selection import EntityType, check_entity_type
 
 if TYPE_CHECKING:
     from geopandas import GeoDataFrame
@@ -20,15 +21,14 @@ if TYPE_CHECKING:
 
 __all__ = ["to_dataframe", "to_geodataframe", "to_geopackage", "to_geoparquet"]
 
-ExportKind = Literal["building", "site"]
 GeometryKind = Literal["footprint", "point"]
 CRS = "EPSG:4326"
 """Coordinate reference system of the exported geometries (WGS84)."""
-LAYERS: dict[ExportKind, str] = {"site": "sites", "building": "buildings"}
-"""GeoPackage layer of each kind of entity."""
+LAYERS: dict[EntityType, str] = {"site": "sites", "building": "buildings"}
+"""GeoPackage layer of each entity type."""
 
 EXCLUDED_ATTRIBUTES = ("footprint",)
-"""Sourced attributes left out of :func:`to_dataframe`."""
+"""Sourced fields left out of :func:`to_dataframe`."""
 
 _ID_COLUMNS: dict[str, tuple[str, ...]] = {
     "building": (
@@ -43,7 +43,7 @@ _ID_COLUMNS: dict[str, tuple[str, ...]] = {
 
 
 def to_dataframe(
-    park: BuildingPark, kind: ExportKind = "building", *, provenance: bool = False
+    park: BuildingPark, entity: EntityType = "building", *, provenance: bool = False
 ) -> pd.DataFrame:
     """Return one row per building (or site) of ``park``, indexed by ``id``.
 
@@ -51,49 +51,48 @@ def to_dataframe(
     ----------
     park
         The park to export.
-    kind
+    entity
         ``"building"`` for every building of the park, ``"site"`` for every site, nested ones
         included.
     provenance
-        Add, after each attribute column, ``<attr>_source`` (source of the effective value) and
+        Add, after each field column, ``<attr>_source`` (source of the effective value) and
         ``<attr>_provider`` (id of the entity providing it, an ancestor site when inherited).
 
     Returns
     -------
     pandas.DataFrame
         Columns: the external ids, ``dpe_ids`` and ``parent_id``, then the effective value of each
-        sourced attribute, inheritance included, in the unit of the attribute. Attributes of
+        sourced field, inheritance included, in the unit of the field. Fields of
         project subclasses are included and ``footprint`` is excluded. Enums are given by their
-        value, lists are kept as lists, integer attributes use the nullable ``Int64`` dtype.
+        value, lists are kept as lists, integer fields use the nullable ``Int64`` dtype.
 
     Raises
     ------
-    UnknownKindError
-        If ``kind`` is neither ``"building"`` nor ``"site"``.
+    InvalidArgumentError
+        If ``entity`` is neither ``"building"`` nor ``"site"``.
     """
-    if kind not in _ID_COLUMNS:
-        raise UnknownKindError(f"unknown export kind {kind!r}; expected 'building' or 'site'")
-    entities = list(park.iter_buildings() if kind == "building" else park.iter_sites())
-    return entities_frame(park, kind, entities, provenance=provenance)
+    check_entity_type(entity)
+    entities = list(park.iter_buildings() if entity == "building" else park.iter_sites())
+    return entities_frame(park, entity, entities, provenance=provenance)
 
 
 def entities_frame(
     park: BuildingPark,
-    kind: ExportKind,
+    entity_type: EntityType,
     entities: list[DescribedEntity],
     *,
     provenance: bool = False,
 ) -> pd.DataFrame:
     """Return the :func:`to_dataframe` rows of ``entities``, buildings or sites of ``park``."""
-    base: type[DescribedEntity] = park.building_cls if kind == "building" else park.site_cls
+    base: type[DescribedEntity] = park.building_cls if entity_type == "building" else park.site_cls
     fields = _exported_fields(base, entities)
-    columns = list(_ID_COLUMNS[kind])
+    columns = list(_ID_COLUMNS[entity_type])
     for name in fields:
         columns.append(name)
         if provenance:
             columns += [f"{name}_source", f"{name}_provider"]
 
-    rows = [_row(entity, kind, fields, provenance) for entity in entities]
+    rows = [_row(entity, entity_type, fields, provenance) for entity in entities]
     frame = pd.DataFrame(rows, columns=columns, index=pd.Index([e.id for e in entities], name="id"))
     for name, field in fields.items():
         if field.type_ is int:
@@ -113,12 +112,12 @@ def _exported_fields(
 
 
 def _row(
-    entity: DescribedEntity, kind: str, fields: dict[str, Any], provenance: bool
+    entity: DescribedEntity, entity_type: str, fields: dict[str, Any], provenance: bool
 ) -> dict[str, Any]:
     parent = entity.parent
     row: dict[str, Any] = {
         column: getattr(entity, column)
-        for column in _ID_COLUMNS[kind]
+        for column in _ID_COLUMNS[entity_type]
         if column not in ("dpe_ids", "parent_id")
     }
     row["dpe_ids"] = list(entity.dpe_ids)
@@ -147,7 +146,7 @@ def _cell(value: Any) -> Any:
 
 def to_geodataframe(
     park: BuildingPark,
-    kind: ExportKind = "building",
+    entity: EntityType = "building",
     *,
     geometry: GeometryKind = "footprint",
     provenance: bool = False,
@@ -156,7 +155,7 @@ def to_geodataframe(
 
     Parameters
     ----------
-    park, kind, provenance
+    park, entity, provenance
         As in :func:`to_dataframe`.
     geometry
         ``"footprint"``: the footprint polygons; ``"point"``: the effective ``lat`` / ``lon``
@@ -172,8 +171,8 @@ def to_geodataframe(
     ------
     MissingDependencyError
         If the ``[geo]`` extra is not installed.
-    UnknownKindError
-        If ``kind`` is invalid.
+    InvalidArgumentError
+        If ``entity`` is invalid.
     InvalidArgumentError
         If ``geometry`` is neither ``"footprint"`` nor ``"point"``.
     """
@@ -181,20 +180,20 @@ def to_geodataframe(
         raise InvalidArgumentError(f"geometry must be 'footprint' or 'point', not {geometry!r}")
     geopandas = require("geopandas", "geo")
     shapely_geometry = require("shapely.geometry", "geo")
-    frame = to_dataframe(park, kind, provenance=provenance)
+    frame = to_dataframe(park, entity, provenance=provenance)
     entities = {
-        e.id: e for e in (park.iter_buildings() if kind == "building" else park.iter_sites())
+        e.id: e for e in (park.iter_buildings() if entity == "building" else park.iter_sites())
     }
     shapes: list[Any] = []
     for entity_id in frame.index:
-        entity = entities[entity_id]
+        item = entities[entity_id]
         if geometry == "footprint":
-            footprint = entity.footprint
+            footprint = item.footprint
             shapes.append(None if footprint is None else shapely_geometry.shape(footprint))
-        elif entity.lat is None or entity.lon is None:
+        elif item.lat is None or item.lon is None:
             shapes.append(None)
         else:
-            shapes.append(shapely_geometry.Point(entity.lon, entity.lat))
+            shapes.append(shapely_geometry.Point(item.lon, item.lat))
     return geopandas.GeoDataFrame(frame, geometry=shapes, crs=CRS)
 
 
@@ -230,8 +229,8 @@ def to_geopackage(
         If the ``[geo]`` extra is not installed.
     """
     path = Path(path)
-    for kind, layer in LAYERS.items():
-        frame = to_geodataframe(park, kind, geometry=geometry, provenance=provenance)
+    for entity_type, layer in LAYERS.items():
+        frame = to_geodataframe(park, entity_type, geometry=geometry, provenance=provenance)
         _lists_to_json(frame).to_file(path, layer=layer, driver="GPKG", index=True)
     return path
 
@@ -239,7 +238,7 @@ def to_geopackage(
 def to_geoparquet(
     park: BuildingPark,
     path: str | Path,
-    kind: ExportKind = "building",
+    entity: EntityType = "building",
     *,
     geometry: GeometryKind = "footprint",
     provenance: bool = False,
@@ -252,7 +251,7 @@ def to_geoparquet(
         The park to export.
     path
         File to write (``.parquet``).
-    kind, geometry, provenance
+    entity, geometry, provenance
         As in :func:`to_geodataframe`.
 
     Returns
@@ -266,7 +265,7 @@ def to_geoparquet(
         If the ``[geo]`` extra is not installed.
     """
     path = Path(path)
-    to_geodataframe(park, kind, geometry=geometry, provenance=provenance).to_parquet(path)
+    to_geodataframe(park, entity, geometry=geometry, provenance=provenance).to_parquet(path)
     return path
 
 
