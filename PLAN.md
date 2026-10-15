@@ -385,11 +385,11 @@ Reportées dans `SPEC.md` (§3.3, §3.6, §3.7, §6.1, §6.5, §11 à §14) à l
 ## v3.e — Graphiques (0.8.0)
 
 ### Étape 30 — `sel.plot`
-- [ ] Module `plot.py` : accesseur `Selection.plot`, import paresseux de plotly
+- [x] Module `plot.py` : accesseur `Selection.plot`, import paresseux de plotly
       (`MissingDependencyError`)
-- [ ] `completeness`, `provenance`, `aggregate`, `distribution`, `map` (points et emprises),
+- [x] `completeness`, `provenance`, `aggregate`, `distribution`, `map` (points et emprises),
       `consumption`, `intensity`
-- [ ] Tests (sautés sans l'extra `[plot]`) : type `Figure`, traces et axes attendus, couverture dans le
+- [x] Tests (sautés sans l'extra `[plot]`) : type `Figure`, traces et axes attendus, couverture dans le
       titre, erreur claire sans plotly
 - [ ] Finalisation 0.8.0 : exemple de graphiques dans `examples/`, README, statut de la SPEC passé en
       v3, version et tag

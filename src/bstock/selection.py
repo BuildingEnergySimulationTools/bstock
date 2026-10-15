@@ -22,6 +22,7 @@ from bstock.site import Site
 
 if TYPE_CHECKING:
     from bstock.park import BuildingPark
+    from bstock.plot import SelectionPlot
 
 __all__ = ["Selection"]
 
@@ -488,6 +489,18 @@ class Selection:
             shown=shown,
             header=f"{self!r} of {type(self._park).__name__} {self._park.name!r}",
         )
+
+    @property
+    def plot(self) -> SelectionPlot:
+        """Figures of the selection, built with plotly (extra ``[plot]``, SPEC §14.5).
+
+        ``sel.plot.completeness()``, ``provenance``, ``aggregate``, ``distribution``, ``map``,
+        ``consumption`` and ``intensity`` each return a ``plotly.graph_objects.Figure`` without
+        showing it.
+        """
+        from bstock.plot import SelectionPlot  # circular import
+
+        return SelectionPlot(self)
 
     def __repr__(self) -> str:
         count = len(self._ids)

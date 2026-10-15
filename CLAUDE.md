@@ -8,7 +8,7 @@ toute évolution, et la mettre à jour quand un choix de conception change.
 
 - Virtualenv local `.venv` (Python 3.14). Cible de compatibilité : **Python ≥ 3.11**. Ne pas utiliser de
   syntaxe plus récente que 3.11.
-- Installation : `.venv/Scripts/python -m pip install -e ".[dev,connectors,geo]"` (les tests des connecteurs ont besoin des extras)
+- Installation : `.venv/Scripts/python -m pip install -e ".[dev,connectors,geo,plot]"` (les tests des connecteurs ont besoin des extras ; ceux des graphiques sont sautés sans plotly)
 - Configuration unique dans `pyproject.toml` (build, dépendances, ruff, pytest). Pas de `setup.py` ni de
   `requirements.txt`.
 

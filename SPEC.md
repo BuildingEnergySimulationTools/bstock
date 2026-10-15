@@ -1225,7 +1225,7 @@ scripts/               # outils de maintenance (régénération de dpe_generator
   `bstock` ; leurs autres noms, et les modules préfixés par `_`, sont internes.
 - Python ≥ 3.11.
 - Dépendances : `pydantic>=2`, `pandas`, `pyarrow` (Parquet). Extras : `[plot]` (plotly, seule lib de
-  graphiques), `[connectors]` (requests), `[geo]` (shapely, geopandas, pyproj), `[dev]` (pytest, ruff). tide n'est **pas** une dépendance : bstock
+  graphiques, ≥ 5.24), `[connectors]` (requests), `[geo]` (shapely, geopandas, pyproj), `[dev]` (pytest, ruff). tide n'est **pas** une dépendance : bstock
   respecte seulement sa convention de nommage.
 - Outillage et conventions : voir `CLAUDE.md`. Plan de réalisation : `PLAN.md`.
 
@@ -1511,16 +1511,34 @@ On la personnalise ensuite avec `fig.update_layout(...)`.
 
 | Méthode | Graphique | Données |
 |---|---|---|
-| `plot.completeness(by="attribute", fields=None)` | Barres horizontales du taux, avec la part héritée en couleur distincte | §14.4 |
+| `plot.completeness(by="attribute", *, fields=None)` | Barres horizontales du taux, avec la part héritée en couleur distincte | §14.4 |
 | `plot.provenance(fields=None)` | Barres empilées des sources par attribut (parts) | §14.4 |
-| `plot.aggregate(field, by=None, prefer="buildings")` | Barres de `total` par site (ou par groupe `by`), avec la couverture au survol | §14.3 |
-| `plot.distribution(field, bins=None)` | Histogramme pour un nombre ; barres de fréquence pour une enum ou une chaîne | Valeurs effectives |
-| `plot.map(geometry="point", color=None)` | Carte sur fond OpenStreetMap (sans clé d'API) : points `lat` / `lon` ou emprises `footprint` (GeoJSON WGS84, sans l'extra `[geo]`), colorés par un attribut | Valeurs effectives |
-| `plot.consumption(start, end, freq=None, by="energy_type")` | Barres empilées de la consommation (kWh) par entité, empilées par énergie (`by="energy_type"`) ou par usage (`by="end_use"`) ; une barre par période avec `freq` | §6.5 |
-| `plot.intensity(start, end, area="heated_area", freq=None)` | Barres du kWh/m² par entité, empilées par énergie | §6.5 |
+| `plot.aggregate(field, *, by=None, prefer="buildings")` | Barres de `total` par site (ou par groupe `by`), avec la couverture au survol | §14.3 |
+| `plot.distribution(field, *, bins=None)` | Histogramme pour un nombre ; barres de fréquence pour une enum ou une chaîne | Valeurs effectives |
+| `plot.map(*, geometry="point", color=None)` | Carte sur fond OpenStreetMap (sans clé d'API) : points `lat` / `lon` ou emprises `footprint` (GeoJSON WGS84, sans l'extra `[geo]`), colorés par un attribut | Valeurs effectives |
+| `plot.consumption(*, start, end, freq=None, by="energy_type", **kwargs)` | Barres empilées de la consommation (kWh) par entité, empilées par énergie (`by="energy_type"`) ou par usage (`by="end_use"`) ; une barre par période avec `freq` | §6.5 |
+| `plot.intensity(*, start, end, area="heated_area", freq=None, **kwargs)` | Barres du kWh/m² par entité, empilées par énergie | §6.5 |
 
 Une entité sans valeur n'est pas tracée, et le titre indique la couverture (« 34 / 42 bâtiments »). Les
 unités des champs (métadonnée `unit`) étiquettent les axes.
+
+Précisions (implémentation 0.8.0) :
+- plotly ≥ 5.24 (cartes `Scattermap` / `Choroplethmap` sur fond MapLibre, sans jeton). `**kwargs` de
+  `consumption` et `intensity` sont transmis à `Selection.consumption` / `intensity` (`tz`, `breakdown`,
+  `split`, `load_data`, `prefer`).
+- Couleurs : huit teintes catégorielles dans un ordre fixe, validé pour les daltonismes (paires
+  adjacentes) ; au-delà, les catégories se replient en « Other » gris. Sur une carte, où toutes les
+  couleurs se côtoient, seules les **trois** valeurs les plus fréquentes ont une couleur (à égalité,
+  l'ordre de la sélection), le reste est « Other ». Les nombres utilisent une rampe bleue unique. Les
+  valeurs manquantes sont grises. Une couleur suit la catégorie, jamais son rang dans un filtre.
+- Style sobre : grille sur l'axe des valeurs seulement, barres arrondies séparées par un filet de la
+  couleur du fond, légende en haut dans l'ordre des traces, survol avec valeur, unité et couverture.
+- `plot.consumption(freq=...)` : une barre par période, qui additionne les entités sélectionnées (dans
+  une sélection de sites, des sites imbriqués se recouvrent). `plot.intensity(freq=...)` : par période,
+  énergie des lignes qui ont une surface divisée par la somme de leurs surfaces (indicateur de la
+  sélection, pas somme de ratios).
+- `plot.distribution` d'un attribut liste ou dict lève `InvalidArgumentError` ; un attribut inconnu lève
+  `UnknownFieldError`, comme `color=` de `plot.map`.
 
 ---
 
