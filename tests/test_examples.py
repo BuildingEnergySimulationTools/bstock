@@ -1,6 +1,11 @@
 import importlib.util
+import runpy
+import tempfile
 from pathlib import Path
 
+import pandas as pd
+
+from bstock.connectors import bdnb, dpe, rnb
 from fakes import FakeBdnbClient, FakeDpeClient, FakeRnbClient, dpe_lines
 
 EXAMPLES = Path(__file__).parents[1] / "examples"
@@ -13,6 +18,25 @@ def load_example(name):
     return module
 
 
+def run_interactive(name, output, monkeypatch):
+    """Run ``examples/<name>_interactive.py`` with its ``OUTPUT`` under ``output``."""
+    monkeypatch.setattr(tempfile, "gettempdir", lambda: str(output))
+    return runpy.run_path(str(EXAMPLES / f"{name}_interactive.py"))
+
+
+def fake_clients(recorded):
+    """Return fake RNB, BDNB and DPE clients serving the responses recorded for the examples."""
+    addresses = {
+        address: f"rnb/address_search_{site_id.replace('-', '_')}.json"
+        for site_id, (_name, address) in load_example("connectors").SITES.items()
+    }
+    return (
+        FakeRnbClient(recorded, addresses=addresses),
+        FakeBdnbClient(recorded),
+        FakeDpeClient(dpe_lines(recorded)),
+    )
+
+
 def test_bayonne_example_runs(tmp_path, capsys):
     park = load_example("bayonne").main(tmp_path)
     assert (tmp_path / "park" / "park.json").exists()
@@ -22,16 +46,9 @@ def test_bayonne_example_runs(tmp_path, capsys):
 
 
 def test_connectors_example_runs_with_fake_clients(tmp_path, capsys, recorded):
-    example = load_example("connectors")
-    addresses = {
-        address: f"rnb/address_search_{site_id.replace('-', '_')}.json"
-        for site_id, (_name, address) in example.SITES.items()
-    }
-    park = example.main(
-        tmp_path,
-        rnb_client=FakeRnbClient(recorded, addresses=addresses),
-        bdnb_client=FakeBdnbClient(recorded),
-        dpe_client=FakeDpeClient(dpe_lines(recorded)),
+    rnb_client, bdnb_client, dpe_client = fake_clients(recorded)
+    park = load_example("connectors").main(
+        tmp_path, rnb_client=rnb_client, bdnb_client=bdnb_client, dpe_client=dpe_client
     )
     assert (tmp_path / "nobatek.gpkg").exists()
     assert (tmp_path / "park" / "park.json").exists()
@@ -51,3 +68,30 @@ def test_connectors_example_runs_with_fake_clients(tmp_path, capsys, recorded):
     assert park["TRKDH5MARXP4"].effective("footprint_area").source == "computed"
     assert bordeaux.effective("address").source == "nobatek"
     assert "Nobatek Anglet: 3 RNB building(s)" in capsys.readouterr().out
+
+
+def test_bayonne_interactive_example_matches_the_script(tmp_path, monkeypatch):
+    park = load_example("bayonne").main(tmp_path)
+    namespace = run_interactive("bayonne", tmp_path / "interactive", monkeypatch)
+    assert namespace["reloaded"] == namespace["park"]
+    pd.testing.assert_frame_equal(
+        namespace["park"].to_dataframe(provenance=True), park.to_dataframe(provenance=True)
+    )
+
+
+def test_connectors_interactive_example_matches_the_script(tmp_path, monkeypatch, recorded):
+    script_clients = fake_clients(recorded)
+    park = load_example("connectors").main(
+        tmp_path,
+        rnb_client=script_clients[0],
+        bdnb_client=script_clients[1],
+        dpe_client=script_clients[2],
+    )
+    rnb_client, bdnb_client, dpe_client = fake_clients(recorded)
+    monkeypatch.setattr(rnb, "RnbClient", lambda: rnb_client)
+    monkeypatch.setattr(bdnb, "BdnbClient", lambda: bdnb_client)
+    monkeypatch.setattr(dpe, "DpeClient", lambda: dpe_client)
+    namespace = run_interactive("connectors", tmp_path / "interactive", monkeypatch)
+    pd.testing.assert_frame_equal(
+        namespace["park"].to_dataframe(provenance=True), park.to_dataframe(provenance=True)
+    )

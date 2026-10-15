@@ -1189,7 +1189,8 @@ src/bstock/
   _ids.py              # génération et contrôle des identifiants
 tests/                 # un fichier par module, plus test_examples.py
 tests/data/            # réponses d'API enregistrées (rnb/, bdnb/, dpe/) pour les tests hors réseau
-examples/bayonne.py    # exemple de bout en bout
+examples/              # exemples de bout en bout (bayonne, connectors), chacun en version script
+                       # (<nom>.py) et en version interactive par cellules (<nom>_interactive.py)
 scripts/               # outils de maintenance (régénération de dpe_generators.csv)
 ```
 

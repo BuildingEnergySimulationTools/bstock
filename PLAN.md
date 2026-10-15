@@ -328,7 +328,8 @@ Reportées dans `SPEC.md` (§3.3, §3.6, §3.7, §6.1, §6.5, §11 à §14) à l
 - [ ] Tests : structure HTML (imbrication, échappement), sans navigateur
 
 ### Étape 24 — Finalisation 0.4.0
-- [ ] `examples/bayonne_interactive.py` : remplacer le helper `tree()` écrit à la main par `park.tree()`
+- [x] Exemples interactifs versionnés et tenus en parallèle des scripts (testés) ; helper `tree()`
+      remplacé par `park.tree()` et `describe()` montré dans les deux versions
 - [ ] Revue de l'API publique (`TreeView` exporté) et des docstrings ; README ; version `0.4.0` et tag
 
 ## v3.b — Sélection (0.5.0)

@@ -107,6 +107,7 @@ def main(output: Path) -> BuildingPark:
     group.set("construction_year", 1972, source="bdnb", ref=group.id)
     group.set("usage", "tertiary", source="bdnb")
     group.envelope.set("u_bat", 1.4, source="dpe", ref="2611E0031228S")
+    print(park.tree(fields=["construction_year", "usage"]))
 
     a = park["A1B2C3D4E5F6"]
     a.set("construction_year", 1974, source="audit", date=date(2025, 3, 12), comment="plans")
@@ -115,6 +116,7 @@ def main(output: Path) -> BuildingPark:
     for entity_id, candidate in a.inherited_candidates("construction_year"):
         print(f"  {entity_id}: {candidate.value} from {candidate.source}")
     print(f"A usage {a.usage} inherited from {a.provider_id('usage')}")
+    print(a.describe().loc[["construction_year", "usage", "heated_area"]].to_string())
 
     # Detailed envelope from an audit, then the computed U_bat beats the DPE value.
     for component in (
@@ -155,6 +157,7 @@ def main(output: Path) -> BuildingPark:
         )
     )
 
+    print(park.tree(systems=True, meters=True))
     frame = park.timeseries(load_data=True)
     print(f"Time series ready for tide: {list(frame.columns)}, {len(frame)} rows")
 

@@ -63,6 +63,7 @@ def main(
     report = bdnb.enrich(park, client=bdnb_client)
     print(f"BDNB: group sites created: {report.created}")
     print(report.to_dataframe()[["enriched", "not_found", "message"]].to_string())
+    print(park.tree(systems=True, fields=["construction_year"]))
 
     # 4. DPE: the most recent building-scale DPE of each building, when the open data has one
     report = dpe.enrich(park, client=dpe_client)

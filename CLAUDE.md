@@ -28,9 +28,16 @@ Avant de considérer une tâche terminée : `ruff check`, `ruff format` et `pyte
 ```
 src/bstock/        # code de la lib (src layout)
 tests/             # miroir de src/bstock : tests/test_<module>.py
+examples/          # exemples de bout en bout, chacun en deux versions
 SPEC.md            # spécification
 ```
 
+- **Exemples** : chaque exemple existe en deux versions maintenues en parallèle : `examples/<nom>.py`
+  (script, fonction `main(output)`, sorties par `print`) et `examples/<nom>_interactive.py` (cellules
+  `# %%` qui finissent par une expression affichée, objets laissés dans l'espace de noms). Toute
+  modification de l'une est reportée dans l'autre (mêmes étapes, mêmes données). `tests/test_examples.py`
+  exécute les deux et vérifie qu'elles produisent le même parc. Quand une fonction de la lib remplace
+  un helper d'exemple, utiliser la fonction de la lib dans les deux versions.
 - L'API publique est exportée explicitement dans `src/bstock/__init__.py` (`__all__`), plus les `__all__`
   des sous-modules documentés : `bstock.io`, `bstock.export`, `bstock.connectors` et ses modules `rnb`,
   `bdnb`, `dpe` (SPEC §11). Les `__all__` des autres modules ne listent que des noms réexportés par
