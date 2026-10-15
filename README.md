@@ -22,6 +22,9 @@ Common data structure for building stocks: sites, buildings, envelopes, systems 
 - **Analysis**: sums of extensive quantities (areas, dwellings, system powers) per site without
   double counting a site value and its buildings', completeness and provenance reports, conflicts
   between sources.
+- **Measured consumption**: final energy per site or building, energy and end use over a period or
+  per calendar month or year, sub-meters without double count, kWh/m²; nothing is integrated or
+  extrapolated, a coverage shows the missing data.
 - **Readable in a console or a notebook**: a park or a site displays as a tree (foldable HTML in
   Jupyter), other entities on one line, and `describe()` lists the effective values with their
   source.
@@ -124,6 +127,27 @@ sel.conflicts(rtol=0.05)               # own candidates that disagree (floats wi
 A site may have its own value (a DPE of the whole block) and its buildings theirs: the aggregation
 shows both and never adds them up. Missing values are never estimated, the `coverage` shows them.
 Project attributes declared `sourced(..., extensive=True)` are aggregated too.
+
+## Measured consumption
+
+```python
+gas = park.add_meter(Meter(id="GAZ_A", scope=["school-A"], energy_type="natural_gas",
+                           end_use="total", channels=[Channel(name="energy", unit="kWh")]))
+park.add_meter(Meter(id="GAZ_A_ECS", scope=["school-A"], parent_meter="GAZ_A", end_use="dhw",
+                     energy_type="natural_gas", channels=[Channel(name="energy", unit="kWh")]))
+
+sel = park.select()
+year = {"start": "2024-01-01", "end": "2025-01-01"}
+sel.consumption(**year)                       # kWh per entity, energy and end use, with coverage
+sel.consumption(**year, freq="MS")            # per calendar month (Europe/Paris by default)
+sel.consumption(**year, breakdown=True)       # head meters split by the end use of their sub-meters
+sel.consumption(**year, split="heated_area")  # site meters shared between buildings (estimated)
+sel.intensity(**year)                         # + area (m²) and intensity (kWh/m²)
+```
+
+Only head meters are added up (`parent_meter=None`). An `energy` channel is summed, an `index`
+channel gives its last reading minus the first; power is not integrated: convert it with tide first.
+A meter appears at the level of its scope: a site meter on the site row.
 
 ## Examples
 

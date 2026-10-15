@@ -8,6 +8,7 @@ temporary directory (``OUTPUT``) so they can be opened after the run. Also works
 """
 
 # %% imports and output directory
+import math
 import tempfile
 from datetime import date
 from pathlib import Path
@@ -189,9 +190,43 @@ park.add_meter(
     )
 )
 
+
+# %% gas: a site meter and a sub-meter on the boiler room for hot water, daily readings in kWh
+days = pd.date_range("2024-01-01", "2024-12-31", freq="D", tz="Europe/Paris")
+winter = [max(0.0, math.cos(2 * math.pi * (day.dayofyear - 15) / 366)) for day in days]
+for meter_id, scope, end_use, parent, daily in (
+    ("GAZ_A", "site-ecole-A", "total", None, [40 + 260 * w for w in winter]),
+    ("GAZ_A_ECS", "heating-chaufferie-A", "dhw", "GAZ_A", [40.0] * len(days)),
+):
+    meter = park.add_meter(
+        Meter(
+            id=meter_id,
+            scope=[scope],
+            end_use=end_use,
+            parent_meter=parent,
+            energy_type="natural_gas",
+            timestep="1D",
+            channels=[Channel(name="energy", unit="kWh")],
+        )
+    )
+    meter.data = pd.DataFrame({"energy": daily}, index=days)
+
 print(park.tree(systems=True, meters=True))
 frame = park.timeseries(load_data=True)  # columns follow the tide convention
-frame.head(24)
+frame.dropna(how="all").head(24)
+
+
+# %% 2024 consumption, the hot water sub-meter splitting the gas
+# The electricity meter measures power, which bstock does not integrate (tide's job): it is
+# ignored with a NoDataWarning.
+year = {"start": "2024-01-01", "end": "2025-01-01"}
+park.select().consumption(**year, breakdown=True)
+
+
+# %% kWh/m² per site (heated area aggregated over the buildings), and per month
+columns = ["entity", "energy_type", "energy", "coverage", "area", "intensity"]
+print(park.select().intensity(**year)[columns])
+park.select().intensity(**year, freq="MS")[["period", "energy", "intensity"]]
 
 
 # %% save a self-contained park directory, then reload it with the project classes

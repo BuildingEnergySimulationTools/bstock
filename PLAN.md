@@ -7,7 +7,7 @@ Règles (voir `CLAUDE.md`) :
 
 Sommaire : [v1](#v1--terminée) (terminée, 0.1.0 puis ajustements d'API en 0.2.0) ·
 [v2](#v2--connecteurs-emprise-et-exports) (terminée, 0.3.0) ·
-[v3](#v3--lisibilité-sélection-analyse-consommations-graphiques) (en cours ; v3.a à v3.c terminées, 0.6.0)
+[v3](#v3--lisibilité-sélection-analyse-consommations-graphiques) (en cours ; v3.a à v3.d terminées, 0.7.0)
 
 ---
 
@@ -379,7 +379,8 @@ Reportées dans `SPEC.md` (§3.3, §3.6, §3.7, §6.1, §6.5, §11 à §14) à l
 - [x] Tests : sous-compteurs sans double compte, index remis à zéro, unité refusée, puissance ignorée,
       couverture partielle, découpage annuel autour du changement d'heure, compteur multi-bâtiments,
       répartition avec une surface manquante, kWh/m² d'un site
-- [ ] Finalisation 0.7.0 (exemple de bout en bout avec des compteurs et des sous-compteurs)
+- [x] Finalisation 0.7.0 (exemple de bout en bout avec des compteurs et des sous-compteurs ; correction
+      de l'avertissement pandas de `timeseries` sur des index entrelacés, révélé par l'exemple)
 
 ## v3.e — Graphiques (0.8.0)
 

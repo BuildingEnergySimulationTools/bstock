@@ -4,8 +4,10 @@ import tempfile
 from pathlib import Path
 
 import pandas as pd
+import pytest
 
 from bstock.connectors import bdnb, dpe, rnb
+from bstock.exceptions import NoDataWarning
 from fakes import FakeBdnbClient, FakeDpeClient, FakeRnbClient, dpe_lines
 
 EXAMPLES = Path(__file__).parents[1] / "examples"
@@ -37,8 +39,13 @@ def fake_clients(recorded):
     )
 
 
+POWER_IGNORED = "'PDL_123' has no 'energy' or 'index' channel"
+"""The Bayonne electricity meter measures power, which the consumption does not integrate."""
+
+
 def test_bayonne_example_runs(tmp_path, capsys):
-    park = load_example("bayonne").main(tmp_path)
+    with pytest.warns(NoDataWarning, match=POWER_IGNORED):
+        park = load_example("bayonne").main(tmp_path)
     assert (tmp_path / "park" / "park.json").exists()
     assert (tmp_path / "park" / "timeseries" / "PDL_123.parquet").exists()
     assert type(park["A1B2C3D4E5F6"]).__name__ == "BayonneBuilding"
@@ -71,8 +78,10 @@ def test_connectors_example_runs_with_fake_clients(tmp_path, capsys, recorded):
 
 
 def test_bayonne_interactive_example_matches_the_script(tmp_path, monkeypatch):
-    park = load_example("bayonne").main(tmp_path)
-    namespace = run_interactive("bayonne", tmp_path / "interactive", monkeypatch)
+    with pytest.warns(NoDataWarning, match=POWER_IGNORED):
+        park = load_example("bayonne").main(tmp_path)
+    with pytest.warns(NoDataWarning, match=POWER_IGNORED):
+        namespace = run_interactive("bayonne", tmp_path / "interactive", monkeypatch)
     assert namespace["reloaded"] == namespace["park"]
     pd.testing.assert_frame_equal(
         namespace["park"].to_dataframe(provenance=True), park.to_dataframe(provenance=True)

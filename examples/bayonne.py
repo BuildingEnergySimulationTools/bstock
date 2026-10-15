@@ -13,6 +13,7 @@ Run it with ``python examples/bayonne.py [output_directory]``.
 
 from __future__ import annotations
 
+import math
 import sys
 import tempfile
 from datetime import date
@@ -167,9 +168,36 @@ def main(output: Path) -> BuildingPark:
         )
     )
 
+    # Gas: a site meter and a sub-meter on the boiler room for hot water, daily readings in kWh.
+    days = pd.date_range("2024-01-01", "2024-12-31", freq="D", tz="Europe/Paris")
+    winter = [max(0.0, math.cos(2 * math.pi * (day.dayofyear - 15) / 366)) for day in days]
+    for meter_id, scope, end_use, parent, daily in (
+        ("GAZ_A", "site-ecole-A", "total", None, [40 + 260 * w for w in winter]),
+        ("GAZ_A_ECS", "heating-chaufferie-A", "dhw", "GAZ_A", [40.0] * len(days)),
+    ):
+        meter = park.add_meter(
+            Meter(
+                id=meter_id,
+                scope=[scope],
+                end_use=end_use,
+                parent_meter=parent,
+                energy_type="natural_gas",
+                timestep="1D",
+                channels=[Channel(name="energy", unit="kWh")],
+            )
+        )
+        meter.data = pd.DataFrame({"energy": daily}, index=days)
+
     print(park.tree(systems=True, meters=True))
     frame = park.timeseries(load_data=True)
     print(f"Time series ready for tide: {list(frame.columns)}, {len(frame)} rows")
+
+    # 2024 consumption, the hot water sub-meter splitting the gas; the electricity meter measures
+    # power, which bstock does not integrate (tide's job): it is ignored with a NoDataWarning.
+    year = {"start": "2024-01-01", "end": "2025-01-01"}
+    print(park.select().consumption(**year, breakdown=True).to_string())
+    columns = ["entity", "energy_type", "energy", "coverage", "area", "intensity"]
+    print(park.select().intensity(**year)[columns].to_string())
 
     park.save(output / "park", include_data=True)
     load_curve.unlink()  # the saved park no longer needs the original file
