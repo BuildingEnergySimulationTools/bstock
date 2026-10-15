@@ -1293,9 +1293,11 @@ sous-classe projet et ceux qui n'ont pas de valeur. L'index est le nom de l'attr
 l'entité qui fournit la valeur), `inherited` (bool) et `candidates` (nombre de candidats propres).
 
 **HTML (Jupyter).** `BuildingPark`, `Site`, `Selection` et `TreeView` ont un `_repr_html_`. C'est un arbre
-repliable en `<details>` imbriqués, sans JavaScript, avec un style intégré. Le premier niveau est ouvert,
-les autres sont fermés. L'arbre HTML n'est pas tronqué, puisqu'il est repliable. Les entités feuilles
-n'ont pas de HTML propre : Jupyter affiche leur repr texte.
+repliable en `<details>` imbriqués, sans JavaScript, avec un style intégré (police à chasse fixe, bordure
+semi-transparente lisible en thème clair et sombre). La ligne d'en-tête et le premier niveau sont visibles ;
+chaque nœud qui a un contenu est replié et s'ouvre au clic, ce qui garde l'affichage court sur un gros
+parc. Les libellés sont échappés. L'arbre HTML suit les options de `tree()` et n'est pas tronqué, puisqu'il
+est repliable. Les entités feuilles n'ont pas de HTML propre : Jupyter affiche leur repr texte.
 
 ### 14.2 Sélection (v3.b)
 

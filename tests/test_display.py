@@ -1,3 +1,5 @@
+from html.parser import HTMLParser
+
 import pandas as pd
 import pytest
 
@@ -201,3 +203,83 @@ def test_describe_keeps_empty_attributes(park):
     assert pd.isna(row["value"])
     assert pd.isna(row["provider"])
     assert not row["inherited"]
+
+
+class _TreeParser(HTMLParser):
+    """Rebuild ``(depth, label, foldable)`` lines from the HTML tree."""
+
+    def __init__(self):
+        super().__init__()
+        self.depth = 0
+        self.lines = []
+        self.header = None
+        self._capture = None
+        self._text = ""
+
+    def handle_starttag(self, tag, attrs):
+        if tag == "details":
+            self.depth += 1
+        elif tag in ("summary", "strong") or (tag == "div" and "padding-left: 1.1em" in str(attrs)):
+            self._capture, self._text = tag, ""
+
+    def handle_endtag(self, tag):
+        if tag == "details":
+            self.depth -= 1
+        elif tag == self._capture:
+            if tag == "strong":
+                self.header = self._text
+            else:
+                depth = self.depth if tag == "summary" else self.depth + 1
+                self.lines.append((depth, self._text, tag == "summary"))
+            self._capture = None
+
+    def handle_data(self, data):
+        if self._capture:
+            self._text += data
+
+
+def parse_html(html):
+    parser = _TreeParser()
+    parser.feed(html)
+    return parser
+
+
+def test_html_tree_nests_foldable_nodes(park):
+    parser = parse_html(park._repr_html_())
+    assert parser.header == "BuildingPark 'Bayonne': 2 sites, 4 buildings, 0 meters"
+    assert parser.lines == [
+        (1, "[site] gs-a  Groupe scolaire A  (3 buildings)", True),
+        (2, "[site] group  (2 buildings)", True),
+        (3, f"[building] {RNB}  École", False),
+        (3, "[building] b2", False),
+        (2, "[building] gym  Gymnase", False),
+        (1, "[building] annex  Mairie annexe", False),
+    ]
+
+
+def test_html_tree_lists_the_first_level_with_nodes_folded(park):
+    html = park._repr_html_()
+    assert html.startswith('<div class="bstock-tree"')
+    assert "<details open" not in html
+    assert "<script" not in html
+
+
+def test_html_tree_is_not_truncated():
+    park = BuildingPark(name="Big")
+    for i in range(40):
+        park.new_building(id=f"b{i}")
+    assert len(parse_html(park._repr_html_()).lines) == 40
+
+
+def test_html_tree_escapes_labels(park):
+    park["annex"].name = "<b>A & B</b>"
+    html = park._repr_html_()
+    assert "<b>A" not in html
+    assert parse_html(html).lines[-1] == (1, "[building] annex  <b>A & B</b>", False)
+
+
+def test_site_and_tree_view_html_follow_the_tree_options(park):
+    site_lines = parse_html(park["group"]._repr_html_()).lines
+    assert [label for _, label, _ in site_lines] == [f"[building] {RNB}  École", "[building] b2"]
+    view = park.tree(max_depth=1)
+    assert parse_html(view._repr_html_()).lines[1] == (2, "… 1 site, 3 buildings", False)

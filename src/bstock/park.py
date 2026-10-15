@@ -370,6 +370,10 @@ class BuildingPark(BaseModel):
     def __repr__(self) -> str:
         return self.tree().truncated(REPR_MAX_LINES)
 
+    def _repr_html_(self) -> str:
+        """Return the full tree as foldable HTML, for Jupyter."""
+        return self.tree()._repr_html_()
+
     def __str__(self) -> str:
         return repr(self)
 

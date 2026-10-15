@@ -116,6 +116,10 @@ class Site(DescribedEntity):
     def __repr__(self) -> str:
         return self.tree().truncated(REPR_MAX_LINES)
 
+    def _repr_html_(self) -> str:
+        """Return the full tree as foldable HTML, for Jupyter."""
+        return self.tree()._repr_html_()
+
     # --- children -----------------------------------------------------------------------------
 
     def add_site(self, site: Site) -> Site:

@@ -323,9 +323,9 @@ Reportées dans `SPEC.md` (§3.3, §3.6, §3.7, §6.1, §6.5, §11 à §14) à l
       `describe` (valeur héritée, attribut vide)
 
 ### Étape 23 — HTML Jupyter
-- [ ] `_repr_html_` de `BuildingPark`, `Site`, `TreeView` : `<details>` imbriqués, style intégré,
-      premier niveau ouvert, échappement des noms
-- [ ] Tests : structure HTML (imbrication, échappement), sans navigateur
+- [x] `_repr_html_` de `BuildingPark`, `Site`, `TreeView` : `<details>` imbriqués, style intégré,
+      premier niveau visible et nœuds repliés, échappement des noms
+- [x] Tests : structure HTML (imbrication, échappement), sans navigateur
 
 ### Étape 24 — Finalisation 0.4.0
 - [x] Exemples interactifs versionnés et tenus en parallèle des scripts (testés) ; helper `tree()`

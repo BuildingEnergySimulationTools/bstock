@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from enum import Enum
+from html import escape
 from typing import TYPE_CHECKING, Any
 
 import pandas as pd
@@ -41,7 +42,8 @@ class _Node:
 class TreeView:
     """Tree of the sites and buildings of a park or a site, returned by ``tree()``.
 
-    ``str()`` and the repr give the full text tree, without truncation.
+    ``str()`` and the repr give the full text tree, without truncation. In Jupyter, the tree is
+    shown as HTML: the first level is listed and every node with content can be unfolded.
     """
 
     def __init__(self, header: str, nodes: list[_Node]) -> None:
@@ -86,6 +88,33 @@ class TreeView:
 
     def __repr__(self) -> str:
         return str(self)
+
+    def _repr_html_(self) -> str:
+        """Return the tree as nested ``<details>`` elements (no JavaScript), for Jupyter."""
+        nodes = "".join(_node_html(node) for node in self._nodes)
+        return (
+            f'<div class="bstock-tree" style="{_HTML_STYLE}">'
+            f"<div><strong>{escape(self._header)}</strong></div>"
+            f'<div style="{_HTML_CHILDREN_STYLE}">{nodes}</div></div>'
+        )
+
+
+_HTML_STYLE = "font-family: monospace; font-size: 13px; line-height: 1.5; white-space: pre"
+# The border colour has some transparency so that it suits light and dark themes.
+_HTML_CHILDREN_STYLE = "margin-left: 0.4em; padding-left: 0.8em; border-left: 1px solid #8884"
+# Leaves are shifted by the width of the disclosure triangle of the <summary> elements.
+_HTML_LEAF_STYLE = "padding-left: 1.1em"
+
+
+def _node_html(node: _Node) -> str:
+    label = escape(node.label)
+    if not node.children:
+        return f'<div style="{_HTML_LEAF_STYLE}">{label}</div>'
+    children = "".join(_node_html(child) for child in node.children)
+    return (
+        f'<details><summary style="cursor: pointer">{label}</summary>'
+        f'<div style="{_HTML_CHILDREN_STYLE}">{children}</div></details>'
+    )
 
 
 def _render(node: _Node, prefix: str, last: bool, lines: list[str]) -> None:
