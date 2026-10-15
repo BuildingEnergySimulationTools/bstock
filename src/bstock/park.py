@@ -28,6 +28,7 @@ from bstock.exceptions import (
 )
 from bstock.meters import Meter
 from bstock.provenance import SourcePriority
+from bstock.selection import Predicate, Selection, SelectionKind, select
 from bstock.site import Site, build_children
 from bstock.systems import System
 
@@ -323,6 +324,58 @@ class BuildingPark(BaseModel):
         target = self._resolve(entity, (Site, Building))
         ids = {target.id, *(s.id for s in target.iter_systems())}
         return [m for m in self.meters if ids & set(m.scope)]
+
+    # --- selection ----------------------------------------------------------------------------
+
+    def select(
+        self,
+        predicate: Predicate | None = None,
+        *,
+        kind: SelectionKind = "building",
+        **criteria: Any,
+    ) -> Selection:
+        """Return the buildings (or sites) that match every criterion (SPEC §14.2).
+
+        Criteria apply to the effective values, inheritance included: a building inheriting
+        ``usage="tertiary"`` from its site matches ``usage="tertiary"``. A missing value matches
+        no comparison, except ``__isnull=True``. Without criterion, every entity of ``kind`` is
+        selected.
+
+        Parameters
+        ----------
+        predicate
+            Function called with each entity; the entity is kept when it returns a true value.
+            Its exceptions are not caught.
+        kind
+            ``"building"`` or ``"site"``; a selection never mixes them.
+        **criteria
+            Value criteria on a sourced attribute (project ones included), ``rnb_id``, the BDNB
+            ids or ``dpe_ids``: ``attr=v`` (equality; an enum accepts its value), ``attr__in``,
+            ``attr__lt``, ``attr__le``, ``attr__gt``, ``attr__ge``, ``attr__isnull=True/False``
+            and ``attr__contains`` (list attributes). Structure criteria: ``within=site`` (in
+            the subtree of the site, object or id), ``parent=site`` (``None``: top level),
+            ``has_rnb_id`` (buildings), ``has_meter``, and ``has_system=True/False`` or a system
+            kind (for a building, shared systems serving it count).
+
+        Returns
+        -------
+        Selection
+            The matching entities, in the order of the park tree.
+
+        Raises
+        ------
+        UnknownKindError
+            If ``kind`` is neither ``"building"`` nor ``"site"``, or ``has_system`` names an
+            unknown system kind.
+        UnknownFieldError
+            If a criterion names an unknown attribute.
+        InvalidArgumentError
+            If an operator does not apply to the value or a criterion to ``kind``, or an enum
+            value is invalid.
+        UnknownIdError
+            If ``within`` or ``parent`` is not a site of the park.
+        """
+        return select(self, predicate, kind=kind, **criteria)
 
     # --- display ------------------------------------------------------------------------------
 

@@ -62,6 +62,7 @@ from bstock.provenance import (
     SourcePriority,
     sourced,
 )
+from bstock.selection import Selection
 from bstock.site import Site
 from bstock.sources import CsvSource, DataSource, ParquetSource, UnknownSource
 from bstock.systems import (
@@ -126,6 +127,7 @@ __all__ = [
     "ParquetSource",
     "PerformanceRatioWarning",
     "ProjectClassError",
+    "Selection",
     "Site",
     "SolarPV",
     "SourcePriority",

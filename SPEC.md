@@ -1319,16 +1319,19 @@ existent déjà (`iter_systems(kind)`, `timeseries(...)`).
 
 **`Selection`** :
 - C'est un **instantané** : elle retient les ids et le parc au moment de sa création. Elle se parcourt
-  dans l'ordre de l'arbre et rend les entités du parc. Si une entité a été retirée du parc depuis,
+  dans l'ordre de `park.iter_buildings()` / `iter_sites()`, qui est aussi celui de `to_dataframe()`
+  (les bâtiments directs d'un site avant ceux de ses sous-sites), et rend les entités du parc. Si une entité a été retirée du parc depuis,
   l'utilisation de la sélection lève `UnknownIdError`. Pour tenir compte des changements du parc, on
   refait la sélection.
 - `sel.filter(predicate=None, **criteria)` renvoie une nouvelle sélection, plus restreinte, du même
   `kind`.
 - Opérations d'ensemble `sel_a | sel_b`, `sel_a & sel_b` et `sel_a - sel_b`. Les deux sélections doivent
-  avoir le même parc et le même `kind` (`InvalidArgumentError` sinon). L'ordre du résultat est celui de
-  l'arbre.
+  avoir le même parc et le même `kind` (`InvalidArgumentError` sinon). Le résultat suit le même ordre.
+- Propriétés `park`, `kind` et `ids` (tuple) ; `len(sel)`, `list(sel)`, `"id" in sel` ou `entité in sel`.
 - Méthodes : `to_dataframe(provenance=False)` (§9, restreint aux entités sélectionnées), `tree(...)`
-  (§14.1 : entités sélectionnées et leurs sites ancêtres), `aggregate`, `completeness`, `provenance`,
+  (§14.1 : entités sélectionnées et leurs sites ancêtres ; un site compte les bâtiments sélectionnés de
+  son sous-arbre, ou tous ses bâtiments dans une sélection de sites, qui ne montre pas les bâtiments ;
+  l'en-tête est le repr de la sélection suivi du parc), `aggregate`, `completeness`, `provenance`,
   `conflicts` (§14.3, §14.4), `consumption`, `intensity` (§6.5) et l'accesseur `plot` (§14.5).
 - Repr sur une ligne : `Selection(kind='building', 42 entities)`. En HTML, c'est l'arbre de la sélection.
 
@@ -1350,8 +1353,14 @@ effective**, héritage compris : un bâtiment qui hérite `usage="tertiary"` de 
 
 - Les attributs utilisables sont les attributs sourcés de la classe (y compris ceux du projet), `rnb_id`,
   les ids BDNB et `dpe_ids`.
-- Un attribut inconnu lève `UnknownFieldError`. Un opérateur inconnu ou un critère de structure
-  inadapté au `kind` (`has_rnb_id` sur des sites, par exemple) lève `InvalidArgumentError`.
+- Un attribut inconnu lève `UnknownFieldError`. Un opérateur inconnu, un opérateur mal employé
+  (`__contains` sur une valeur qui n'est pas une liste, `__isnull` sans booléen, comparaison de types
+  incompatibles), une valeur d'enum invalide (`usage="education"`) ou un critère de structure inadapté au
+  `kind` (`has_rnb_id` sur des sites, par exemple) lèvent `InvalidArgumentError`. `within` ou `parent`
+  qui ne désigne pas un site du parc lève `UnknownIdError`, et `has_system` avec un `kind` de système
+  inconnu lève `UnknownKindError`. Les critères sont contrôlés à la création de la sélection, même si le
+  parc est vide.
+- `has_system=False` retient les entités sans aucun système (ni propre, ni partagé pour un bâtiment).
 - Une valeur absente ne satisfait aucune comparaison, sauf `__isnull=True`.
 - Le prédicat reçoit l'entité. Ses exceptions ne sont pas interceptées.
 - Il n'y a pas de critère sur la provenance : pour cela, on passe par

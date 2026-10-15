@@ -335,12 +335,12 @@ Reportées dans `SPEC.md` (§3.3, §3.6, §3.7, §6.1, §6.5, §11 à §14) à l
 ## v3.b — Sélection (0.5.0)
 
 ### Étape 25 — `Selection`
-- [ ] Module `selection.py` : `Selection` (instantané d'ids, parcours dans l'ordre de l'arbre, `len`,
+- [x] Module `selection.py` : `Selection` (instantané d'ids, parcours dans l'ordre de l'arbre, `len`,
       `in`, `ids`, `kind`, repr), `park.select`, `sel.filter`
-- [ ] Critères de valeur et opérateurs ; critères de structure ; prédicat ; erreurs (champ inconnu,
+- [x] Critères de valeur et opérateurs ; critères de structure ; prédicat ; erreurs (champ inconnu,
       opérateur inconnu, critère inadapté au `kind`)
-- [ ] Opérations d'ensemble ; `to_dataframe` et `tree` restreints à la sélection
-- [ ] Tests : valeur héritée retenue, valeur absente, chaque opérateur (paramétré), `within` à plusieurs
+- [x] Opérations d'ensemble ; `to_dataframe` et `tree` restreints à la sélection
+- [x] Tests : valeur héritée retenue, valeur absente, chaque opérateur (paramétré), `within` à plusieurs
       niveaux, `has_system` avec un système partagé, entité retirée après la sélection, parcs ou `kind`
       différents
 - [ ] Finalisation 0.5.0 (API publique, docstrings, README, version et tag)

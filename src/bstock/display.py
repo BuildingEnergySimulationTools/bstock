@@ -6,7 +6,7 @@ details the sourced attributes of an entity.
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Collection, Sequence
 from enum import Enum
 from html import escape
 from typing import TYPE_CHECKING, Any
@@ -137,8 +137,15 @@ def build_tree(
     meters: bool = False,
     max_depth: int | None = None,
     fields: Sequence[str] | None = None,
+    shown: Collection[str] | None = None,
+    header: str | None = None,
 ) -> TreeView:
-    """Build the tree of a park or a site; see :meth:`bstock.BuildingPark.tree`."""
+    """Build the tree of a park or a site; see :meth:`bstock.BuildingPark.tree`.
+
+    ``shown`` restricts the sites and buildings to these ids (``None``: all); the building count
+    of a site then counts the shown buildings, or all of them if no building is shown. ``header``
+    replaces the first line of a park tree.
+    """
     from bstock.park import BuildingPark
 
     if max_depth is not None and max_depth < 0:
@@ -146,14 +153,21 @@ def build_tree(
     fields = list(fields or [])
     _check_fields(fields, [*root.iter_sites(), *root.iter_buildings()])
     park = root if isinstance(root, BuildingPark) else root.park
-    builder = _TreeBuilder(park, systems=systems, meters=meters, max_depth=max_depth, fields=fields)
+    builder = _TreeBuilder(
+        park,
+        systems=systems,
+        meters=meters,
+        max_depth=max_depth,
+        fields=fields,
+        shown=None if shown is None else set(shown),
+    )
     if isinstance(root, BuildingPark):
-        nodes = builder.children(root.sites, root.buildings, depth=1)
-        if meters:
+        nodes = builder.children(root, depth=1)
+        if meters and shown is None:
             nodes.extend(
                 _Node(f"{_meter_label(m)}  (no scope)") for m in root.meters if not m.scope
             )
-        return TreeView(_park_header(root), nodes)
+        return TreeView(header or _park_header(root), nodes)
     return TreeView(builder.label(root), builder.content(root, depth=1))
 
 
@@ -168,19 +182,34 @@ class _TreeBuilder:
         meters: bool,
         max_depth: int | None,
         fields: list[str],
+        shown: set[str] | None,
     ) -> None:
         self.park = park
         self.systems = systems
         self.meters = meters
         self.max_depth = max_depth
         self.fields = fields
+        self.shown = shown
 
-    def children(
-        self, sites: Sequence[Site], buildings: Sequence[Building], depth: int
-    ) -> list[_Node]:
-        """Return the nodes of ``sites`` then ``buildings``, which are at ``depth``."""
+    def sites(self, container: BuildingPark | Site) -> list[Site]:
+        """Return the shown direct sub-sites of ``container``."""
+        return [s for s in container.sites if self._is_shown(s)]
+
+    def buildings(self, container: BuildingPark | Site) -> list[Building]:
+        """Return the shown direct buildings of ``container``."""
+        return [b for b in container.buildings if self._is_shown(b)]
+
+    def building_count(self, site: Site) -> int:
+        """Return the number of buildings counted on the line of ``site``."""
+        every = list(site.iter_buildings())
+        shown = [b for b in every if self._is_shown(b)]
+        return len(shown) if shown or self.shown is None else len(every)
+
+    def children(self, container: BuildingPark | Site, depth: int) -> list[_Node]:
+        """Return the nodes of the shown sites then buildings of ``container``, at ``depth``."""
+        sites, buildings = self.sites(container), self.buildings(container)
         if self.max_depth is not None and depth > self.max_depth:
-            summary = _counts(sites, buildings)
+            summary = self._counts(sites, buildings)
             return [_Node(f"… {summary}")] if summary else []
         return [
             _Node(self.label(entity), self.content(entity, depth + 1))
@@ -192,14 +221,13 @@ class _TreeBuilder:
         from bstock.site import Site
 
         nodes: list[_Node] = []
-        if self.systems:
-            nodes.extend(_Node(_system_label(s)) for s in entity.iter_systems())
-        if self.meters and self.park is not None:
-            nodes.extend(_Node(_meter_label(m)) for m in self.park.meters_for(entity))
-        if self.max_depth is not None and depth > self.max_depth:
-            nodes = []
+        if self.max_depth is None or depth <= self.max_depth:
+            if self.systems:
+                nodes.extend(_Node(_system_label(s)) for s in entity.iter_systems())
+            if self.meters and self.park is not None:
+                nodes.extend(_Node(_meter_label(m)) for m in self.park.meters_for(entity))
         if isinstance(entity, Site):
-            nodes.extend(self.children(entity.sites, entity.buildings, depth))
+            nodes.extend(self.children(entity, depth))
         return nodes
 
     def label(self, entity: Site | Building) -> str:
@@ -208,8 +236,8 @@ class _TreeBuilder:
 
         is_site = isinstance(entity, Site)
         parts = [f"[{'site' if is_site else 'building'}] {_id_and_name(entity)}"]
-        if is_site:
-            parts.append(f"({_plural(sum(1 for _ in entity.iter_buildings()), 'building')})")
+        if isinstance(entity, Site):
+            parts.append(f"({_plural(self.building_count(entity), 'building')})")
         values = [
             f"{name}={_format_value(getattr(entity, name), _unit(entity, name))}"
             for name in self.fields
@@ -218,6 +246,18 @@ class _TreeBuilder:
         if values:
             parts.append(", ".join(values))
         return "  ".join(parts)
+
+    def _counts(self, sites: list[Site], buildings: list[Building]) -> str:
+        """Return the number of shown sites and buildings in and below the given ones, as text."""
+        nested_sites = [s for site in sites for s in site.iter_sites()]
+        nested_buildings = [b for site in sites for b in site.iter_buildings()]
+        site_count = len(sites) + sum(1 for s in nested_sites if self._is_shown(s))
+        building_count = len(buildings) + sum(1 for b in nested_buildings if self._is_shown(b))
+        pairs = [(site_count, "site"), (building_count, "building")]
+        return ", ".join(_plural(n, word) for n, word in pairs if n)
+
+    def _is_shown(self, entity: Site | Building) -> bool:
+        return self.shown is None or entity.id in self.shown
 
 
 def _check_fields(fields: list[str], entities: list[Any]) -> None:
@@ -238,15 +278,6 @@ def _park_header(park: BuildingPark) -> str:
         _plural(len(park.meters), "meter"),
     ]
     return f"{type(park).__name__} {park.name!r}: {', '.join(counts)}"
-
-
-def _counts(sites: Sequence[Site], buildings: Sequence[Building]) -> str:
-    site_count = len(sites) + sum(1 for s in sites for _ in s.iter_sites())
-    building_count = len(buildings) + sum(1 for s in sites for _ in s.iter_buildings())
-    counts = [
-        _plural(n, word) for n, word in [(site_count, "site"), (building_count, "building")] if n
-    ]
-    return ", ".join(counts)
 
 
 def _id_and_name(entity: Any) -> str:

@@ -73,14 +73,19 @@ def to_dataframe(
     """
     if kind not in _ID_COLUMNS:
         raise UnknownKindError(f"unknown export kind {kind!r}; expected 'building' or 'site'")
-    entities: list[DescribedEntity]
-    if kind == "building":
-        entities = list(park.iter_buildings())
-        base: type[DescribedEntity] = park.building_cls
-    else:
-        entities = list(park.iter_sites())
-        base = park.site_cls
+    entities = list(park.iter_buildings() if kind == "building" else park.iter_sites())
+    return entities_frame(park, kind, entities, provenance=provenance)
 
+
+def entities_frame(
+    park: BuildingPark,
+    kind: ExportKind,
+    entities: list[DescribedEntity],
+    *,
+    provenance: bool = False,
+) -> pd.DataFrame:
+    """Return the :func:`to_dataframe` rows of ``entities``, buildings or sites of ``park``."""
+    base: type[DescribedEntity] = park.building_cls if kind == "building" else park.site_cls
     fields = _exported_fields(base, entities)
     columns = list(_ID_COLUMNS[kind])
     for name in fields:
