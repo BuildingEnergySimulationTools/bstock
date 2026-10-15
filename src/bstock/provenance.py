@@ -31,6 +31,7 @@ from pydantic import (
 )
 
 from bstock import display
+from bstock._children import deepcopy_linked
 from bstock.exceptions import (
     HierarchyError,
     InvalidArgumentError,
@@ -397,6 +398,9 @@ class SourcedModel(BaseModel):
         return type(self) is type(other) and self.__dict__ == other.__dict__
 
     __hash__ = None  # type: ignore[assignment]
+
+    def __deepcopy__(self, memo: dict[int, Any] | None = None) -> Self:
+        return deepcopy_linked(self, memo)
 
     # --- display (bstock.display) ----------------------------------------------------------------
 

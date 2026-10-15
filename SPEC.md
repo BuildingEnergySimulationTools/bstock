@@ -123,7 +123,11 @@ Toutes les entités (`Site`, `Building`, `Envelope`, systèmes, `Meter`) hérite
 - **Les collections (sites, bâtiments, systèmes, parois, compteurs) se modifient uniquement via les
   méthodes du parc ou des entités** (`new_*`, `add_*`, `remove`, `move`). Ces méthodes maintiennent l'index
   des ids, les liens vers le parent et les contrôles de cohérence. La modification directe des listes
-  n'est pas supportée.
+  est refusée : `park.sites`, `park.buildings`, `park.meters`, `site.sites`, `site.buildings`, les
+  listes de systèmes (`heating`… `pv`) et `envelope.components` restent des `list` en lecture (index,
+  itération, `==`), mais leurs méthodes de modification (`append`, `remove`, `sort`, `lst[i] = …`…) et
+  leur réaffectation (`site.buildings = [...]`) lèvent `HierarchyError` en citant les méthodes à
+  utiliser. Les listes d'ids (`scope`, `serves`, `dpe_ids`) ne sont pas concernées (§3.8).
 
 ### 3.4 BuildingPark
 
@@ -276,6 +280,13 @@ La composition des parois (couches, matériaux) est hors périmètre.
 
 `loss_area` et `heat_loss_coefficient` sont déclarés `extensive=True` (§3.3). L'enveloppe n'est pas
 agrégée en v3, mais la métadonnée est posée dès maintenant pour rester cohérente.
+
+Chaque site ou bâtiment a sa propre enveloppe. `entity.envelope = Envelope(...)` (ou un dict) rattache
+la nouvelle enveloppe à l'entité, qui en hérite les valeurs du site parent ; l'ancienne est détachée.
+L'enveloppe d'une autre entité ne peut pas être affectée (`HierarchyError`) : on affecte une copie,
+`other.envelope.model_copy(deep=True)`. Plus généralement, la copie profonde d'une entité, d'une
+enveloppe ou d'un compteur seul est détachée de son propriétaire (pas de parent ni de parc), alors que
+celle d'un parc entier garde ses liens internes.
 
 **EnvelopeComponent**
 

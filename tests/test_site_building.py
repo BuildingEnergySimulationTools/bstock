@@ -6,6 +6,7 @@ from pydantic import ValidationError
 
 from bstock.building import Building
 from bstock.enums import BuildingUsage, Inertia
+from bstock.envelope import Envelope
 from bstock.exceptions import (
     DuplicateIdError,
     HierarchyError,
@@ -332,3 +333,40 @@ def test_footprint_json_round_trip():
     loaded = Building.model_validate_json(building.model_dump_json())
     assert loaded.footprint == FOOTPRINT
     assert loaded.candidates("footprint_area") == building.candidates("footprint_area")
+
+
+# --- envelope assignment ----------------------------------------------------------------------
+
+
+def test_assigned_envelope_inherits_from_parent_site():
+    # the bug: an assigned envelope was not attached to its entity, so it inherited nothing
+    site = Site(id="s1", buildings=[Building(id="b1")])
+    site.envelope.u_bat = 1.2
+    building = site.buildings[0]
+    old = building.envelope
+    building.envelope = Envelope(inertia=Inertia.HEAVY)
+    assert building.envelope.u_bat == 1.2
+    assert building.envelope.inertia is Inertia.HEAVY
+    assert old.u_bat is None  # the replaced envelope no longer belongs to the building
+
+
+def test_assigned_envelope_from_dict_is_attached():
+    site = Site(id="s1", buildings=[Building(id="b1")])
+    site.envelope.u_bat = 1.2
+    site.buildings[0].envelope = {"inertia": "heavy"}
+    assert site.buildings[0].envelope.u_bat == 1.2
+
+
+def test_envelope_of_another_entity_cannot_be_assigned():
+    first, second = Building(id="b1"), Building(id="b2")
+    with pytest.raises(HierarchyError, match="already belongs to 'b1'"):
+        second.envelope = first.envelope
+    assert first.envelope._container is first
+
+
+def test_envelope_copy_can_be_assigned():
+    first, second = Building(id="b1"), Building(id="b2")
+    first.envelope.u_bat = 0.8
+    second.envelope = first.envelope.model_copy(deep=True)
+    assert second.envelope.u_bat == 0.8
+    assert first.envelope._container is first

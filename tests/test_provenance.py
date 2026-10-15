@@ -358,3 +358,36 @@ def test_extensive_attribute_cannot_be_inherited():
 )
 def test_extensive_flag_of_core_attributes(cls, name, extensive):
     assert getattr(bstock, cls).sourced_fields()[name].extensive is extensive
+
+
+def test_deep_copy_is_detached_from_its_owner():
+    from bstock import BuildingPark
+
+    park = BuildingPark(name="Park")
+    building = park.new_building(id="b1", parent=park.new_site("s1"))
+    copied = building.model_copy(deep=True)
+    assert copied.parent is None
+    assert copied.park is None
+    assert building.parent is park["s1"]
+
+
+def test_deep_copy_of_park_keeps_links_inside_the_copy():
+    from bstock import BuildingPark
+
+    park = BuildingPark(name="Park")
+    park.new_building(id="b1", parent=park.new_site("s1"))
+    copied = park.model_copy(deep=True)
+    assert copied["b1"].parent is copied["s1"]
+    assert copied["s1"].park is copied
+
+
+def test_deep_copy_of_park_is_independent():
+    from bstock import BuildingPark
+
+    park = BuildingPark(name="Park")
+    park.new_building(id="b1", parent=park.new_site("s1", construction_year=1970))
+    copied = park.model_copy(deep=True)
+    copied["s1"].construction_year = 1990
+    assert copied["b1"].construction_year == 1990
+    assert park["b1"].construction_year == 1970
+    assert copied["b1"] is copied["s1"].buildings[0]

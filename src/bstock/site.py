@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 from collections.abc import Iterator, Sequence
-from typing import Any
+from typing import Any, ClassVar
 
 from pydantic import Field, ValidationInfo, field_validator, model_validator
 
+from bstock._children import ChildList, append_child, remove_child, wrap_children
 from bstock._ids import check_external_id
 from bstock.building import Building
 from bstock.description import DescribedEntity
@@ -35,13 +36,24 @@ class Site(DescribedEntity):
     """
 
     bdnb_batiment_groupe_id: str | None = None
-    sites: list[Site] = Field(default_factory=list)
-    buildings: list[Building] = Field(default_factory=list)
+    sites: list[Site] = Field(default_factory=list, validate_default=True)
+    buildings: list[Building] = Field(default_factory=list, validate_default=True)
+
+    _child_hints: ClassVar[dict[str, str]] = {
+        **DescribedEntity._child_hints,
+        "sites": "site.add_site, site.detach, park.move or park.remove",
+        "buildings": "site.add_building, site.detach, park.move or park.remove",
+    }
 
     @model_validator(mode="before")
     @classmethod
     def _build_children_with_context_classes(cls, data: Any, info: ValidationInfo) -> Any:
         return build_children(data, info)
+
+    @field_validator("sites", "buildings")
+    @classmethod
+    def _protect_children(cls, value: list[Any], info: ValidationInfo) -> ChildList[Any]:
+        return wrap_children(cls, info.field_name or "", value)
 
     @field_validator("bdnb_batiment_groupe_id")
     @classmethod
@@ -136,7 +148,7 @@ class Site(DescribedEntity):
         self._check_new_child(site)
         self._notify_park("_register", site)
         site._container = self
-        self.sites.append(site)
+        append_child(self.sites, site)
         return site
 
     def add_building(self, building: Building) -> Building:
@@ -153,7 +165,7 @@ class Site(DescribedEntity):
         self._check_new_child(building)
         self._notify_park("_register", building)
         building._container = self
-        self.buildings.append(building)
+        append_child(self.buildings, building)
         return building
 
     def detach(self, child_id: str) -> Site | Building:
@@ -175,7 +187,7 @@ class Site(DescribedEntity):
                 if child.id == child_id:
                     self._notify_park("_release", child)
                     self._notify_park("_unregister", child)
-                    collection.remove(child)
+                    remove_child(collection, child)
                     child._container = None
                     return child
         raise UnknownIdError(child_id)

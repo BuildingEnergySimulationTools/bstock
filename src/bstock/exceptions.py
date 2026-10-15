@@ -43,8 +43,9 @@ class UnknownKindError(InvalidArgumentError):
 class HierarchyError(BstockError, ValueError):
     """An operation would break the park hierarchy.
 
-    For example: a site moved or attached inside itself, an inheritance cycle, or ``serves`` set on
-    a system owned by a building.
+    For example: a site moved or attached inside itself, an inheritance cycle, ``serves`` set on
+    a system owned by a building, or a list of children (``site.buildings``...) changed in place
+    instead of through the park or entity methods.
     """
 
 

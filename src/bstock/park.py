@@ -7,12 +7,28 @@ import types
 import warnings
 from collections.abc import Callable, Iterable, Iterator, Sequence
 from pathlib import Path
-from typing import Any, Literal, TypeVar, overload
+from typing import Any, ClassVar, Literal, Self, TypeVar, overload
 
 import pandas as pd
-from pydantic import BaseModel, ConfigDict, Field, PrivateAttr, ValidationInfo, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    PrivateAttr,
+    ValidationInfo,
+    field_validator,
+    model_validator,
+)
 from pydantic.json_schema import SkipJsonSchema
 
+from bstock._children import (
+    ChildList,
+    append_child,
+    deepcopy_linked,
+    guard_assignment,
+    remove_child,
+    wrap_children,
+)
 from bstock._ids import normalize_rnb_id
 from bstock.building import Building
 from bstock.description import DescribedEntity
@@ -78,14 +94,26 @@ class BuildingPark(BaseModel):
     name: str
     description: str | None = None
     source_priority: SourcePriority = Field(default_factory=SourcePriority)
-    sites: list[Site] = Field(default_factory=list)
-    buildings: list[Building] = Field(default_factory=list)
-    meters: list[Meter] = Field(default_factory=list)
+    sites: list[Site] = Field(default_factory=list, validate_default=True)
+    buildings: list[Building] = Field(default_factory=list, validate_default=True)
+    meters: list[Meter] = Field(default_factory=list, validate_default=True)
     site_cls: SkipJsonSchema[type[Site]] = Field(default=Site, exclude=True)
     building_cls: SkipJsonSchema[type[Building]] = Field(default=Building, exclude=True)
 
     _index: dict[str, Entity] = PrivateAttr(default_factory=dict)
     _rnb_index: dict[str, Building] = PrivateAttr(default_factory=dict)
+
+    _child_hints: ClassVar[dict[str, str]] = {
+        "sites": "park.new_site, park.add_site, park.move or park.remove",
+        "buildings": "park.new_building, park.add_building, park.move or park.remove",
+        "meters": "park.add_meter or park.remove",
+    }
+    """Child lists changed only through methods, with the methods cited in the error message."""
+
+    @field_validator("sites", "buildings", "meters")
+    @classmethod
+    def _protect_children(cls, value: list[Any], info: ValidationInfo) -> ChildList[Any]:
+        return wrap_children(cls, info.field_name or "", value)
 
     @model_validator(mode="before")
     @classmethod
@@ -118,6 +146,13 @@ class BuildingPark(BaseModel):
         return type(self) is type(other) and self.__dict__ == other.__dict__
 
     __hash__ = None  # type: ignore[assignment]
+
+    def __setattr__(self, name: str, value: Any) -> None:
+        guard_assignment(self, name)
+        super().__setattr__(name, value)
+
+    def __deepcopy__(self, memo: dict[int, Any] | None = None) -> Self:
+        return deepcopy_linked(self, memo)
 
     # --- persistence (implemented in bstock.io) ------------------------------------------------
 
@@ -502,7 +537,7 @@ class BuildingPark(BaseModel):
         if parent is None:
             self._register(site)
             site._container = self
-            self.sites.append(site)
+            append_child(self.sites, site)
             return site
         return self._resolve_site(parent).add_site(site)
 
@@ -522,7 +557,7 @@ class BuildingPark(BaseModel):
         if parent is None:
             self._register(building)
             building._container = self
-            self.buildings.append(building)
+            append_child(self.buildings, building)
             return building
         return self._resolve_site(parent).add_building(building)
 
@@ -558,7 +593,7 @@ class BuildingPark(BaseModel):
         self._check_parent_meter(meter.id, meter.parent_meter)
         self._register(meter)
         meter._container = self
-        self.meters.append(meter)
+        append_child(self.meters, meter)
         return meter
 
     def _check_scope(self, meter_id: str, scope: Iterable[str]) -> None:
@@ -701,10 +736,10 @@ class BuildingPark(BaseModel):
         self._take_out(entity)
         if target is None:
             entity._container = self
-            (self.sites if isinstance(entity, Site) else self.buildings).append(entity)
+            append_child(self.sites if isinstance(entity, Site) else self.buildings, entity)
         else:
             entity._container = target
-            (target.sites if isinstance(entity, Site) else target.buildings).append(entity)
+            append_child(target.sites if isinstance(entity, Site) else target.buildings, entity)
         return entity
 
     def remove(self, entity: Entity | str, *, force: bool = False) -> Entity:
@@ -733,7 +768,7 @@ class BuildingPark(BaseModel):
             assert isinstance(owner, DescribedEntity)
             return owner.remove_system(entity.id)
         if isinstance(entity, Meter):
-            self.meters.remove(entity)
+            remove_child(self.meters, entity)
             self._unregister(entity)
             entity._container = None
             return entity
@@ -820,7 +855,7 @@ class BuildingPark(BaseModel):
         container = entity._container
         holder: Any = self if container is self else container
         collection = holder.sites if isinstance(entity, Site) else holder.buildings
-        collection.remove(entity)
+        remove_child(collection, entity)
 
     def _subtree_ids(self, entity: Entity) -> Iterator[str]:
         return (e.id for e in _walk(entity))

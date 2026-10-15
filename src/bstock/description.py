@@ -3,10 +3,17 @@
 from __future__ import annotations
 
 from collections.abc import Iterator
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, ClassVar
 
-from pydantic import Field, field_validator
+from pydantic import Field, ValidationInfo, field_validator
 
+from bstock._children import (
+    ChildList,
+    append_child,
+    guard_assignment,
+    remove_child,
+    wrap_children,
+)
 from bstock._geometry import Footprint, geometry_area
 from bstock._ids import check_external_id, check_id
 from bstock.enums import BuildingUsage, SystemKind
@@ -46,11 +53,11 @@ class DescribedEntity(SourcedModel):
     id: str = Field(frozen=True)
     dpe_ids: list[str] = Field(default_factory=list)
     envelope: Envelope = Field(default_factory=Envelope)
-    heating: list[HeatingGenerator] = Field(default_factory=list)
-    cooling: list[CoolingGenerator] = Field(default_factory=list)
-    dhw: list[DHWGenerator] = Field(default_factory=list)
-    ventilation: list[Ventilation] = Field(default_factory=list)
-    pv: list[SolarPV] = Field(default_factory=list)
+    heating: list[HeatingGenerator] = Field(default_factory=list, validate_default=True)
+    cooling: list[CoolingGenerator] = Field(default_factory=list, validate_default=True)
+    dhw: list[DHWGenerator] = Field(default_factory=list, validate_default=True)
+    ventilation: list[Ventilation] = Field(default_factory=list, validate_default=True)
+    pv: list[SolarPV] = Field(default_factory=list, validate_default=True)
 
     name = sourced(str)
     address = sourced(str, inherit=True)
@@ -72,10 +79,21 @@ class DescribedEntity(SourcedModel):
     floor_area = sourced(float, unit="m²", ge=0, extensive=True, description="Gross floor area")
     heated_area = sourced(float, unit="m²", ge=0, extensive=True, description="Heated area")
 
+    _SYSTEMS_HINT: ClassVar[str] = "add_system and remove_system (or park.add_system, park.remove)"
+    _child_hints: ClassVar[dict[str, str]] = dict.fromkeys(
+        ("heating", "cooling", "dhw", "ventilation", "pv"), _SYSTEMS_HINT
+    )
+    """Child lists changed only through methods, with the methods cited in the error message."""
+
     @field_validator("id")
     @classmethod
     def _check_id(cls, value: str) -> str:
         return check_id(value)
+
+    @field_validator("heating", "cooling", "dhw", "ventilation", "pv")
+    @classmethod
+    def _protect_systems(cls, value: list[Any], info: ValidationInfo) -> ChildList[Any]:
+        return wrap_children(cls, info.field_name or "", value)
 
     @field_validator("dpe_ids")
     @classmethod
@@ -91,6 +109,24 @@ class DescribedEntity(SourcedModel):
                 raise DuplicateIdError(f"system id {system.id!r} is used twice in {self.id!r}")
             seen.add(system.id)
             system._container = self
+
+    def __setattr__(self, name: str, value: Any) -> None:
+        guard_assignment(self, name)
+        if name != "envelope":
+            super().__setattr__(name, value)
+            return
+        # attach the new envelope, so that its values inherit from the parent site
+        owner = value._container if isinstance(value, Envelope) else None
+        if owner is not None and owner is not self:
+            raise HierarchyError(
+                f"this envelope already belongs to {owner._entity_id()!r}; "
+                "assign a copy (envelope.model_copy(deep=True))"
+            )
+        old = self.envelope
+        super().__setattr__(name, value)
+        if self.envelope is not old:
+            old._container = None
+            self.envelope._container = self
 
     # --- hierarchy ----------------------------------------------------------------------------
 
@@ -176,7 +212,7 @@ class DescribedEntity(SourcedModel):
             raise DuplicateIdError(f"system id {system.id!r} is already used in {self.id!r}")
         self._notify_park("_register", system)
         system._container = self
-        getattr(self, system.kind).append(system)
+        append_child(getattr(self, system.kind), system)
         return system
 
     def remove_system(self, system_id: str) -> System:
@@ -194,7 +230,7 @@ class DescribedEntity(SourcedModel):
             if system.id == system_id:
                 self._notify_park("_release", system)
                 self._notify_park("_unregister", system)
-                getattr(self, system.kind).remove(system)
+                remove_child(getattr(self, system.kind), system)
                 system._container = None
                 return system
         raise UnknownIdError(system_id)

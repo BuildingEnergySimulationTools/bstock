@@ -7,6 +7,13 @@ from typing import Annotated, Any, ClassVar, Literal
 
 from pydantic import Discriminator, Field, Tag, field_validator
 
+from bstock._children import (
+    ChildList,
+    append_child,
+    guard_assignment,
+    remove_child,
+    wrap_children,
+)
 from bstock._ids import check_id, new_id
 from bstock.enums import (
     Adjacency,
@@ -117,9 +124,21 @@ class Envelope(SourcedModel):
         float, unit="m³/(h.m²)", ge=0, inherit=True, description="Air permeability under 4 Pa"
     )
 
-    components: list[AnyComponent] = Field(default_factory=list)
+    components: list[AnyComponent] = Field(default_factory=list, validate_default=True)
 
     _repr_fields: ClassVar[tuple[str, ...]] = ("loss_area", "heat_loss_coefficient", "u_bat")
+    _child_hints: ClassVar[dict[str, str]] = {
+        "components": "envelope.add_component and envelope.remove_component"
+    }
+
+    @field_validator("components")
+    @classmethod
+    def _protect_components(cls, value: list[Any]) -> ChildList[Any]:
+        return wrap_children(cls, "components", value)
+
+    def __setattr__(self, name: str, value: Any) -> None:
+        guard_assignment(self, name)
+        super().__setattr__(name, value)
 
     def _repr_items(self) -> list[tuple[str, str]]:
         owner_id = getattr(self._container, "id", None)
@@ -156,7 +175,7 @@ class Envelope(SourcedModel):
         if any(c.id == component.id for c in self.components):
             raise DuplicateIdError(f"component id {component.id!r} is already used")
         component._container = self
-        self.components.append(component)
+        append_child(self.components, component)
         return component
 
     def remove_component(self, component_id: str) -> EnvelopeComponent:
@@ -167,10 +186,11 @@ class Envelope(SourcedModel):
         UnknownIdError
             If no component has this id.
         """
-        for index, component in enumerate(self.components):
+        for component in self.components:
             if component.id == component_id:
                 component._container = None
-                return self.components.pop(index)
+                remove_child(self.components, component)
+                return component
         raise UnknownIdError(component_id)
 
     def find_components(
