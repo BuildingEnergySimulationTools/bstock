@@ -1,3 +1,4 @@
+import pandas as pd
 import pytest
 
 from bstock.building import Building
@@ -37,7 +38,7 @@ def park():
 
 
 def test_building_candidates_from_recorded_response(recorded):
-    candidates = rnb.building_candidates(recorded(f"rnb/building_{GABARRE}.json"))
+    candidates = rnb._building_candidates(recorded(f"rnb/building_{GABARRE}.json"))
     assert candidates["lat"].value == pytest.approx(43.48829, abs=1e-5)
     assert candidates["lon"].value == pytest.approx(-1.45472, abs=1e-5)
     assert candidates["footprint"].value["type"] == "MultiPolygon"
@@ -53,12 +54,12 @@ def test_building_candidates_from_recorded_response(recorded):
 def test_point_shape_is_not_a_footprint(recorded):
     record = recorded(f"rnb/building_{GABARRE}.json")
     record["shape"] = record["point"]
-    assert "footprint" not in rnb.building_candidates(record)
+    assert "footprint" not in rnb._building_candidates(record)
 
 
 def test_building_without_address_gives_no_address(recorded):
     record = {**recorded(f"rnb/building_{GABARRE}.json"), "addresses": []}
-    candidates = rnb.building_candidates(record)
+    candidates = rnb._building_candidates(record)
     assert not {"address", "municipality", "insee_code"} & set(candidates)
 
 
@@ -80,7 +81,7 @@ def test_rnb_ids_are_normalised(raw, expected):
 )
 def test_successors_are_read_in_history(recorded, name, event, ids):
     rnb_id = next(k for k, v in INACTIVE_FILES.items() if v == name)
-    assert rnb.successors(recorded(f"rnb/history_{name}_{rnb_id}.json")) == (event, ids)
+    assert rnb._successors(recorded(f"rnb/history_{name}_{rnb_id}.json")) == (event, ids)
 
 
 # --- add_buildings and enrich -----------------------------------------------------------------
@@ -201,6 +202,32 @@ def test_report_to_dataframe(park, client):
     assert frame.loc[GABARRE, "created"]
 
 
+# --- add_buildings_at_address ---------------------------------------------------------------
+
+
+def test_buildings_at_an_address_are_added_to_the_site(park, client):
+    report = rnb.add_buildings_at_address(
+        park, "4 rue de la Gabarre 64100 Bayonne", parent="ecole", client=client
+    )
+    assert report.created == [GABARRE]
+    assert park[GABARRE].parent is park["ecole"]
+    assert client.calls == [("address", "4 rue de la Gabarre 64100 Bayonne"), ("building", GABARRE)]
+
+
+def test_address_without_building_is_not_found(park, recorded):
+    client = FakeRnbClient(recorded, address=recorded("rnb/address_search_low_score.json"))
+    report = rnb.add_buildings_at_address(park, "rue de la Gabarre Bayonne", client=client)
+    assert report.not_found == ["rue de la Gabarre Bayonne"]
+    assert "geocoding_score_is_too_low" in report.messages["rue de la Gabarre Bayonne"][0]
+    assert list(park.iter_buildings()) == []
+
+
+def test_address_with_unknown_parent_fails_before_any_request(park, client):
+    with pytest.raises(UnknownIdError):
+        rnb.add_buildings_at_address(park, "4 rue de la Gabarre", parent="nope", client=client)
+    assert client.calls == []
+
+
 # --- suggest_matches --------------------------------------------------------------------------
 
 
@@ -223,34 +250,18 @@ def test_point_suggestions_list_every_candidate(park, client, unmatched):
     assert client.calls[0] == ("closest", 43.48829, -1.45472, 50)
 
 
-def test_assign_unique_sets_the_only_candidate(park, client, unmatched, recorded):
-    client.closest_response = recorded("rnb/closest_bayonne.json")["results"][:1]
-    frame = rnb.suggest_matches(park, client=client, assign="unique")
-    assert unmatched.rnb_id == GABARRE
-    assert park.get_by_rnb(GABARRE) is unmatched
-    assert frame["assigned"].tolist() == [True]
-
-
-def test_assign_unique_ignores_several_candidates(park, client, unmatched):
-    frame = rnb.suggest_matches(park, client=client, assign="unique")
-    assert unmatched.rnb_id is None
-    assert not frame["assigned"].any()
-
-
 def test_no_candidate_gives_no_row(park, client, unmatched):
     client.closest_response = []
-    frame = rnb.suggest_matches(park, client=client, assign="unique")
+    frame = rnb.suggest_matches(park, client=client)
     assert frame.empty
     assert list(frame.columns) == rnb.SUGGESTION_COLUMNS
 
 
-def test_rnb_id_already_used_is_reported_never_assigned(park, client, unmatched, recorded):
+def test_rnb_id_already_used_is_reported(park, client, unmatched, recorded):
     park.new_building(id="autre", rnb_id=GABARRE)
     client.closest_response = recorded("rnb/closest_bayonne.json")["results"][:1]
-    frame = rnb.suggest_matches(park, ["BAY-001"], client=client, assign="unique")
+    frame = rnb.suggest_matches(park, ["BAY-001"], client=client)
     assert frame.iloc[0]["used_by"] == "autre"
-    assert not frame.iloc[0]["assigned"]
-    assert unmatched.rnb_id is None
 
 
 def test_by_default_only_buildings_without_rnb_id_are_matched(park, client, unmatched):
@@ -274,10 +285,9 @@ def test_point_can_be_inherited_from_site(park, client):
 
 
 def test_address_suggestions_carry_the_ban_score(park, client, unmatched):
-    frame = rnb.suggest_matches(park, client=client, method="address", assign="unique")
+    frame = rnb.suggest_matches(park, client=client, method="address")
     assert frame.iloc[0]["rnb_id"] == GABARRE
     assert frame.iloc[0]["score"] == pytest.approx(0.967, abs=1e-3)
-    assert unmatched.rnb_id == GABARRE
     assert client.calls == [("address", "4 rue de la Gabarre 64100 Bayonne")]
 
 
@@ -288,11 +298,73 @@ def test_low_geocoding_score_gives_no_candidate(park, recorded, unmatched):
 
 @pytest.mark.parametrize(
     "kwargs",
-    [{"radius": 0}, {"radius": 1500}, {"method": "cadastre"}, {"assign": "all"}],
+    [{"radius": 0}, {"radius": 1500}, {"method": "cadastre"}],
 )
 def test_invalid_suggestion_options_are_rejected(park, client, kwargs):
-    with pytest.raises(InvalidArgumentError, match=r"^(method|radius|assign) must"):
+    with pytest.raises(InvalidArgumentError, match=r"^(method|radius) must"):
         rnb.suggest_matches(park, client=client, **kwargs)
+
+
+# --- assign_matches ---------------------------------------------------------------------------
+
+
+def matches(*rows):
+    return pd.DataFrame(rows, columns=["building_id", "rnb_id"])
+
+
+def test_assign_unique_sets_the_only_candidate(park, client, unmatched, recorded):
+    client.closest_response = recorded("rnb/closest_bayonne.json")["results"][:1]
+    report = rnb.assign_matches(park, rnb.suggest_matches(park, client=client))
+    assert unmatched.rnb_id == GABARRE
+    assert park.get_by_rnb(GABARRE) is unmatched
+    assert report.enriched == ["BAY-001"]
+
+
+def test_suggestions_change_nothing_until_assigned(park, client, unmatched, recorded):
+    client.closest_response = recorded("rnb/closest_bayonne.json")["results"][:1]
+    rnb.suggest_matches(park, client=client)
+    assert unmatched.rnb_id is None
+
+
+def test_assign_unique_reports_several_candidates(park, client, unmatched):
+    frame = rnb.suggest_matches(park, client=client)
+    report = rnb.assign_matches(park, frame)
+    assert unmatched.rnb_id is None
+    assert report.ambiguous == ["BAY-001"]
+
+
+def test_filtered_suggestions_can_be_assigned(park, client, unmatched):
+    frame = rnb.suggest_matches(park, client=client)
+    rnb.assign_matches(park, frame[frame["distance"] == 0])
+    assert unmatched.rnb_id == GABARRE
+
+
+def test_rnb_id_held_by_another_building_is_never_assigned(park, unmatched):
+    park.new_building(id="autre", rnb_id=GABARRE)
+    report = rnb.assign_matches(park, matches(("BAY-001", GABARRE)))
+    assert unmatched.rnb_id is None
+    assert "already held by autre" in report.messages["BAY-001"][0]
+
+
+def test_existing_rnb_id_is_not_replaced(park):
+    building = park.new_building(id="b", rnb_id=NEIGHBOUR)
+    report = rnb.assign_matches(park, matches(("b", GABARRE)))
+    assert building.rnb_id == NEIGHBOUR
+    assert report.enriched == []
+
+
+@pytest.mark.parametrize(
+    ("frame", "kwargs", "error"),
+    [
+        (matches(("BAY-001", GABARRE)), {"strategy": "all"}, InvalidArgumentError),
+        (pd.DataFrame({"building_id": ["BAY-001"]}), {}, InvalidArgumentError),
+        (matches(("inconnu", GABARRE)), {}, UnknownIdError),
+    ],
+)
+def test_assign_arguments_are_checked(park, unmatched, frame, kwargs, error):
+    with pytest.raises(error):
+        rnb.assign_matches(park, frame, **kwargs)
+    assert unmatched.rnb_id is None
 
 
 # --- real API ---------------------------------------------------------------------------------
@@ -304,3 +376,8 @@ def test_real_rnb_building_is_added():
     report = rnb.add_buildings(park, [GABARRE])
     assert report.created == [GABARRE]
     assert park[GABARRE].insee_code == "64102"
+
+
+def test_client_arguments_are_keywords():
+    with pytest.raises(TypeError):
+        rnb.RnbClient("https://rnb.example/")

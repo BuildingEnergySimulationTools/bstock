@@ -177,12 +177,12 @@ class FakeDpeClient:
         self.all_lines = lines
         self.calls = []
 
-    def by_rnb(self, rnb_ids):
+    def dpe_by_rnb(self, rnb_ids):
         rnb_ids = set(rnb_ids)
         self.calls.append(("rnb", sorted(rnb_ids)))
         return [line for line in self.all_lines if line.get("id_rnb") in rnb_ids]
 
-    def by_numbers(self, numbers):
+    def dpe_by_numbers(self, numbers):
         numbers = set(numbers)
         self.calls.append(("numbers", sorted(numbers)))
         return [line for line in self.all_lines if line["numero_dpe"] in numbers]

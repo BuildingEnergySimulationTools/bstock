@@ -73,28 +73,28 @@ def park():
     ],
 )
 def test_building_scale(line, number, expected):
-    assert dpe.is_building_scale(line(number)) is expected
+    assert dpe._is_building_scale(line(number)) is expected
 
 
 def test_replaced_dpe_is_set_aside_even_if_more_recent(line):
-    assert dpe.select_dpe([line(REPLACED), line(IMMEUBLE)])["numero_dpe"] == IMMEUBLE
+    assert dpe._select_dpe([line(REPLACED), line(IMMEUBLE)])["numero_dpe"] == IMMEUBLE
 
 
 def test_most_recent_dpe_wins(line):
     older = {**line(IMMEUBLE), "numero_dpe": "2664E0000000A", "numero_dpe_remplace": None}
     older["date_etablissement_dpe"] = "2022-01-01"
-    assert dpe.select_dpe([older, line(IMMEUBLE)])["numero_dpe"] == IMMEUBLE
+    assert dpe._select_dpe([older, line(IMMEUBLE)])["numero_dpe"] == IMMEUBLE
 
 
 def test_apartments_only_select_nothing(line):
-    assert dpe.select_dpe([line("2664E2539952D")]) is None
+    assert dpe._select_dpe([line("2664E2539952D")]) is None
 
 
 # --- correspondences --------------------------------------------------------------------------
 
 
 def test_residential_building_description(line):
-    found = dpe.description_candidates(line(IMMEUBLE))
+    found = dpe._description_candidates(line(IMMEUBLE))
     assert found["usage"].value == BuildingUsage.RESIDENTIAL_COLLECTIVE
     assert found["construction_year"].value == 1838
     assert found["dwelling_count"].value == 6
@@ -107,7 +107,7 @@ def test_residential_building_description(line):
 
 
 def test_house_description(line):
-    found = dpe.description_candidates(line("2664E2310621S"))
+    found = dpe._description_candidates(line("2664E2310621S"))
     assert found["usage"].value == BuildingUsage.RESIDENTIAL_INDIVIDUAL
     assert found["dwelling_count"].value == 1
     assert found["heated_area"].value == 132
@@ -115,11 +115,11 @@ def test_house_description(line):
 
 
 def test_period_alone_gives_no_year(line):
-    assert "construction_year" not in dpe.description_candidates(line("2664E2513521O"))
+    assert "construction_year" not in dpe._description_candidates(line("2664E2513521O"))
 
 
 def test_tertiary_description(line):
-    found = dpe.description_candidates(line("2664T2231016O"))
+    found = dpe._description_candidates(line("2664T2231016O"))
     assert found["usage"].value == BuildingUsage.TERTIARY
     assert found["heated_area"].value == 153
     assert found["heated_area"].comment == "surface utile (DPE tertiaire)"
@@ -127,7 +127,7 @@ def test_tertiary_description(line):
 
 
 def test_envelope(line):
-    envelope, components = dpe.envelope_candidates(line(IMMEUBLE))
+    envelope, components = dpe._envelope_candidates(line(IMMEUBLE))
     assert envelope["u_bat"].value == 0.77
     assert envelope["inertia"].value == Inertia.MEDIUM
     assert envelope["inertia"].raw == "Moyenne"
@@ -145,11 +145,11 @@ def test_envelope(line):
 
 
 def test_tertiary_dpe_has_no_envelope(line):
-    assert dpe.envelope_candidates(line("2664T2231016O")) == ({}, {})
+    assert dpe._envelope_candidates(line("2664T2231016O")) == ({}, {})
 
 
 def test_generators(line):
-    produced = dpe.generator_candidates(line(IMMEUBLE))
+    produced = dpe._generator_candidates(line(IMMEUBLE))
     heating = produced[SystemKind.HEATING]
     assert [g["technology"].value for g in heating] == [T.ELECTRIC_RESISTANCE, T.BOILER_CONDENSING]
     assert [g["name"].value for g in heating] == [
@@ -174,7 +174,7 @@ def test_combined_boiler_storage_of_zero_is_left_out(line):
         "volume_stockage_generateur_n1_ecs_n1": 0,
         "cop_generateur_n1_ecs_n1": None,
     }
-    [dhw] = dpe.generator_candidates(record)[SystemKind.DHW]
+    [dhw] = dpe._generator_candidates(record)[SystemKind.DHW]
     assert "storage_volume" not in dhw
 
 
@@ -184,13 +184,13 @@ def test_dhw_cop_is_the_nominal_ratio(line):
         "type_generateur_n1_ecs_n1": "CET sur air extrait après 2014",
         "cop_generateur_n1_ecs_n1": 2.9,
     }
-    [dhw] = dpe.generator_candidates(record)[SystemKind.DHW]
+    [dhw] = dpe._generator_candidates(record)[SystemKind.DHW]
     assert dhw["nominal_performance_ratio"].value == 2.9
 
 
 def test_tertiary_heating_energy_only(line):
     record = {**line("2664T2231016O"), "type_energie_principale_chauffage": "Gaz naturel"}
-    [heating] = dpe.generator_candidates(record)[SystemKind.HEATING]
+    [heating] = dpe._generator_candidates(record)[SystemKind.HEATING]
     assert heating["energy_type"].value == E.NATURAL_GAS
     assert "technology" not in heating
 
@@ -310,7 +310,7 @@ def test_numbers_are_looked_up_in_their_dataset(fake_session):
     session = fake_session(
         [{"results": [{"numero_dpe": "2664E1"}]}, {"results": [{"numero_dpe": "2664T1"}]}]
     )
-    found = DpeClient(session=session).by_numbers(["2664E1", "2664T1", "bad"])
+    found = DpeClient(session=session).dpe_by_numbers(["2664E1", "2664T1", "bad"])
     assert [line[DATASET_KEY] for line in found] == ["dpe03existant", "dpe01tertiaire"]
     first = session.calls[0]
     assert first["url"].endswith("/datasets/dpe03existant/lines")
@@ -322,7 +322,7 @@ def test_numbers_are_looked_up_in_their_dataset(fake_session):
 
 def test_rnb_ids_are_looked_up_in_every_dataset(fake_session):
     session = fake_session([{"results": []}] * 3)
-    DpeClient(session=session).by_rnb(["A", "B"])
+    DpeClient(session=session).dpe_by_rnb(["A", "B"])
     assert [c["params"]["id_rnb_in"] for c in session.calls] == ["A,B"] * 3
 
 
@@ -333,14 +333,14 @@ def test_lines_follow_next(fake_session):
             {"results": [{"numero_dpe": "2"}]},
         ]
     )
-    found = DpeClient(session=session).lines("dpe02neuf", "numero_dpe", ["1", "2"])
+    found = DpeClient(session=session).query("dpe02neuf", "numero_dpe", ["1", "2"])
     assert [line["numero_dpe"] for line in found] == ["1", "2"]
 
 
 def test_unexpected_line_raises(fake_session):
     session = fake_session([{"results": [{"oops": 1}]}])
     with pytest.raises(ConnectorError, match="unexpected DPE line"):
-        DpeClient(session=session).lines("dpe02neuf", "numero_dpe", ["1"])
+        DpeClient(session=session).query("dpe02neuf", "numero_dpe", ["1"])
 
 
 # --- real API ---------------------------------------------------------------------------------
@@ -356,6 +356,11 @@ def test_unexpected_line_raises(fake_session):
     ],
 )
 def test_real_dpe_lines(dataset, number):
-    [found] = DpeClient().lines(dataset, "numero_dpe", [number])
+    [found] = DpeClient().query(dataset, "numero_dpe", [number])
     assert found["numero_dpe"] == number
-    assert dpe.description_candidates(found)
+    assert dpe._description_candidates(found)
+
+
+def test_client_arguments_are_keywords():
+    with pytest.raises(TypeError):
+        DpeClient("https://dpe.example/")

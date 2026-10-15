@@ -54,7 +54,7 @@ def recorded_row(recorded):
 
 
 def test_construction_candidates(recorded_row):
-    candidates = bdnb.construction_candidates(recorded_row("batiment_construction", SINGLE_GROUP))
+    candidates = bdnb._construction_candidates(recorded_row("batiment_construction", SINGLE_GROUP))
     assert candidates["height"].value == 19.2
     assert candidates["footprint_area"].value == 2831
     footprint = candidates["footprint"].value
@@ -66,7 +66,7 @@ def test_construction_candidates(recorded_row):
 
 
 def test_group_candidates(recorded_row):
-    candidates = bdnb.group_candidates(recorded_row("batiment_groupe_complet", SINGLE_GROUP))
+    candidates = bdnb._group_candidates(recorded_row("batiment_groupe_complet", SINGLE_GROUP))
     assert candidates["usage"].value == BuildingUsage.RESIDENTIAL_COLLECTIVE
     assert candidates["usage"].raw == "Résidentiel collectif"
     assert candidates["construction_year"].value == 2016
@@ -81,13 +81,13 @@ def test_group_candidates(recorded_row):
 
 def test_invalid_values_are_ignored(recorded_row):
     row = {**recorded_row("batiment_groupe_complet", SINGLE_GROUP), "nb_niveau": 0}
-    assert "level_count" not in bdnb.group_candidates(row)
+    assert "level_count" not in bdnb._group_candidates(row)
 
 
 def test_generators_use_energy_columns_and_dpe_date(recorded_row, recorded):
     group = recorded_row("batiment_groupe_complet", MULTI_GROUP)
     dpe = recorded(f"bdnb/batiment_groupe_dpe_representatif_logement_{MULTI_GROUP}.json")[0]
-    produced = bdnb.generator_candidates(group, dpe)
+    produced = bdnb._generator_candidates(group, dpe)
     [heating] = produced[SystemKind.HEATING]
     assert heating["technology"].value == T.ELECTRIC_RESISTANCE
     assert heating["technology"].raw == "generateurs a effet joule"
@@ -103,7 +103,7 @@ def test_generators_use_energy_columns_and_dpe_date(recorded_row, recorded):
 
 def test_generator_energy_falls_back_on_the_label(recorded_row):
     group = recorded_row("batiment_groupe_complet", SINGLE_GROUP)
-    [dhw] = bdnb.generator_candidates(group)[SystemKind.DHW]  # no representative DPE row
+    [dhw] = bdnb._generator_candidates(group)[SystemKind.DHW]  # no representative DPE row
     assert dhw["technology"].value == T.BOILER_CONDENSING
     assert dhw["energy_type"].value == E.NATURAL_GAS
     assert dhw["energy_type"].raw == "chaudiere gaz condensation"
@@ -116,7 +116,7 @@ def test_backup_generator_is_second():
         "type_generateur_chauffage": "pac air/eau",
         "type_generateur_chauffage_appoint": "poele ou insert bois",
     }
-    heating = bdnb.generator_candidates(group)[SystemKind.HEATING]
+    heating = bdnb._generator_candidates(group)[SystemKind.HEATING]
     assert [g["name"].value for g in heating] == ["main", "backup"]
     assert heating[1]["energy_type"].value == E.WOOD
 
@@ -133,7 +133,7 @@ def test_backup_generator_is_second():
     ],
 )
 def test_dpe_date(value, expected):
-    assert bdnb.dpe_date(value) == expected
+    assert bdnb._dpe_date(value) == expected
 
 
 # --- groups of one construction ---------------------------------------------------------------
@@ -171,6 +171,7 @@ def test_multi_construction_group_becomes_a_site(park, client):
     assert building.parent is site
     assert report.created == [MULTI_GROUP]
     assert report.enriched == [MULTI_GROUP, MULTI_RNB]
+    assert report.messages[MULTI_RNB] == [f"moved from ecole into the group site {MULTI_GROUP}"]
     # group values on the site: intensive ones inherited, extensive ones not
     assert site.dwelling_count == 83
     assert site.footprint_area == 3114
@@ -318,7 +319,7 @@ def test_client_batches_ids_and_follows_offsets(fake_session):
 
 def test_api_key_is_sent_and_raises_page_size(fake_session):
     session = fake_session([[]])
-    client = BdnbClient("secret", session=session)
+    client = BdnbClient(api_key="secret", session=session)
     client.groups(["g"])
     assert session.calls[0]["headers"]["X-Gravitee-Api-Key"] == "secret"
     assert session.calls[0]["params"]["limit"] == 1000
@@ -356,3 +357,8 @@ def test_real_bdnb_enrichment():
     assert report.enriched == [SINGLE_RNB]
     assert building.bdnb_batiment_groupe_id == SINGLE_GROUP
     assert building.footprint["type"] == "MultiPolygon"
+
+
+def test_client_arguments_are_keywords():
+    with pytest.raises(TypeError):
+        BdnbClient("secret")

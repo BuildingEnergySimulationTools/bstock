@@ -54,9 +54,7 @@ def main(
 
     # 2. RNB: the buildings at each site address (the RNB geocodes the address with the BAN)
     for site in list(park.iter_sites()):
-        response = rnb_client.search_address(site.address)
-        rnb_ids = [building["rnb_id"] for building in response.get("results") or []]
-        report = rnb.add_buildings(park, rnb_ids, parent=site, client=rnb_client)
+        report = rnb.add_buildings_at_address(park, site.address, parent=site, client=rnb_client)
         print(f"{site.name}: {len(report.created)} RNB building(s) at {site.address!r}")
 
     # 3. BDNB: construction values on the buildings, group values on the building or a sub-site

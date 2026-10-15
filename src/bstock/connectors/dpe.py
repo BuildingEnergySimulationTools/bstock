@@ -1,8 +1,8 @@
 """Connector to the DPE open data of the ADEME (SPEC §8.5, annex A.4 to A.6).
 
-Three layers: :class:`DpeClient` fetches raw lines of the three datasets, the ``*_candidates``
-functions translate one DPE, and :func:`enrich` works on a park. Requires the ``[connectors]``
-extra.
+Three layers: :class:`DpeClient` fetches raw lines of the three datasets, internal correspondence
+functions translate one DPE into candidate values, and :func:`enrich` works on a park. Requires the
+``[connectors]`` extra.
 """
 
 from __future__ import annotations
@@ -32,11 +32,6 @@ __all__ = [
     "DATASETS",
     "SOURCE",
     "DpeClient",
-    "description_candidates",
-    "envelope_candidates",
-    "generator_candidates",
-    "is_building_scale",
-    "select_dpe",
 ]
 
 logger = logging.getLogger(__name__)
@@ -136,11 +131,11 @@ class DpeClient:
     """
 
     def __init__(
-        self, base_url: str = BASE_URL, *, session: Any | None = None, **http_options: Any
+        self, *, base_url: str = BASE_URL, session: Any | None = None, **http_options: Any
     ) -> None:
         self.http = HttpClient(base_url, session=session, **http_options)
 
-    def by_numbers(self, numbers: Iterable[str]) -> list[dict[str, Any]]:
+    def dpe_by_numbers(self, numbers: Iterable[str]) -> list[dict[str, Any]]:
         """Return the DPE with the given numbers, each looked up in the dataset of its number."""
         by_dataset: dict[str, list[str]] = {}
         for number in dict.fromkeys(numbers):
@@ -152,15 +147,15 @@ class DpeClient:
         return [
             line
             for dataset, values in by_dataset.items()
-            for line in self.lines(dataset, "numero_dpe", values)
+            for line in self.query(dataset, "numero_dpe", values)
         ]
 
-    def by_rnb(self, rnb_ids: Iterable[str]) -> list[dict[str, Any]]:
+    def dpe_by_rnb(self, rnb_ids: Iterable[str]) -> list[dict[str, Any]]:
         """Return the DPE of the given RNB ids, from the three datasets."""
         values = list(dict.fromkeys(rnb_ids))
-        return [line for d in DATASETS.values() for line in self.lines(d, "id_rnb", values)]
+        return [line for d in DATASETS.values() for line in self.query(d, "id_rnb", values)]
 
-    def lines(self, dataset: str, column: str, values: Iterable[str]) -> list[dict[str, Any]]:
+    def query(self, dataset: str, column: str, values: Iterable[str]) -> list[dict[str, Any]]:
         """Return the lines of ``dataset`` whose ``column`` is in ``values``.
 
         Raises
@@ -185,7 +180,7 @@ class DpeClient:
 # --- selection --------------------------------------------------------------------------------
 
 
-def is_building_scale(line: Mapping[str, Any]) -> bool:
+def _is_building_scale(line: Mapping[str, Any]) -> bool:
     """Tell whether a DPE describes a whole building (SPEC §8.5).
 
     A house or a residential building DPE, or a tertiary DPE that is not for premises in a
@@ -196,7 +191,7 @@ def is_building_scale(line: Mapping[str, Any]) -> bool:
     return line.get("type_batiment") in _BUILDING_TYPES
 
 
-def select_dpe(lines: Iterable[Mapping[str, Any]]) -> Mapping[str, Any] | None:
+def _select_dpe(lines: Iterable[Mapping[str, Any]]) -> Mapping[str, Any] | None:
     """Return the DPE whose values are used: the most recent building-scale one not replaced.
 
     Ties on the date are broken by the DPE number.
@@ -204,7 +199,7 @@ def select_dpe(lines: Iterable[Mapping[str, Any]]) -> Mapping[str, Any] | None:
     lines = list(lines)
     replaced = {line.get("numero_dpe_remplace") for line in lines} - {None}
     usable = [
-        line for line in lines if is_building_scale(line) and line["numero_dpe"] not in replaced
+        line for line in lines if _is_building_scale(line) and line["numero_dpe"] not in replaced
     ]
     if not usable:
         return None
@@ -238,7 +233,7 @@ class _Builder:
         )
 
 
-def description_candidates(line: Mapping[str, Any]) -> dict[str, SourcedValue]:
+def _description_candidates(line: Mapping[str, Any]) -> dict[str, SourcedValue]:
     """Translate the description of a building-scale DPE into candidates for its entity.
 
     ``annee_construction`` gives ``construction_year``; ``nombre_appartement`` (1 for a house)
@@ -293,7 +288,7 @@ _INSULATION_ORDER = [
 ]
 
 
-def envelope_candidates(
+def _envelope_candidates(
     line: Mapping[str, Any],
 ) -> tuple[dict[str, SourcedValue], dict[ComponentKind, Candidates]]:
     """Translate the envelope of a residential DPE (SPEC A.4).
@@ -330,7 +325,7 @@ def envelope_candidates(
     return envelope.found, components
 
 
-def generator_candidates(line: Mapping[str, Any]) -> dict[SystemKind, list[Candidates]]:
+def _generator_candidates(line: Mapping[str, Any]) -> dict[SystemKind, list[Candidates]]:
     """Translate the generators of a DPE into candidates, by system kind (SPEC A.5).
 
     Residential DPE: up to four heating generators (two installations of two generators), two
@@ -471,7 +466,7 @@ def enrich(
         for number in entity.dpe_ids:
             number_owners.setdefault(number, []).append(entity)
 
-    lines = [*client.by_rnb(rnb_owner), *client.by_numbers(number_owners)]
+    lines = [*client.dpe_by_rnb(rnb_owner), *client.dpe_by_numbers(number_owners)]
     found: dict[str, dict[str, dict[str, Any]]] = {e.id: {} for e in entities}
     by_id = {e.id: e for e in entities}
     for line in lines:
@@ -489,7 +484,7 @@ def enrich(
             report.add("not_found", entity_id, "no DPE found")
             continue
         _add_numbers(entity, entity_lines)
-        chosen = select_dpe(entity_lines.values())
+        chosen = _select_dpe(entity_lines.values())
         if chosen is None:
             report.note(entity_id, f"{len(entity_lines)} DPE found, none for the whole building")
             continue
@@ -518,7 +513,7 @@ def _follow_building_dpe(client: DpeClient, found: dict[str, dict[str, dict[str,
                 wanted.setdefault(number, []).append(entity_id)
     if not wanted:
         return
-    for line in client.by_numbers(wanted):
+    for line in client.dpe_by_numbers(wanted):
         for entity_id in wanted.get(line.get("numero_dpe", ""), []):
             found[entity_id][line["numero_dpe"]] = line
 
@@ -531,11 +526,11 @@ def _add_numbers(entity: DescribedEntity, lines: Mapping[str, Mapping[str, Any]]
 
 
 def _apply(entity: DescribedEntity, line: Mapping[str, Any], report: ImportReport) -> None:
-    put(entity, description_candidates(line), source=SOURCE, clear=True)
-    envelope, components = envelope_candidates(line)
+    put(entity, _description_candidates(line), source=SOURCE, clear=True)
+    envelope, components = _envelope_candidates(line)
     put(entity.envelope, envelope, source=SOURCE, clear=True)
     sync_components(entity.envelope, SOURCE, components)
-    for kind, produced in generator_candidates(line).items():
+    for kind, produced in _generator_candidates(line).items():
         sync_systems(entity, kind, SOURCE, produced, report)
 
 

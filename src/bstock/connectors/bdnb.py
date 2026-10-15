@@ -1,8 +1,8 @@
 """Connector to the BDNB, the national building database (SPEC §8.4, annex A.6).
 
-Three layers: :class:`BdnbClient` fetches raw rows, :func:`construction_candidates`,
-:func:`group_candidates` and :func:`generator_candidates` translate them, and :func:`enrich` works
-on a park. Requires the ``[connectors]`` extra; geometries also need the ``[geo]`` extra.
+Three layers: :class:`BdnbClient` fetches raw rows, internal correspondence functions translate them
+into candidate values, and :func:`enrich` works on a park. Requires the ``[connectors]`` extra;
+geometries also need the ``[geo]`` extra.
 """
 
 from __future__ import annotations
@@ -41,10 +41,7 @@ if TYPE_CHECKING:
 __all__ = [
     "SOURCE",
     "BdnbClient",
-    "construction_candidates",
     "enrich",
-    "generator_candidates",
-    "group_candidates",
 ]
 
 logger = logging.getLogger(__name__)
@@ -143,8 +140,8 @@ class BdnbClient:
 
     def __init__(
         self,
-        api_key: str | None = None,
         *,
+        api_key: str | None = None,
         base_url: str = BASE_URL,
         page_size: int | None = None,
         session: Any | None = None,
@@ -156,17 +153,15 @@ class BdnbClient:
 
     def constructions_by_rnb(self, rnb_ids: Iterable[str]) -> list[dict[str, Any]]:
         """Return the ``batiment_construction`` rows of the given RNB ids."""
-        return self.select("batiment_construction", "rnb_id", rnb_ids, CONSTRUCTION_COLUMNS)
+        return self.query("batiment_construction", "rnb_id", rnb_ids, CONSTRUCTION_COLUMNS)
 
     def groups(self, group_ids: Iterable[str]) -> list[dict[str, Any]]:
         """Return the ``batiment_groupe_complet`` rows of the given groups."""
-        return self.select(
-            "batiment_groupe_complet", "batiment_groupe_id", group_ids, GROUP_COLUMNS
-        )
+        return self.query("batiment_groupe_complet", "batiment_groupe_id", group_ids, GROUP_COLUMNS)
 
     def representative_dpe(self, group_ids: Iterable[str]) -> list[dict[str, Any]]:
         """Return the ``batiment_groupe_dpe_representatif_logement`` rows of the given groups."""
-        return self.select(
+        return self.query(
             "batiment_groupe_dpe_representatif_logement",
             "batiment_groupe_id",
             group_ids,
@@ -196,7 +191,7 @@ class BdnbClient:
             raise ConnectorError(f"no construction count in Content-Range {content_range!r}")
         return int(match.group(1))
 
-    def select(
+    def query(
         self, table: str, column: str, values: Iterable[str], columns: Iterable[str] | None = None
     ) -> list[dict[str, Any]]:
         """Return the rows of ``table`` whose ``column`` is in ``values``.
@@ -228,7 +223,7 @@ class BdnbClient:
 _FIELDS = DescribedEntity.sourced_fields()
 
 
-def construction_candidates(row: dict[str, Any]) -> dict[str, SourcedValue]:
+def _construction_candidates(row: dict[str, Any]) -> dict[str, SourcedValue]:
     """Translate a ``batiment_construction`` row into ``"bdnb"`` candidates for a building.
 
     ``hauteur`` gives ``height``, ``s_geom_cstr`` ``footprint_area`` and ``geom_cstr`` (reprojected
@@ -242,7 +237,7 @@ def construction_candidates(row: dict[str, Any]) -> dict[str, SourcedValue]:
     return found
 
 
-def group_candidates(row: dict[str, Any]) -> dict[str, SourcedValue]:
+def _group_candidates(row: dict[str, Any]) -> dict[str, SourcedValue]:
     """Translate a ``batiment_groupe_complet`` row into ``"bdnb"`` candidates.
 
     ``usage_principal_bdnb_open`` gives ``usage`` (SPEC A.2), ``annee_construction``
@@ -263,7 +258,7 @@ def group_candidates(row: dict[str, Any]) -> dict[str, SourcedValue]:
     return found
 
 
-def generator_candidates(
+def _generator_candidates(
     group: dict[str, Any], dpe: dict[str, Any] | None = None
 ) -> dict[SystemKind, list[Candidates]]:
     """Translate the generators of a group into candidates, by system kind (SPEC A.5).
@@ -273,7 +268,7 @@ def generator_candidates(
     read in the generator label. Every candidate has the representative DPE date.
     """
     ref = group.get("batiment_groupe_id")
-    date = dpe_date((dpe or {}).get("date_etablissement_dpe"))
+    date = _dpe_date((dpe or {}).get("date_etablissement_dpe"))
     produced: dict[SystemKind, list[Candidates]] = {kind: [] for kind in GENERATOR_KINDS}
 
     def candidate(value: Any, raw: Any = None) -> SourcedValue:
@@ -297,7 +292,7 @@ def generator_candidates(
     return produced
 
 
-def dpe_date(value: str | None) -> datetime.date | None:
+def _dpe_date(value: str | None) -> datetime.date | None:
     """Return the date, in Paris, of a BDNB DPE timestamp.
 
     The BDNB gives UTC timestamps without offset: ``2026-03-09T23:00:00`` is midnight in Paris on
@@ -368,6 +363,9 @@ def enrich(
     - on each building, intensive values only, when the buildings of the group have different
       parents or ``group_sites`` is False.
 
+    Unlike the other connectors, it may thus change the structure of the park: every building moved
+    into a group site is reported. Pass ``group_sites=False`` to keep the structure as is.
+
     Parameters
     ----------
     park
@@ -384,7 +382,8 @@ def enrich(
     -------
     ImportReport
         ``enriched`` buildings and group sites, ``created`` group sites, ``not_found`` buildings
-        without BDNB construction, ``ambiguous`` buildings with several, and messages.
+        without BDNB construction, ``ambiguous`` buildings with several, and messages (among
+        them, every building moved into a group site, with its former parent).
 
     Raises
     ------
@@ -444,8 +443,8 @@ def _apply_group(
     report: ImportReport,
 ) -> None:
     group_id = group["batiment_groupe_id"]
-    values = group_candidates(group)
-    systems = generator_candidates(group, dpe)
+    values = _group_candidates(group)
+    systems = _generator_candidates(group, dpe)
     dpe_id = group.get("identifiant_dpe")
 
     if client.count_constructions(group_id) <= 1:
@@ -500,7 +499,7 @@ def _set_building(
     group_values: Candidates | None = None,
 ) -> None:
     """Store the construction values, which take precedence over the group ones."""
-    values = {**(group_values or {}), **construction_candidates(row)}
+    values = {**(group_values or {}), **_construction_candidates(row)}
     put(building, values, source=SOURCE, clear=True)
     building.bdnb_batiment_construction_id = row.get("batiment_construction_id")
 
@@ -530,11 +529,13 @@ def _parent_outside(building: Building, group_id: str) -> str | None:
 
 
 def _move(park: BuildingPark, building: Building, site: Site, report: ImportReport) -> bool:
+    former = building.parent.id if building.parent is not None else "the top level"
     try:
         park.move(building, site)
     except EntityInUseError as error:
         report.note(building.id, f"not moved into {site.id}: {error}")
         return False
+    report.note(building.id, f"moved from {former} into the group site {site.id}")
     return True
 
 

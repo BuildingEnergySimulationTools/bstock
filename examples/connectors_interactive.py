@@ -52,24 +52,12 @@ for site_id, (name, address) in SITES.items():
 park.to_dataframe("site", provenance=True)
 
 
-# %% 2. RNB: search the buildings at each site address (geocoded with the BAN)
+# %% 2. RNB: the buildings at each site address (geocoded with the BAN), added to their site
 rnb_client = rnb.RnbClient()
-rnb_responses = {site.id: rnb_client.search_address(site.address) for site in park.iter_sites()}
-
-pd.DataFrame(
-    [
-        {"site": site_id, **{k: v for k, v in result.items() if k != "shape"}}
-        for site_id, response in rnb_responses.items()
-        for result in response.get("results") or []
-    ]
-)
-
-
-# %% add the RNB buildings to their site (point, footprint, address)
-rnb_reports = {}
-for site in list(park.iter_sites()):
-    rnb_ids = [building["rnb_id"] for building in rnb_responses[site.id].get("results") or []]
-    rnb_reports[site.id] = rnb.add_buildings(park, rnb_ids, parent=site, client=rnb_client)
+rnb_reports = {
+    site.id: rnb.add_buildings_at_address(park, site.address, parent=site, client=rnb_client)
+    for site in list(park.iter_sites())
+}
 
 park.tree(fields=["address"])
 

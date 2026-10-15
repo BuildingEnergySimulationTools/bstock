@@ -197,11 +197,13 @@ from bstock.connectors import bdnb, dpe, rnb
 park = BuildingPark(name="Bayonne")
 park.new_site("district", name="Saint-Esprit")
 rnb.add_buildings(park, ["5CWS74SZZ7EW", "BWB9SNCJHWVT"], parent="district")  # point, footprint, address
+rnb.add_buildings_at_address(park, "4 rue de la Gabarre 64100 Bayonne", parent="district")
 bdnb.enrich(park)        # year, usage, dwellings, height, generators; BDNB groups become sub-sites
 report = dpe.enrich(park)  # most recent building DPE: areas, envelope, generators
 report.to_dataframe()      # what was created, enriched, not found, and why
 
-rnb.suggest_matches(park, method="address")   # RNB candidates for buildings without rnb_id
+matches = rnb.suggest_matches(park, method="address")  # RNB candidates, nothing changed
+rnb.assign_matches(park, matches)              # set the rnb_id of buildings with one candidate
 
 park.to_dataframe(provenance=True)        # effective values with their source and provider
 park.to_geopackage("bayonne.gpkg")        # "sites" and "buildings" layers

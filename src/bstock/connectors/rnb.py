@@ -1,8 +1,8 @@
 """Connector to the RNB, the national building register (SPEC §8.3, annex A.6).
 
-Three layers: :class:`RnbClient` fetches raw responses, :func:`building_candidates` translates one
-building into candidate values, and :func:`add_buildings`, :func:`enrich` and
-:func:`suggest_matches` work on a park. Requires the ``[connectors]`` extra.
+Three layers: :class:`RnbClient` fetches raw responses, internal correspondence functions translate
+one building into candidate values, and the other public functions work on a park. Requires the
+``[connectors]`` extra.
 """
 
 from __future__ import annotations
@@ -30,12 +30,10 @@ __all__ = [
     "SOURCE",
     "RnbClient",
     "add_buildings",
-    "bdnb_construction_id",
-    "building_candidates",
+    "add_buildings_at_address",
+    "assign_matches",
     "enrich",
-    "format_address",
     "normalize_rnb_id",
-    "successors",
     "suggest_matches",
 ]
 
@@ -53,7 +51,6 @@ SUGGESTION_COLUMNS = [
     "score",
     "address",
     "used_by",
-    "assigned",
 ]
 
 
@@ -79,7 +76,7 @@ class RnbClient:
     """
 
     def __init__(
-        self, base_url: str = BASE_URL, *, session: Any | None = None, **http_options: Any
+        self, *, base_url: str = BASE_URL, session: Any | None = None, **http_options: Any
     ) -> None:
         self.http = HttpClient(base_url, session=session, **http_options)
 
@@ -112,7 +109,7 @@ class RnbClient:
 # --- correspondences --------------------------------------------------------------------------
 
 
-def format_address(address: dict[str, Any]) -> str | None:
+def _format_address(address: dict[str, Any]) -> str | None:
     """Return a one-line address (``"4 Rue de la Gabarre, 64100 Bayonne"``), or ``None``."""
     street = " ".join(
         str(part)
@@ -124,7 +121,7 @@ def format_address(address: dict[str, Any]) -> str | None:
     return text or None
 
 
-def building_candidates(record: dict[str, Any]) -> dict[str, SourcedValue]:
+def _building_candidates(record: dict[str, Any]) -> dict[str, SourcedValue]:
     """Translate an RNB building into ``"rnb"`` candidates, by field name.
 
     ``point`` gives ``lat`` / ``lon``, ``shape`` the ``footprint`` (only a valid ``Polygon`` or
@@ -159,7 +156,7 @@ def building_candidates(record: dict[str, Any]) -> dict[str, SourcedValue]:
     if addresses:
         first = addresses[0]
         ban = f"BAN {first['id']}" if first.get("id") else None
-        text = format_address(first)
+        text = _format_address(first)
         if text:
             found["address"] = candidate(text, comment=ban)
         if first.get("city_name"):
@@ -169,7 +166,7 @@ def building_candidates(record: dict[str, Any]) -> dict[str, SourcedValue]:
     return found
 
 
-def bdnb_construction_id(record: dict[str, Any]) -> str | None:
+def _bdnb_construction_id(record: dict[str, Any]) -> str | None:
     """Return the BDNB construction id among the external ids of an RNB building, if any."""
     for ext in record.get("ext_ids") or []:
         if ext.get("source") == "bdnb" and ext.get("id"):
@@ -177,7 +174,7 @@ def bdnb_construction_id(record: dict[str, Any]) -> str | None:
     return None
 
 
-def successors(history: list[dict[str, Any]]) -> tuple[str | None, list[str]]:
+def _successors(history: list[dict[str, Any]]) -> tuple[str | None, list[str]]:
     """Return the event that deactivated an id and the successor ids.
 
     The history lists the versions of the building, most recent first. The event is ``"merge"``,
@@ -255,6 +252,56 @@ def add_buildings(
     return report
 
 
+def add_buildings_at_address(
+    park: BuildingPark,
+    address: str,
+    parent: Site | str | None = None,
+    *,
+    client: RnbClient | None = None,
+) -> ImportReport:
+    """Add the RNB buildings found at ``address``, as :func:`add_buildings` does.
+
+    The RNB geocodes the address with the BAN and keeps the best match only; an address without
+    number or poorly recognised gives no building. The buildings found are then fetched one by one
+    (:func:`add_buildings`), so that demolished and inactive ones are left aside.
+
+    Parameters
+    ----------
+    park
+        Park to complete.
+    address
+        Postal address on one line, e.g. ``"67 rue de Mirambeau 64600 Anglet"``.
+    parent
+        Site receiving the created buildings.
+    client
+        RNB client; a default one is created when omitted.
+
+    Returns
+    -------
+    ImportReport
+        As :func:`add_buildings`; when the address gives no building, ``not_found`` under the
+        address, with the status of the search.
+
+    Raises
+    ------
+    UnknownIdError
+        If ``parent`` is not a site of the park.
+    ConnectorError
+        If the API fails persistently.
+    """
+    if parent is not None:
+        park._resolve_site(parent)  # fail before any request
+    client = client or RnbClient()
+    response = client.search_address(address)
+    rnb_ids = [record["rnb_id"] for record in response.get("results") or []]
+    if not rnb_ids:
+        report = ImportReport(source=SOURCE)
+        status = response.get("status")
+        report.add("not_found", address, f"no RNB building at this address (status {status!r})")
+        return report
+    return add_buildings(park, rnb_ids, parent, client=client)
+
+
 def enrich(
     park: BuildingPark,
     buildings: Iterable[Building | str] | None = None,
@@ -305,13 +352,13 @@ def suggest_matches(
     *,
     method: Literal["point", "address"] = "point",
     radius: float = 30.0,
-    assign: Literal["unique"] | None = None,
     client: RnbClient | None = None,
 ) -> pd.DataFrame:
     """Propose RNB buildings for park buildings that have no ``rnb_id`` (SPEC §8.3).
 
-    Unlike the other connector functions, which return an :class:`ImportReport`, this returns a
-    table of proposals to review: the user validates them and sets ``building.rnb_id``.
+    Nothing is changed in the park. Unlike the other connector functions, which return an
+    :class:`ImportReport`, this returns a table of proposals to review: filter it, then pass it to
+    :func:`assign_matches`, or set ``building.rnb_id`` by hand.
 
     Parameters
     ----------
@@ -325,10 +372,6 @@ def suggest_matches(
         effective ``address``, geocoded by the RNB with the BAN.
     radius
         Search radius around the point, in m (at most 1000).
-    assign
-        ``"unique"`` sets ``rnb_id`` when a building has exactly one candidate that no other park
-        building uses. ``None`` (default) changes nothing. A string rather than a boolean, so that
-        other assignment strategies can be added later.
     client
         RNB client; a default one is created when omitted.
 
@@ -337,14 +380,13 @@ def suggest_matches(
     pandas.DataFrame
         One row per (building, candidate): ``building_id``, ``rnb_id``, ``distance`` (m, 0 inside
         the footprint; point search), ``score`` (BAN geocoding score; address search),
-        ``address`` (RNB), ``used_by`` (park building already holding this ``rnb_id``, never
-        assigned) and ``assigned``. Buildings without point (or address) or without candidate have
-        no row.
+        ``address`` (RNB) and ``used_by`` (park building already holding this ``rnb_id``).
+        Buildings without point (or address) or without candidate have no row.
 
     Raises
     ------
     InvalidArgumentError
-        If ``method``, ``radius`` or ``assign`` is invalid.
+        If ``method`` or ``radius`` is invalid.
     UnknownIdError
         If a building id is not in the park.
     ConnectorError
@@ -354,8 +396,6 @@ def suggest_matches(
         raise InvalidArgumentError(f"method must be 'point' or 'address', not {method!r}")
     if not 0 < radius <= MAX_RADIUS:
         raise InvalidArgumentError(f"radius must be in ]0, {MAX_RADIUS:g}] m, not {radius!r}")
-    if assign not in (None, "unique"):
-        raise InvalidArgumentError(f"assign must be None or 'unique', not {assign!r}")
     client = client or RnbClient()
     targets = (
         [b for b in park.iter_buildings() if not b.rnb_id]
@@ -367,12 +407,77 @@ def suggest_matches(
         found = list(_candidates(client, building, method, radius))
         for candidate in found:
             used = _find(park, candidate["rnb_id"])
-            candidate.update(building_id=building.id, used_by=used and used.id, assigned=False)
-        if assign == "unique" and len(found) == 1 and found[0]["used_by"] is None:
-            building.rnb_id = found[0]["rnb_id"]
-            found[0]["assigned"] = True
+            candidate.update(building_id=building.id, used_by=used and used.id)
         rows.extend(found)
     return pd.DataFrame(rows, columns=SUGGESTION_COLUMNS)
+
+
+def assign_matches(
+    park: BuildingPark,
+    matches: pd.DataFrame,
+    *,
+    strategy: Literal["unique"] = "unique",
+) -> ImportReport:
+    """Set the ``rnb_id`` of park buildings from a table of proposals (SPEC §8.3).
+
+    ``matches`` is typically the result of :func:`suggest_matches`, filtered by the user. No
+    request is made: run :func:`enrich` afterwards to fetch the RNB values of the assigned
+    buildings.
+
+    Parameters
+    ----------
+    park
+        Park whose buildings receive an ``rnb_id``.
+    matches
+        Table with at least the columns ``building_id`` and ``rnb_id``, one row per candidate.
+    strategy
+        ``"unique"``: a building receives its candidate when it is the only one left in
+        ``matches``. A string rather than a boolean, so that other strategies can be added.
+
+    Returns
+    -------
+    ImportReport
+        ``enriched`` for the buildings that received an ``rnb_id``; ``ambiguous`` for those with
+        several candidates. Messages for a building that already has another ``rnb_id``, or a
+        candidate already held by another park building: both are left unchanged.
+
+    Raises
+    ------
+    InvalidArgumentError
+        If ``strategy`` is invalid or ``matches`` lacks a column.
+    UnknownIdError
+        If a ``building_id`` is not a building of the park.
+    """
+    if strategy != "unique":
+        raise InvalidArgumentError(f"strategy must be 'unique', not {strategy!r}")
+    missing = [c for c in ("building_id", "rnb_id") if c not in matches.columns]
+    if missing:
+        raise InvalidArgumentError(f"matches lacks the columns {missing}")
+    report = ImportReport(source=SOURCE)
+    candidates: dict[str, list[str]] = {}
+    for building_id, rnb_id in zip(matches["building_id"], matches["rnb_id"], strict=True):
+        ids = candidates.setdefault(building_id, [])
+        if normalize_rnb_id(rnb_id) not in ids:
+            ids.append(normalize_rnb_id(rnb_id))
+    buildings = {i: park._resolve(i, (Building,)) for i in candidates}  # fail before any change
+    for building_id, ids in candidates.items():
+        building = buildings[building_id]
+        if len(ids) > 1:
+            report.add("ambiguous", building_id, f"several candidates: {', '.join(ids)}")
+            continue
+        [rnb_id] = ids
+        if building.rnb_id == rnb_id:
+            continue
+        if building.rnb_id:
+            report.note(building_id, f"already has RNB id {building.rnb_id}: {rnb_id} not set")
+            continue
+        used = _find(park, rnb_id)
+        if used is not None:
+            report.note(building_id, f"RNB id {rnb_id} is already held by {used.id}: not set")
+            continue
+        building.rnb_id = rnb_id
+        report.add("enriched", building_id, f"rnb_id set to {rnb_id}")
+    return report
 
 
 # --- helpers ----------------------------------------------------------------------------------
@@ -391,7 +496,7 @@ def _fetch_usable(
         report.note(key, f"RNB id {rnb_id} is a demolished building: left unchanged")
         return None
     if record.get("is_active") is False:
-        event, ids = successors(client.history(rnb_id))
+        event, ids = _successors(client.history(rnb_id))
         detail = f" after a {event}" if event else ""
         following = f"; successors: {', '.join(ids)}" if ids else "; no successor"
         report.note(key, f"RNB id {rnb_id} is inactive{detail}{following}: left unchanged")
@@ -400,8 +505,8 @@ def _fetch_usable(
 
 
 def _apply(building: Building, record: dict[str, Any]) -> None:
-    put(building, building_candidates(record), source=SOURCE, clear=True)
-    construction = bdnb_construction_id(record)
+    put(building, _building_candidates(record), source=SOURCE, clear=True)
+    construction = _bdnb_construction_id(record)
     if construction and not building.bdnb_batiment_construction_id:
         building.bdnb_batiment_construction_id = construction
 
@@ -446,5 +551,5 @@ def _suggestion(
         "rnb_id": record["rnb_id"],
         "distance": distance,
         "score": score,
-        "address": format_address(addresses[0]) if addresses else None,
+        "address": _format_address(addresses[0]) if addresses else None,
     }

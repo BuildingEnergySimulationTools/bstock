@@ -958,16 +958,22 @@ src/bstock/connectors/
   _geo.py          # reprojection des géométries vers WGS84 (extra [geo])
   _mappings.py     # tables de correspondance de l'annexe A (fonctions pures)
   data/            # dpe_generators.csv (annexe A.5)
-  rnb.py           # RnbClient, add_buildings, enrich, suggest_matches
+  rnb.py           # RnbClient, add_buildings, add_buildings_at_address, enrich, suggest_matches,
+                   # assign_matches
   bdnb.py          # BdnbClient, enrich
   dpe.py           # DpeClient, enrich
 ```
 
 Chaque connecteur a trois couches :
 - un **client** (`RnbClient`, `BdnbClient`, `DpeClient`) qui ne fait que récupérer les réponses brutes
-  (dicts JSON). URL de base, session `requests` et clé d'API éventuelle sont configurables ;
-- des **correspondances** pures, internes : réponse brute → candidats `SourcedValue` (avec `raw` et
-  `ref`) ;
+  (dicts JSON). URL de base, session `requests` et clé d'API éventuelle sont configurables, en arguments
+  nommés uniquement (`BdnbClient(api_key=...)`). Les méthodes portent le nom de ce qu'elles renvoient
+  (`RnbClient.building`, `history`, `closest`, `search_address` ; `BdnbClient.constructions_by_rnb`,
+  `groups`, `representative_dpe`, `count_constructions` ; `DpeClient.dpe_by_rnb`, `dpe_by_numbers`), et
+  la requête générique sur une table ou un jeu de données s'appelle `query(...)` dans les deux clients
+  qui en ont une ;
+- des **correspondances** pures, internes (fonctions privées, préfixées par `_`) : réponse brute →
+  candidats `SourcedValue` (avec `raw` et `ref`) ;
 - des **fonctions de haut niveau** qui modifient le parc. Elles acceptent un `client=` (sinon un client
   par défaut est créé), ce qui permet de les tester hors réseau avec un faux client.
 
@@ -1014,6 +1020,10 @@ géographiques (§9). Un extra manquant lève `MissingDependencyError` avec la c
 - `rnb.add_buildings(park, rnb_ids, parent=None, *, client=None) -> ImportReport` : crée via
   `park.new_building` les bâtiments absents du parc et enrichit ceux qui existent déjà (recherche par
   `get_by_rnb`).
+- `rnb.add_buildings_at_address(park, address, parent=None, *, client=None) -> ImportReport` : cherche
+  l'adresse dans le RNB (géocodée avec la BAN, meilleure adresse seulement), puis ajoute les bâtiments
+  trouvés comme `add_buildings`. Une adresse sans bâtiment figure en `not_found` sous l'adresse, avec le
+  statut de la recherche.
 - `rnb.enrich(park, buildings=None, *, client=None) -> ImportReport` : bâtiments du parc qui ont un
   `rnb_id` (tous si `buildings` est `None`).
 - Une requête par bâtiment : l'API n'offre pas de lecture groupée par liste d'ids.
@@ -1026,16 +1036,29 @@ géographiques (§9). Un extra manquant lève `MissingDependencyError` avec la c
   démoli (`status`), id désactivé après une fusion ou une scission (`is_active: false` ; le rapport
   donne le ou les ids successeurs lus dans l'historique du bâtiment).
 
-**Bâtiments sans `rnb_id`.** `rnb.suggest_matches(park, buildings=None, *, method="point", radius=...,
-assign=None, client=None) -> pd.DataFrame` propose des bâtiments RNB candidats, cherchés autour du point
-(`lat` / `lon`, rayon ≤ 1000 m) ou à partir de l'adresse (`method="address"`). Le DataFrame a une ligne par
-couple (bâtiment, candidat) : id du bâtiment, `rnb_id` candidat, distance (m, 0 si le point est dans
-l'emprise) ou score de géocodage de l'adresse, adresse RNB. L'utilisateur valide puis pose
-`building.rnb_id`. Aucune affectation automatique, sauf `assign="unique"` : le `rnb_id` est posé quand il
-n'y a qu'un candidat (dans le rayon, ou à l'adresse). Un `rnb_id` déjà utilisé dans le parc est signalé
-mais jamais affecté. Une valeur invalide de `by`, `radius` ou `assign` lève `InvalidArgumentError`.
-Contrairement aux autres fonctions des connecteurs, le résultat est un tableau de propositions à examiner,
-pas un `ImportReport`. `assign` est une chaîne et non un booléen pour accueillir d'autres stratégies.
+**Bâtiments sans `rnb_id`.** L'appariement se fait en deux temps, pour qu'on puisse examiner et filtrer
+les propositions avant de modifier le parc :
+
+```python
+matches = rnb.suggest_matches(park, method="address")       # ne modifie rien
+matches = matches[matches["score"] > 0.8]                    # revue par l'utilisateur
+report = rnb.assign_matches(park, matches, strategy="unique")
+```
+
+- `rnb.suggest_matches(park, buildings=None, *, method="point", radius=30.0, client=None) ->
+  pd.DataFrame` propose des bâtiments RNB candidats, cherchés autour du point (`lat` / `lon`, rayon
+  ≤ 1000 m) ou à partir de l'adresse (`method="address"`). Le DataFrame a une ligne par couple
+  (bâtiment, candidat) : id du bâtiment, `rnb_id` candidat, distance (m, 0 si le point est dans
+  l'emprise) ou score de géocodage de l'adresse, adresse RNB. Il ne modifie rien. Une valeur invalide de
+  `method` ou `radius` lève `InvalidArgumentError`. Contrairement aux autres fonctions des connecteurs,
+  le résultat est un tableau de propositions à examiner, pas un `ImportReport`.
+- `rnb.assign_matches(park, matches, *, strategy="unique") -> ImportReport` pose les `rnb_id` à partir
+  d'un tel tableau (colonnes `building_id` et `rnb_id` au moins), sans requête : lancer `rnb.enrich`
+  ensuite pour récupérer les valeurs. Avec `"unique"`, un bâtiment reçoit son candidat s'il est le seul
+  restant dans le tableau (`enriched`) ; plusieurs candidats donnent `ambiguous`. Un `rnb_id` déjà porté
+  par un autre bâtiment du parc n'est jamais affecté, et un `rnb_id` existant n'est jamais remplacé : les
+  deux sont signalés par un message. `strategy` est une chaîne et non un booléen pour accueillir d'autres
+  stratégies.
 
 Précisions d'implémentation :
 - les candidats RNB n'ont pas de `date` (la réponse ne date pas l'information) ; `ref` = `rnb_id`, et le
@@ -1046,8 +1069,8 @@ Précisions d'implémentation :
   `enrich`, un bâtiment sans `rnb_id` est signalé (renvoi vers `suggest_matches`) ;
 - `suggest_matches` : rayon par défaut 30 m ; le point et l'adresse sont les valeurs effectives, donc
   hérités du site si le bâtiment n'en a pas. Colonnes : `building_id`, `rnb_id`, `distance`, `score`,
-  `address`, `used_by` (bâtiment du parc qui porte déjà ce `rnb_id`), `assigned`. Un bâtiment sans point
-  (ou sans adresse) ou sans candidat n'a pas de ligne.
+  `address`, `used_by` (bâtiment du parc qui porte déjà ce `rnb_id`). Un bâtiment sans point (ou sans
+  adresse) ou sans candidat n'a pas de ligne.
 
 La recherche par adresse s'appuie sur l'API RNB, qui géocode elle-même l'adresse avec la BAN et ne garde
 que la meilleure adresse : il n'y a pas de géocodage séparé dans bstock. Une adresse sans numéro ou mal
@@ -1083,7 +1106,8 @@ bâtiments.
     `bdnb_batiment_groupe_id`, est créé sous le parent commun des bâtiments du groupe (ou réutilisé
     s'il existe), et ces bâtiments y sont déplacés (`park.move`). Les valeurs du groupe sont posées sur
     le sous-site : les grandeurs intensives sont héritées par les bâtiments, les extensives restent au
-    niveau du groupe (§4.4). C'est le cas même si un seul bâtiment du groupe est dans le parc, car les
+    niveau du groupe (§4.4). `bdnb.enrich` est ainsi le seul connecteur qui peut changer la structure du
+    parc : chaque bâtiment déplacé figure dans le rapport, avec son ancien parent. C'est le cas même si un seul bâtiment du groupe est dans le parc, car les
     valeurs extensives du groupe ne valent pas pour ce seul bâtiment.
   - Bâtiments d'un même groupe rangés sous des parents différents : pas de restructuration ; les valeurs
     intensives du groupe sont posées sur chaque bâtiment, les extensives ne le sont pas, et le rapport
@@ -1324,6 +1348,19 @@ Changements **incompatibles de 0.9.0**, sans alias ni migration :
 Ajouts compatibles : `fields` accepte un nom seul ; `site.remove_site` / `remove_building` ; la copie
 profonde d'une entité seule est détachée de son propriétaire.
 
+Changements **incompatibles de 0.10.0** (en préparation : connecteurs, §8) :
+
+| Avant 0.10.0 | Depuis 0.10.0 |
+|---|---|
+| `RnbClient(url)`, `DpeClient(url)`, `BdnbClient(key)` (positionnels) | arguments nommés uniquement : `BdnbClient(api_key=...)` |
+| `BdnbClient.select(...)`, `DpeClient.lines(...)` | `query(...)` |
+| `DpeClient.by_rnb(...)`, `DpeClient.by_numbers(...)` | `dpe_by_rnb(...)`, `dpe_by_numbers(...)` |
+| `rnb.suggest_matches(..., assign="unique")`, colonne `assigned` | `suggest_matches` ne modifie rien ; `rnb.assign_matches(park, matches, strategy="unique")` |
+| correspondances publiques (`rnb.building_candidates`, `bdnb.group_candidates`, `dpe.select_dpe`…) | internes (`_building_candidates`…) |
+
+Ajouts compatibles : `rnb.add_buildings_at_address` ; `bdnb.enrich` signale chaque bâtiment déplacé
+dans un sous-site de groupe.
+
 ---
 
 ## 13. Questions ouvertes
@@ -1385,7 +1422,7 @@ lignes du texte et `truncated(max_lines)` le texte coupé, comme dans le repr.
 
 **`describe()`** est défini sur toute entité sourcée (Site, Building, Envelope, systèmes, Meter). Il
 renvoie un DataFrame avec une ligne par attribut sourcé, dans l'ordre de déclaration, y compris ceux de la
-sous-classe projet et ceux qui n'ont pas de valeur. L'index est le nom de l'attribut. Colonnes : `value`
+sous-classe projet et ceux qui n'ont pas de valeur. L'index, nommé `field`, est le nom de l'attribut. Colonnes : `value`
 (valeur effective, enums rendus par leur valeur), `unit`, `source` (source retenue), `provider` (id de
 l'entité qui fournit la valeur), `inherited` (bool) et `candidates` (nombre de candidats propres).
 
@@ -1408,9 +1445,9 @@ sel.to_dataframe(provenance=True); sel.tree(fields=["usage"])
 ```
 
 `park.select(predicate=None, *, entity="building", **criteria)` renvoie une `Selection`. Sans critère, la
-sélection contient toutes les entités du `kind` : `park.select()` est le point d'entrée des analyses sur
-tout le parc. `kind` vaut `"building"` ou `"site"` : une sélection ne mélange jamais les deux. Un autre
-`kind` lève `UnknownKindError`. Les systèmes et les compteurs ne se sélectionnent pas : leurs filtres
+sélection contient toutes les entités du type `entity` : `park.select()` est le point d'entrée des analyses
+sur tout le parc. `entity` vaut `"building"` ou `"site"` : une sélection ne mélange jamais les deux. Une
+autre valeur lève `InvalidArgumentError`. Les systèmes et les compteurs ne se sélectionnent pas : leurs filtres
 existent déjà (`iter_systems(kind)`, `timeseries(...)`).
 
 **`Selection`** :
