@@ -1444,13 +1444,18 @@ signale. `by` n'est accepté que pour une sélection de bâtiments.
 
 ```python
 sel.completeness()                    # par attribut
-sel.completeness(by="entity")         # par entité
-sel.provenance()                      # répartition des sources
+sel.completeness("entity")            # par entité
+sel.provenance(normalize=True)        # répartition des sources
 sel.conflicts(rtol=0.05)              # candidats en désaccord
 ```
 
 Par défaut, `fields` contient tous les attributs sourcés de la classe des entités sélectionnées (projet
 compris, `footprint` compris). L'enveloppe et les systèmes ne sont pas couverts en v3.
+
+Signatures : `completeness(by="attribute", *, fields=None)`, `provenance(fields=None, *,
+normalize=False)`, `conflicts(fields=None, *, rtol=0.05)`. Un attribut inconnu lève `UnknownFieldError`.
+Une entité dont la classe ne déclare pas un attribut (champ d'une autre sous-classe projet) n'est pas
+comptée pour lui. Un taux sans entité concernée est manquant (NaN).
 
 **`completeness(by="attribute", fields=None)`.** Une valeur héritée compte comme renseignée.
 - `by="attribute"` : une ligne par attribut. Colonnes `filled` (nombre d'entités avec une valeur
@@ -1459,7 +1464,8 @@ compris, `footprint` compris). L'enveloppe et les systèmes ne sont pas couverts
   attributs sans valeur).
 
 **`provenance(fields=None, normalize=False)`.** Une ligne par attribut et une colonne par source retenue
-(nombre d'entités dont la valeur effective vient de cette source). S'y ajoutent les colonnes `inherited`
+(nombre d'entités dont la valeur effective vient de cette source), la source la plus fréquente sur
+l'ensemble des attributs en premier, puis par ordre alphabétique. S'y ajoutent les colonnes `inherited`
 (dont valeurs héritées, toutes sources confondues) et `missing`. Avec `normalize=True`, on obtient des
 parts plutôt que des nombres.
 
@@ -1470,7 +1476,10 @@ conflit.
   est donc un conflit.
 - Les flottants sont comparés avec la tolérance relative `rtol` (rapportée à la plus grande valeur
   absolue).
-- Colonnes : `entity`, `attribute`, `values` (dict source → valeur), `retained` (source retenue).
+- Colonnes : `entity`, `attribute`, `values` (dict source → valeur, enums par leur valeur), `retained`
+  (source retenue). Sans conflit, le DataFrame est vide avec ces colonnes.
+- Par défaut, `footprint` n'est pas comparé : deux emprises de sources différentes (RNB, BDNB) ne sont
+  presque jamais identiques au point près. On le compare en le nommant dans `fields`.
 
 ### 14.5 Graphiques (v3.e)
 

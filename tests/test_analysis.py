@@ -185,3 +185,148 @@ def test_aggregation_does_not_modify_the_park(park):
     before = park.to_json()
     park.select().aggregate(prefer="site")
     assert park.to_json() == before
+
+
+# --- completeness, provenance, conflicts -------------------------------------------------------
+
+
+@pytest.fixture
+def sourced_park():
+    """Site s (year 1970, bdnb) > b1 (own year from dpe and bdnb, area from dpe and audit), b2."""
+    park = BuildingPark(name="P")
+    site = park.new_site("s", construction_year=1970, usage="tertiary", source="bdnb")
+    b1 = park.new_building(id="b1", parent=site, heated_area=1000.0, source="dpe")
+    b1.set("heated_area", 1020.0, source="audit")
+    b1.set("construction_year", 1972, source="dpe")
+    b1.set("construction_year", 1970, source="bdnb")
+    park.new_building(id="b2", parent=site, name="Annex")
+    return park
+
+
+def test_completeness_by_attribute_counts_inherited_values_as_filled(sourced_park):
+    frame = sourced_park.select().completeness(fields=["construction_year", "heated_area", "name"])
+    assert frame.index.name == "attribute"
+    assert frame.loc["construction_year"].to_dict() == {
+        "filled": 2,
+        "inherited": 1,
+        "total": 2,
+        "rate": 1.0,
+    }
+    assert frame.loc["heated_area", "rate"] == 0.5
+    assert frame.loc["name", "inherited"] == 0
+
+
+def test_completeness_covers_every_attribute_by_default(sourced_park):
+    frame = sourced_park.select().completeness()
+    assert list(frame.index) == list(Building.sourced_fields())
+
+
+def test_completeness_by_entity_lists_missing_attributes(sourced_park):
+    frame = sourced_park.select().completeness("entity", fields=["usage", "heated_area", "name"])
+    assert frame.index.name == "id"
+    assert frame.loc["b1", "missing"] == ["name"]
+    assert frame.loc["b2", "missing"] == ["heated_area"]
+    assert frame.loc["b2", "filled"] == 2
+    assert frame.loc["b2", "rate"] == pytest.approx(2 / 3)
+
+
+def test_completeness_of_project_attributes_and_of_sites():
+    class ProjectBuilding(Building):
+        code = sourced(str)
+
+    park = BuildingPark(name="P", building_cls=ProjectBuilding)
+    park.new_building(id="a", code="X")
+    park.new_building(id="b")
+    assert park.select().completeness(fields=["code"]).loc["code", "rate"] == 0.5
+    assert park.select(kind="site").completeness().loc["name", "total"] == 0
+
+
+@pytest.mark.parametrize(
+    ("method", "kwargs", "error"),
+    [
+        ("completeness", {"fields": ["colour"]}, UnknownFieldError),
+        ("completeness", {"by": "site"}, InvalidArgumentError),
+        ("provenance", {"fields": ["colour"]}, UnknownFieldError),
+        ("conflicts", {"fields": ["colour"]}, UnknownFieldError),
+        ("conflicts", {"rtol": -0.1}, InvalidArgumentError),
+    ],
+)
+def test_report_arguments_are_checked(sourced_park, method, kwargs, error):
+    with pytest.raises(error):
+        getattr(sourced_park.select(), method)(**kwargs)
+
+
+def test_provenance_counts_sources_of_effective_values(sourced_park):
+    frame = sourced_park.select().provenance(["construction_year", "heated_area", "name"])
+    assert list(frame.columns) == ["audit", "bdnb", "dpe", "manual", "inherited", "missing"]
+    assert frame.loc["construction_year"].to_dict() == {
+        "audit": 0,
+        "bdnb": 1,
+        "dpe": 1,
+        "manual": 0,
+        "inherited": 1,
+        "missing": 0,
+    }
+    assert frame.loc["heated_area", "missing"] == 1
+    assert frame.loc["name", "manual"] == 1
+
+
+def test_provenance_sources_are_ordered_by_frequency(sourced_park):
+    sourced_park["b2"].set("heated_area", 300.0, source="dpe")
+    frame = sourced_park.select().provenance(["construction_year", "heated_area"])
+    assert list(frame.columns[:3]) == ["dpe", "audit", "bdnb"]
+
+
+def test_provenance_can_give_shares(sourced_park):
+    frame = sourced_park.select().provenance(["construction_year"], normalize=True)
+    assert frame.loc["construction_year"].to_dict() == {
+        "bdnb": 0.5,
+        "dpe": 0.5,
+        "inherited": 0.5,
+        "missing": 0.0,
+    }
+
+
+def test_conflicts_compare_integers_strictly(sourced_park):
+    frame = sourced_park.select().conflicts()
+    assert frame.to_dict("records") == [
+        {
+            "entity": "b1",
+            "attribute": "construction_year",
+            "values": {"dpe": 1972, "bdnb": 1970},
+            "retained": "dpe",
+        }
+    ]
+
+
+@pytest.mark.parametrize(("rtol", "in_conflict"), [(0.05, False), (0.01, True), (0.0, True)])
+def test_conflicts_compare_floats_with_a_tolerance(sourced_park, rtol, in_conflict):
+    frame = sourced_park.select().conflicts(["heated_area"], rtol=rtol)
+    assert (len(frame) == 1) is in_conflict
+
+
+def test_conflicts_compare_enums(sourced_park):
+    sourced_park["b2"].set("usage", "tertiary", source="dpe")
+    sourced_park["b2"].set("usage", "outbuilding", source="bdnb")
+    row = sourced_park.select().conflicts(["usage"]).iloc[0]
+    assert row["values"] == {"dpe": "tertiary", "bdnb": "outbuilding"}
+
+
+def test_inherited_candidates_are_not_conflicts(sourced_park):
+    sourced_park["b2"].set("construction_year", 1990, source="audit")
+    assert "b2" not in set(sourced_park.select().conflicts()["entity"])
+
+
+def test_footprint_is_compared_only_on_request(sourced_park):
+    square = {"type": "Polygon", "coordinates": [[[0, 0], [0, 1], [1, 1], [0, 0]]]}
+    other = {"type": "Polygon", "coordinates": [[[0, 0], [0, 2], [2, 2], [0, 0]]]}
+    sourced_park["b2"].set("footprint", square, source="rnb")
+    sourced_park["b2"].set("footprint", other, source="bdnb")
+    assert "footprint" not in set(sourced_park.select().conflicts()["attribute"])
+    assert len(sourced_park.select().conflicts(["footprint"])) == 1
+
+
+def test_no_conflict_gives_an_empty_frame(park):
+    frame = park.select().conflicts()
+    assert frame.empty
+    assert list(frame.columns) == ["entity", "attribute", "values", "retained"]

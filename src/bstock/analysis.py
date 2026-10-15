@@ -306,3 +306,156 @@ def _warn_ignored_site_values(buildings: list[Building], names: list[str]) -> No
             NoDataWarning,
             stacklevel=5,
         )
+
+
+# --- completeness and provenance (SPEC §14.4) ----------------------------------------------------
+
+CONFLICT_EXCLUDED = ("footprint",)
+"""Attributes left out of :func:`conflicts` by default: two geometries never match exactly."""
+
+
+def completeness(
+    selection: Selection,
+    *,
+    by: Literal["attribute", "entity"] = "attribute",
+    fields: Sequence[str] | None = None,
+) -> pd.DataFrame:
+    """Return the share of filled attributes; see :meth:`Selection.completeness`."""
+    if by not in ("attribute", "entity"):
+        raise InvalidArgumentError(f"by must be 'attribute' or 'entity', not {by!r}")
+    entities = selection._entities()
+    names = _sourced_names(selection, entities, fields)
+    if by == "entity":
+        rows = []
+        for entity in entities:
+            own = [name for name in names if name in entity.sourced_fields()]
+            missing = [name for name in own if getattr(entity, name) is None]
+            rows.append(
+                {
+                    "filled": len(own) - len(missing),
+                    "total": len(own),
+                    "rate": _rate(len(own) - len(missing), len(own)),
+                    "missing": missing,
+                }
+            )
+        index = pd.Index([e.id for e in entities], name="id")
+        return pd.DataFrame(rows, index=index, columns=["filled", "total", "rate", "missing"])
+    rows = []
+    for name in names:
+        concerned = [e for e in entities if name in e.sourced_fields()]
+        providers = [e._provider(name) for e in concerned]
+        filled = sum(1 for p in providers if p is not None)
+        inherited = sum(1 for e, p in zip(concerned, providers, strict=True) if p not in (None, e))
+        rows.append(
+            {
+                "filled": filled,
+                "inherited": inherited,
+                "total": len(concerned),
+                "rate": _rate(filled, len(concerned)),
+            }
+        )
+    index = pd.Index(names, name="attribute")
+    return pd.DataFrame(rows, index=index, columns=["filled", "inherited", "total", "rate"])
+
+
+def provenance(
+    selection: Selection, *, fields: Sequence[str] | None = None, normalize: bool = False
+) -> pd.DataFrame:
+    """Return the sources of the effective values; see :meth:`Selection.provenance`."""
+    entities = selection._entities()
+    names = _sourced_names(selection, entities, fields)
+    counts: dict[str, dict[str, int]] = {}
+    extra: dict[str, dict[str, int]] = {}
+    totals: dict[str, int] = {}
+    for name in names:
+        concerned = [e for e in entities if name in e.sourced_fields()]
+        totals[name] = len(concerned)
+        by_source: dict[str, int] = {}
+        inherited = missing = 0
+        for entity in concerned:
+            candidate = entity.effective(name)
+            if candidate is None:
+                missing += 1
+                continue
+            by_source[candidate.source] = by_source.get(candidate.source, 0) + 1
+            if entity._provider(name) is not entity:
+                inherited += 1
+        counts[name] = by_source
+        extra[name] = {"inherited": inherited, "missing": missing}
+    overall: dict[str, int] = {}
+    for by_source in counts.values():
+        for source, count in by_source.items():
+            overall[source] = overall.get(source, 0) + count
+    sources = sorted(overall, key=lambda source: (-overall[source], source))
+    rows = [{**{s: counts[name].get(s, 0) for s in sources}, **extra[name]} for name in names]
+    frame = pd.DataFrame(
+        rows, index=pd.Index(names, name="attribute"), columns=[*sources, "inherited", "missing"]
+    )
+    if normalize:
+        frame = frame.div(pd.Series(totals).replace(0, math.nan), axis=0)
+    return frame
+
+
+def conflicts(
+    selection: Selection, *, fields: Sequence[str] | None = None, rtol: float = 0.05
+) -> pd.DataFrame:
+    """Return the attributes whose own candidates disagree; see :meth:`Selection.conflicts`."""
+    if rtol < 0:
+        raise InvalidArgumentError(f"rtol must be positive, not {rtol!r}")
+    entities = selection._entities()
+    names = _sourced_names(selection, entities, fields)
+    if fields is None:
+        names = [name for name in names if name not in CONFLICT_EXCLUDED]
+    rows = []
+    for entity in entities:
+        for name in names:
+            if name not in entity.sourced_fields():
+                continue
+            candidates = entity.candidates(name)
+            values = [c.value for c in candidates]
+            if len(candidates) < 2 or _agree(values, rtol):
+                continue
+            retained = entity.effective(name)
+            rows.append(
+                {
+                    "entity": entity.id,
+                    "attribute": name,
+                    "values": {c.source: _plain(c.value) for c in candidates},
+                    "retained": None if retained is None else retained.source,
+                }
+            )
+    return pd.DataFrame(rows, columns=["entity", "attribute", "values", "retained"])
+
+
+def _sourced_names(
+    selection: Selection, entities: list[Any], fields: Sequence[str] | None
+) -> list[str]:
+    """Return ``fields``, checked, or every sourced attribute of the selected entities."""
+    park = selection.park
+    base = park.building_cls if selection.kind == "building" else park.site_cls
+    available = list(base.sourced_fields())
+    for entity in entities:
+        available += [n for n in type(entity).sourced_fields() if n not in available]
+    if fields is None:
+        return available
+    unknown = ", ".join(repr(name) for name in fields if name not in available)
+    if unknown:
+        raise UnknownFieldError(f"unknown attribute(s) of the {selection.kind}s: {unknown}")
+    return list(fields)
+
+
+def _rate(count: int, total: int) -> float:
+    return count / total if total else math.nan
+
+
+def _agree(values: list[Any], rtol: float) -> bool:
+    """Whether the candidate values agree: equal, or floats within ``rtol`` of the largest."""
+    if all(isinstance(v, float) for v in values):
+        largest = max(abs(v) for v in values)
+        return max(values) - min(values) <= rtol * largest
+    first = values[0]
+    return all(v == first and type(v) is type(first) for v in values[1:])
+
+
+def _plain(value: Any) -> Any:
+    return value.value if isinstance(value, Enum) else value

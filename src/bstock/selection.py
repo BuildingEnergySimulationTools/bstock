@@ -204,6 +204,104 @@ class Selection:
 
         return aggregate(self, fields, by=by, prefer=prefer)
 
+    def completeness(
+        self,
+        by: Literal["attribute", "entity"] = "attribute",
+        *,
+        fields: Sequence[str] | None = None,
+    ) -> pd.DataFrame:
+        """Return how complete the sourced attributes of the selected entities are (SPEC §14.4).
+
+        An inherited value counts as filled.
+
+        Parameters
+        ----------
+        by
+            ``"attribute"``: one row per attribute, with ``filled`` (entities having an effective
+            value), ``inherited`` (of which inherited), ``total`` and ``rate`` (0 to 1).
+            ``"entity"``: one row per entity, with ``filled``, ``total``, ``rate`` and
+            ``missing`` (names of the attributes without value).
+        fields
+            Attributes to look at; by default every sourced attribute of the selected entities,
+            project ones and ``footprint`` included.
+
+        Returns
+        -------
+        pandas.DataFrame
+            Indexed by attribute name, or by entity id.
+
+        Raises
+        ------
+        UnknownFieldError
+            If an attribute is unknown.
+        InvalidArgumentError
+            If ``by`` is neither ``"attribute"`` nor ``"entity"``.
+        """
+        from bstock.analysis import completeness  # circular import
+
+        return completeness(self, by=by, fields=fields)
+
+    def provenance(
+        self, fields: Sequence[str] | None = None, *, normalize: bool = False
+    ) -> pd.DataFrame:
+        """Return the sources of the effective values of the selected entities (SPEC §14.4).
+
+        Parameters
+        ----------
+        fields
+            Attributes to look at; by default every sourced attribute of the selected entities.
+        normalize
+            Return shares of the entities (0 to 1) rather than counts.
+
+        Returns
+        -------
+        pandas.DataFrame
+            One row per attribute (index ``attribute``) and one column per source of the
+            effective values, the most frequent first, giving the number of entities whose value
+            comes from it; then ``inherited`` (values inherited from a site, whatever their
+            source) and ``missing``.
+
+        Raises
+        ------
+        UnknownFieldError
+            If an attribute is unknown.
+        """
+        from bstock.analysis import provenance  # circular import
+
+        return provenance(self, fields=fields, normalize=normalize)
+
+    def conflicts(self, fields: Sequence[str] | None = None, *, rtol: float = 0.05) -> pd.DataFrame:
+        """Return the attributes whose own candidates disagree (SPEC §14.4).
+
+        Inherited candidates are not compared: another level is not a conflict. Strings, enums,
+        lists and integers are compared strictly; floats agree when they are within ``rtol`` of
+        the largest absolute value.
+
+        Parameters
+        ----------
+        fields
+            Attributes to compare; by default every sourced attribute of the selected entities
+            except ``footprint`` (two geometries from different sources never match exactly).
+        rtol
+            Relative tolerance for floats.
+
+        Returns
+        -------
+        pandas.DataFrame
+            One row per entity and attribute in conflict, with ``entity``, ``attribute``,
+            ``values`` (dict source to value) and ``retained`` (source of the effective value).
+
+        Raises
+        ------
+        UnknownFieldError
+            If an attribute is unknown.
+        InvalidArgumentError
+            If ``rtol`` is negative.
+        """
+        from bstock.analysis import conflicts  # circular import
+
+        return conflicts(self, fields=fields, rtol=rtol)
+
     # --- exports and display ------------------------------------------------------------------
 
     def to_dataframe(self, *, provenance: bool = False) -> pd.DataFrame:

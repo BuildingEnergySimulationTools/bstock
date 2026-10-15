@@ -358,8 +358,8 @@ Reportées dans `SPEC.md` (§3.3, §3.6, §3.7, §6.1, §6.5, §11 à §14) à l
       imbriqués, couverture partielle, champ projet extensif, sélection de sites, `by`
 
 ### Étape 27 — Complétude et provenance
-- [ ] `completeness(by="attribute" | "entity")`, `provenance(normalize=)`, `conflicts(rtol=)`
-- [ ] Tests : valeur héritée comptée, part héritée, conflits (entier strict, flottant dans et hors
+- [x] `completeness(by="attribute" | "entity")`, `provenance(normalize=)`, `conflicts(rtol=)`
+- [x] Tests : valeur héritée comptée, part héritée, conflits (entier strict, flottant dans et hors
       tolérance, enum), candidats hérités non comparés
 - [ ] Finalisation 0.6.0
 
