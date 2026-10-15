@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterator
-from typing import Annotated, Any, Literal
+from typing import Annotated, Any, ClassVar, Literal
 
 from pydantic import Discriminator, Field, Tag, field_validator
 
@@ -55,6 +55,12 @@ class EnvelopeComponent(SourcedModel):
         if kind is ComponentKind.WINDOW and cls is EnvelopeComponent:
             raise ValueError("use the Window class for windows")
         return kind
+
+    _repr_fields: ClassVar[tuple[str, ...]] = ("area", "u_value", "orientation")
+
+    def _repr_items(self) -> list[tuple[str, str]]:
+        items = super()._repr_items()
+        return [items[0], ("kind", repr(str(self.kind))), *items[1:]]
 
     def resolved_heat_loss_coefficient(self) -> float | None:
         """Return the heat loss coefficient in W/K: the given one, else U·A, else ``None``."""
@@ -108,6 +114,14 @@ class Envelope(SourcedModel):
     )
 
     components: list[AnyComponent] = Field(default_factory=list)
+
+    _repr_fields: ClassVar[tuple[str, ...]] = ("loss_area", "heat_loss_coefficient", "u_bat")
+
+    def _repr_items(self) -> list[tuple[str, str]]:
+        owner_id = getattr(self._container, "id", None)
+        items = [] if owner_id is None else [("owner", repr(owner_id))]
+        items += super()._repr_items()
+        return [*items, ("components", str(len(self.components)))]
 
     def model_post_init(self, context: Any) -> None:
         """Attach the components to this envelope and check their ids are unique."""

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterator
+from collections.abc import Iterator, Sequence
 from typing import Any
 
 from pydantic import Field, ValidationInfo, field_validator, model_validator
@@ -10,6 +10,7 @@ from pydantic import Field, ValidationInfo, field_validator, model_validator
 from bstock._ids import check_external_id
 from bstock.building import Building
 from bstock.description import DescribedEntity
+from bstock.display import REPR_MAX_LINES, TreeView, build_tree
 from bstock.exceptions import DuplicateIdError, HierarchyError, UnknownIdError
 
 __all__ = ["Site"]
@@ -72,6 +73,48 @@ class Site(DescribedEntity):
         if recursive:
             for site in self.sites:
                 yield from site.iter_buildings(recursive=True)
+
+    # --- display ------------------------------------------------------------------------------
+
+    def tree(
+        self,
+        *,
+        systems: bool = False,
+        meters: bool = False,
+        max_depth: int | None = None,
+        fields: Sequence[str] | None = None,
+    ) -> TreeView:
+        """Return the tree of the sub-sites and buildings of the site.
+
+        Parameters
+        ----------
+        systems
+            Also show the systems owned by each entity.
+        meters
+            Also show, under each entity, the meters whose scope contains it or one of its systems
+            (empty outside a park).
+        max_depth
+            Number of levels shown below the site (``None``: all); deeper content is counted on
+            one line.
+        fields
+            Sourced attributes whose effective value is shown on each line, with its unit.
+
+        Returns
+        -------
+        TreeView
+            The tree; ``str()`` gives the text and Jupyter shows it as HTML.
+
+        Raises
+        ------
+        UnknownFieldError
+            If a name of ``fields`` is not a sourced attribute of the sites or buildings.
+        InvalidArgumentError
+            If ``max_depth`` is negative.
+        """
+        return build_tree(self, systems=systems, meters=meters, max_depth=max_depth, fields=fields)
+
+    def __repr__(self) -> str:
+        return self.tree().truncated(REPR_MAX_LINES)
 
     # --- children -----------------------------------------------------------------------------
 

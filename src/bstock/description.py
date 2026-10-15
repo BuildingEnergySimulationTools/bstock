@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import warnings
 from collections.abc import Iterator
 from typing import TYPE_CHECKING, Any
 
@@ -215,15 +214,6 @@ class DescribedEntity(SourcedModel):
         """
         park = self.park
         return [] if park is None else park.meters_for(self)
-
-    def meters(self) -> list[Any]:
-        """Return the same as :meth:`find_meters` (deprecated alias)."""
-        warnings.warn(
-            "meters() is deprecated; use find_meters()",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        return self.find_meters()
 
     def _notify_park(self, method: str, entity: SourcedModel) -> None:
         """Let the park check references and maintain its index (no-op outside a park)."""

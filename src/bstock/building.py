@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
-import warnings
 from typing import Any
 
 from pydantic import field_validator, model_validator
 
 from bstock._ids import check_external_id, new_id, normalize_rnb_id
 from bstock.description import DescribedEntity
+from bstock.display import sourced_items
 from bstock.enums import SystemKind
 from bstock.systems import System
 
@@ -95,13 +95,11 @@ class Building(DescribedEntity):
                 )
         return found
 
-    def systems(
-        self, kind: SystemKind | str | None = None, *, include_shared: bool = True
-    ) -> list[System]:
-        """Return the same as :meth:`serving_systems` (deprecated alias)."""
-        warnings.warn(
-            "systems() is deprecated; use serving_systems()",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        return self.serving_systems(kind, include_shared=include_shared)
+    def _repr_items(self) -> list[tuple[str, str]]:
+        items = [("id", repr(self.id))]
+        if self.rnb_id is not None and self.rnb_id != self.id:
+            items.append(("rnb_id", repr(self.rnb_id)))
+        items += sourced_items(self, ["name"])
+        if self.parent is not None:
+            items.append(("parent", repr(self.parent.id)))
+        return items

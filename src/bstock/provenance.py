@@ -18,7 +18,7 @@ from __future__ import annotations
 import datetime
 import warnings
 from collections.abc import Iterable, Mapping
-from typing import Annotated, Any, ClassVar, Generic, Literal, Self, TypeVar, overload
+from typing import TYPE_CHECKING, Annotated, Any, ClassVar, Generic, Self, TypeVar, overload
 
 from pydantic import (
     BaseModel,
@@ -30,7 +30,11 @@ from pydantic import (
     model_validator,
 )
 
+from bstock import display
 from bstock.exceptions import HierarchyError, UnknownAttributeWarning, UnknownFieldError
+
+if TYPE_CHECKING:
+    import pandas as pd
 
 __all__ = [
     "COMPUTED_SOURCE",
@@ -368,6 +372,37 @@ class SourcedModel(BaseModel):
 
     __hash__ = None  # type: ignore[assignment]
 
+    # --- display (bstock.display) ----------------------------------------------------------------
+
+    _repr_fields: ClassVar[tuple[str, ...]] = ()
+    """Sourced attributes shown by the one-line repr when they have a value."""
+
+    def __repr__(self) -> str:
+        return display.one_line_repr(self)
+
+    def __str__(self) -> str:
+        return repr(self)
+
+    def _repr_items(self) -> list[tuple[str, str]]:
+        """Return the ``(key, text)`` pairs of the one-line repr."""
+        own_id = getattr(self, "id", None)
+        items = [("id", repr(own_id))] if isinstance(own_id, str) else []
+        return items + display.sourced_items(self, self._repr_fields)
+
+    def describe(self) -> pd.DataFrame:
+        """Return the effective value and provenance of every sourced attribute.
+
+        Returns
+        -------
+        pandas.DataFrame
+            One row per sourced attribute, in declaration order (project attributes and empty
+            attributes included), indexed by name. Columns: ``value`` (effective value, enums
+            as their value), ``unit``, ``source`` (source of the effective value), ``provider``
+            (id of the entity giving it), ``inherited`` (bool) and ``candidates`` (number of own
+            candidates).
+        """
+        return display.describe(self)
+
     def _field(self, name: str) -> SourcedField[Any]:
         try:
             return self.__sourced_fields__[name]
@@ -458,39 +493,21 @@ class SourcedModel(BaseModel):
     def _on_change(self, name: str) -> None:
         """React to a change of the candidates of ``name``; called by ``set`` and ``unset``."""
 
-    @overload
-    def candidates(self, name: str, *, inherited: Literal[False] = False) -> list[SourcedValue]: ...
-
-    @overload
-    def candidates(
-        self, name: str, *, inherited: Literal[True]
-    ) -> list[tuple[str | None, SourcedValue]]: ...
-
-    def candidates(
-        self, name: str, *, inherited: bool = False
-    ) -> list[SourcedValue] | list[tuple[str | None, SourcedValue]]:
+    def candidates(self, name: str) -> list[SourcedValue]:
         """Return the own candidates of ``name``, in insertion order.
+
+        Candidates inherited from the ancestor sites are returned by :meth:`inherited_candidates`.
 
         Parameters
         ----------
         name
             Attribute name. Names unknown to the class but present in loaded data are accepted.
-        inherited
-            Deprecated: use :meth:`inherited_candidates`, which returns what ``inherited=True``
-            returned.
 
         Raises
         ------
         UnknownFieldError
             If ``name`` is neither a sourced attribute nor present in ``values``.
         """
-        if inherited:
-            warnings.warn(
-                "candidates(name, inherited=True) is deprecated; use inherited_candidates(name)",
-                DeprecationWarning,
-                stacklevel=2,
-            )
-            return self.inherited_candidates(name)
         if name not in self.values:
             self._field(name)
         return list(self.values.get(name, []))

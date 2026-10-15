@@ -87,6 +87,13 @@ class System(SourcedModel):
 
     name = sourced(str)
 
+    _repr_fields: ClassVar[tuple[str, ...]] = ("name",)
+
+    def _repr_items(self) -> list[tuple[str, str]]:
+        items = super()._repr_items()
+        owner_id = getattr(self._container, "id", None)
+        return items if owner_id is None else [*items, ("owner", repr(owner_id))]
+
     @model_validator(mode="before")
     @classmethod
     def _generate_id(cls, data: Any) -> Any:
@@ -127,6 +134,8 @@ class Generator(System):
     seasonal_performance_ratio = sourced(
         float, gt=0, description="SCOP, SEER or seasonal efficiency (as given by the DPE)"
     )
+
+    _repr_fields: ClassVar[tuple[str, ...]] = ("name", "technology", "energy_type", "nominal_power")
 
     def model_post_init(self, context: Any) -> None:
         """Check the performance ratios given at construction."""
@@ -195,6 +204,8 @@ class Ventilation(System):
         float, ge=0, le=1, description="Heat exchanger efficiency; None means no heat recovery"
     )
 
+    _repr_fields: ClassVar[tuple[str, ...]] = ("name", "air_change_rate")
+
 
 class SolarPV(System):
     """Photovoltaic installation."""
@@ -205,6 +216,8 @@ class SolarPV(System):
     area = sourced(float, unit="m²", ge=0)
     azimuth = sourced(float, unit="°", ge=0, le=360, description="0 = north, 180 = south")
     tilt = sourced(float, unit="°", ge=0, le=90, description="0 = horizontal")
+
+    _repr_fields: ClassVar[tuple[str, ...]] = ("name", "peak_power")
 
 
 #: Concrete system classes by kind.

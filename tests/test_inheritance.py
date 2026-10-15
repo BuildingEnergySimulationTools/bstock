@@ -130,12 +130,10 @@ def test_inherited_sources_of_extensive_field_are_own_only(tree):
     assert building.inherited_candidates("dwellings") == []
 
 
-def test_candidates_inherited_flag_is_deprecated(tree):
-    _, group, building = tree
-    group.set("year", 1972, source="bdnb")
-    with pytest.warns(DeprecationWarning, match="inherited_candidates"):
-        pairs = building.candidates("year", inherited=True)
-    assert pairs == building.inherited_candidates("year")
+def test_candidates_no_longer_accepts_inherited_flag(tree):
+    _, _, building = tree
+    with pytest.raises(TypeError):
+        building.candidates("year", inherited=True)
 
 
 def test_field_missing_on_parent_stops_inheritance(tree):

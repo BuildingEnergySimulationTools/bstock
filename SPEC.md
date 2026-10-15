@@ -1217,7 +1217,7 @@ scripts/               # outils de maintenance (régénération de dpe_generator
 | v3.d (0.7.0) | Consommations mesurées et kWh/m², `Meter.parent_meter` (§6.5) |
 | v3.e (0.8.0) | Graphiques plotly : `sel.plot.*` (§14.5) |
 
-Noms dépréciés (ils émettent un `DeprecationWarning` et seront retirés en v3.a) :
+Noms dépréciés en 0.2.0, **retirés en 0.4.0** (v3.a) :
 
 | Ancien nom | Remplacé par |
 |---|---|
@@ -1260,19 +1260,20 @@ mesurées sont au §6.5.
   Exemple : `BayonneBuilding(id='A1B2C3D4E5F6', name='École Jean Jaurès', parent='gs-a')`.
 
 ```
-BuildingPark 'Ville de Bayonne' : 3 sites, 12 buildings, 4 meters
+BuildingPark 'Ville de Bayonne': 3 sites, 12 buildings, 4 meters
 ├── [site] gs-a  Groupe scolaire A  (3 buildings)
 │   ├── [site] bdnb-bg-1111-1HRT-8SVH  (2 buildings)
 │   │   ├── [building] A1B2C3D4E5F6  École Jean Jaurès
 │   │   └── [building] B2C3D4E5F6G7
 │   └── [building] C3D4E5F6G7H8  Gymnase
 └── [building] bldg-1f3a  Mairie annexe
-… 18 more lines: park.tree() shows the full tree
+… 18 more lines: call .tree() for the full tree
 ```
 
 **`tree(*, systems=False, meters=False, max_depth=None, fields=None)`** est défini sur `BuildingPark`,
 `Site` et `Selection` (§14.2). Il renvoie un objet `TreeView`. Son `str()` et son repr donnent le texte
-complet, sans troncature. Son `_repr_html_` donne la version HTML.
+complet, sans troncature. Son `_repr_html_` donne la version HTML. `lines()` renvoie les
+lignes du texte et `truncated(max_lines)` le texte coupé, comme dans le repr.
 - Par défaut, l'arbre montre les sites et les bâtiments, dans l'ordre de `iter_sites` / `iter_buildings`.
 - Chaque nœud affiche son type, son `id` et son `name`. Un site affiche aussi le nombre de bâtiments de
   son sous-arbre.
@@ -1298,10 +1299,10 @@ n'ont pas de HTML propre : Jupyter affiche leur repr texte.
 ### 14.2 Sélection (v3.b)
 
 ```python
-sel = park.select(usage="education", construction_year__lt=1975, within="gs-a")
+sel = park.select(usage="tertiary", construction_year__lt=1975, within="gs-a")
 sel = sel.filter(heated_area__isnull=False)
 sel = park.select(lambda b: b.height is not None and b.height > 2 * b.level_count, kind="building")
-écoles_sans_rnb = park.select(usage="education") - park.select(has_rnb_id=True)
+tertiaire_sans_rnb = park.select(usage="tertiary") - park.select(has_rnb_id=True)
 len(sel); list(sel); "A1B2C3D4E5F6" in sel; sel.ids; sel.kind
 sel.to_dataframe(provenance=True); sel.tree(fields=["usage"])
 ```
@@ -1328,7 +1329,7 @@ existent déjà (`iter_systems(kind)`, `timeseries(...)`).
 - Repr sur une ligne : `Selection(kind='building', 42 entities)`. En HTML, c'est l'arbre de la sélection.
 
 **Critères.** Tous les critères se combinent par ET, et le prédicat aussi. Ils portent sur la **valeur
-effective**, héritage compris : un bâtiment qui hérite `usage="education"` de son site est retenu.
+effective**, héritage compris : un bâtiment qui hérite `usage="tertiary"` de son site est retenu.
 
 | Forme | Sens |
 |---|---|

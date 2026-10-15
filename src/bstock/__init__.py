@@ -7,6 +7,7 @@ from importlib.metadata import PackageNotFoundError, version
 
 from bstock.building import Building
 from bstock.description import DescribedEntity
+from bstock.display import TreeView
 from bstock.enums import (
     Adjacency,
     BuildingUsage,
@@ -134,6 +135,7 @@ __all__ = [
     "System",
     "SystemKind",
     "TimeSeriesError",
+    "TreeView",
     "UnknownAttributeWarning",
     "UnknownFieldError",
     "UnknownIdError",

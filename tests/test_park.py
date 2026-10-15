@@ -121,19 +121,11 @@ def test_new_entity_takes_parent_and_id_by_keyword_only(park, method, args):
 
 
 @pytest.mark.parametrize(
-    ("old", "new", "target"),
-    [
-        ("meters", "find_meters", lambda park: park[RNB_A]),
-        ("systems", "serving_systems", lambda park: park[RNB_A]),
-        ("column_names", "tide_columns", lambda park: park["m"]),
-    ],
+    ("cls", "name"),
+    [(Building, "meters"), (Site, "meters"), (Building, "systems"), (Meter, "column_names")],
 )
-def test_deprecated_aliases_warn_and_delegate(park, old, new, target):
-    park.add_meter(Meter(id="m", scope=[RNB_A], channels=[Channel(name="e", unit="kWh")]))
-    entity = target(park)
-    with pytest.warns(DeprecationWarning, match=new):
-        result = getattr(entity, old)()
-    assert result == getattr(entity, new)()
+def test_deprecated_aliases_are_removed(cls, name):
+    assert not hasattr(cls, name)
 
 
 def test_duplicate_rnb_id_is_rejected(park):

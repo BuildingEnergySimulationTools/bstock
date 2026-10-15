@@ -2,8 +2,7 @@
 
 from __future__ import annotations
 
-import warnings
-from typing import Annotated, Any
+from typing import Annotated, Any, ClassVar
 
 import pandas as pd
 from pydantic import (
@@ -129,6 +128,12 @@ class Meter(SourcedModel):
 
     _data: pd.DataFrame | None = PrivateAttr(default=None)
 
+    _repr_fields: ClassVar[tuple[str, ...]] = ("name", "energy_type", "end_use")
+
+    def _repr_items(self) -> list[tuple[str, str]]:
+        items = [*super()._repr_items(), ("scope", repr(self.scope))]
+        return items if self._data is None else [*items, ("data", "loaded")]
+
     @field_validator("id")
     @classmethod
     def _check_id(cls, value: str) -> str:
@@ -181,15 +186,6 @@ class Meter(SourcedModel):
             c.name: tide_column(f"{self.id}_{c.name}", c.unit, bloc, sub_bloc)
             for c in self.channels
         }
-
-    def column_names(self) -> dict[str, str]:
-        """Return the same as :meth:`tide_columns` (deprecated alias)."""
-        warnings.warn(
-            "column_names() is deprecated; use tide_columns()",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        return self.tide_columns()
 
     # --- data ---------------------------------------------------------------------------------
 

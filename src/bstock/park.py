@@ -5,7 +5,7 @@ from __future__ import annotations
 import functools
 import types
 import warnings
-from collections.abc import Callable, Iterable, Iterator
+from collections.abc import Callable, Iterable, Iterator, Sequence
 from pathlib import Path
 from typing import Any, Literal, TypeVar, overload
 
@@ -16,6 +16,7 @@ from pydantic.json_schema import SkipJsonSchema
 from bstock._ids import normalize_rnb_id
 from bstock.building import Building
 from bstock.description import DescribedEntity
+from bstock.display import REPR_MAX_LINES, TreeView, build_tree
 from bstock.enums import EndUse, EnergyType, SystemKind
 from bstock.exceptions import (
     DuplicateIdError,
@@ -322,6 +323,55 @@ class BuildingPark(BaseModel):
         target = self._resolve(entity, (Site, Building))
         ids = {target.id, *(s.id for s in target.iter_systems())}
         return [m for m in self.meters if ids & set(m.scope)]
+
+    # --- display ------------------------------------------------------------------------------
+
+    def tree(
+        self,
+        *,
+        systems: bool = False,
+        meters: bool = False,
+        max_depth: int | None = None,
+        fields: Sequence[str] | None = None,
+    ) -> TreeView:
+        """Return the tree of the sites and buildings of the park (SPEC §14.1).
+
+        The first line counts the sites, buildings and meters. Each entity shows its kind, id
+        and name, and a site the number of buildings below it.
+
+        Parameters
+        ----------
+        systems
+            Also show the systems owned by each entity.
+        meters
+            Also show, under each entity, the meters whose scope contains it or one of its
+            systems; meters without scope are listed at the end.
+        max_depth
+            Number of levels shown (``None``: all; 1: top level only); deeper content is counted
+            on one line.
+        fields
+            Sourced attributes whose effective value (inheritance included) is shown on each
+            line, with its unit, e.g. ``["usage", "heated_area"]``.
+
+        Returns
+        -------
+        TreeView
+            The tree; ``str()`` gives the text and Jupyter shows it as HTML.
+
+        Raises
+        ------
+        UnknownFieldError
+            If a name of ``fields`` is not a sourced attribute of the sites or buildings.
+        InvalidArgumentError
+            If ``max_depth`` is negative.
+        """
+        return build_tree(self, systems=systems, meters=meters, max_depth=max_depth, fields=fields)
+
+    def __repr__(self) -> str:
+        return self.tree().truncated(REPR_MAX_LINES)
+
+    def __str__(self) -> str:
+        return repr(self)
 
     # --- creation -----------------------------------------------------------------------------
 

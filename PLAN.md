@@ -313,13 +313,13 @@ Reportées dans `SPEC.md` (§3.3, §3.6, §3.7, §6.1, §6.5, §11 à §14) à l
 ## v3.a — Lisibilité (0.4.0)
 
 ### Étape 22 — Repr texte, arbre et `describe()`
-- [ ] Retrait des noms dépréciés (SPEC §12) et de leurs tests
-- [ ] Module `display.py` : `TreeView`, rendu texte de l'arbre (`systems`, `meters`, `max_depth`,
+- [x] Retrait des noms dépréciés (SPEC §12) et de leurs tests
+- [x] Module `display.py` : `TreeView`, rendu texte de l'arbre (`systems`, `meters`, `max_depth`,
       `fields`), en-tête de comptage, troncature du repr
-- [ ] `park.tree()`, `site.tree()` ; `__repr__` de `BuildingPark` et `Site` (arbre tronqué)
-- [ ] `__repr__` sur une ligne : `Building`, systèmes, `Meter`, `Envelope`, parois (classe projet affichée)
-- [ ] `describe()` sur les entités sourcées (héritage, unité, attributs vides, champs projet)
-- [ ] Tests : arbre (sites imbriqués, options, troncature, champ inconnu), repr d'une sous-classe projet,
+- [x] `park.tree()`, `site.tree()` ; `__repr__` de `BuildingPark` et `Site` (arbre tronqué)
+- [x] `__repr__` sur une ligne : `Building`, systèmes, `Meter`, `Envelope`, parois (classe projet affichée)
+- [x] `describe()` sur les entités sourcées (héritage, unité, attributs vides, champs projet)
+- [x] Tests : arbre (sites imbriqués, options, troncature, champ inconnu), repr d'une sous-classe projet,
       `describe` (valeur héritée, attribut vide)
 
 ### Étape 23 — HTML Jupyter
