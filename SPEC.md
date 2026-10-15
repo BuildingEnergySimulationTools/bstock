@@ -10,6 +10,10 @@
 > **0.9.0** : relecture de l'API publique (règles de nommage du §3.3, renommages listés au §12), format
 > de fichier v2 (§7). Version incompatible : pas d'alias pour les anciens noms, pas de migration des
 > fichiers v1.
+>
+> **0.10.0** : fin de la relecture de l'API : connecteurs (§8), familles d'enums et secteurs renommés
+> (§3.9), production PV négative dans les bilans (§6.5), format de fichier v3 (§7). Version
+> incompatible, sans alias ni migration ; changements listés au §12.
 
 ---
 
@@ -1328,6 +1332,7 @@ scripts/               # outils de maintenance (régénération de dpe_generator
 | v3.d (0.7.0) | Consommations mesurées et kWh/m², `Meter.parent_meter` (§6.5) |
 | v3.e (0.8.0) | Graphiques plotly : `sel.plot.*` (§14.5) |
 | API (0.9.0) | Relecture de l'API publique : hiérarchie protégée, readers, verbes, vocabulaire, signatures des rapports, `None` refusé (renommages ci-dessous) ; format de fichier v2 |
+| API (0.10.0) | Fin de la relecture : connecteurs, familles d'enums, secteurs renommés, production PV négative, noms internes et typage (changements ci-dessous) ; format de fichier v3 |
 
 Noms dépréciés en 0.2.0, **retirés en 0.4.0** (v3.a) :
 
@@ -1369,8 +1374,8 @@ Changements **incompatibles de 0.9.0**, sans alias ni migration :
 Ajouts compatibles : `fields` accepte un nom seul ; `site.remove_site` / `remove_building` ; la copie
 profonde d'une entité seule est détachée de son propriétaire.
 
-Changements **incompatibles de 0.10.0** (en préparation : connecteurs §8, énumérations §3.9, petits
-points) :
+Changements **incompatibles de 0.10.0** (connecteurs §8, énumérations §3.9, consommations §6.5, noms
+internes), sans alias ni migration :
 
 | Avant 0.10.0 | Depuis 0.10.0 |
 |---|---|

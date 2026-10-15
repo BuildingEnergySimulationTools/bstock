@@ -8,7 +8,7 @@ Règles (voir `CLAUDE.md`) :
 Sommaire : [v1](#v1--terminée) (terminée, 0.1.0 puis ajustements d'API en 0.2.0) ·
 [v2](#v2--connecteurs-emprise-et-exports) (terminée, 0.3.0) ·
 [v3](#v3--lisibilité-sélection-analyse-consommations-graphiques) (terminée, 0.8.0) ·
-[relecture de l'API](#relecture-de-lapi-090) (0.9.0)
+[relecture de l'API](#relecture-de-lapi-090) (0.9.0 et 0.10.0)
 
 ---
 
@@ -414,4 +414,11 @@ avec sa mise à jour de la SPEC (§12 : liste des renommages). Rupture nette : n
       rôles de `tz` (§3.3)
 - [x] `None` refusé comme valeur sourcée, règle des `compute_*`, `heat_loss_coefficient_or_ua` (§3.3, §4.2)
 - [x] Finalisation 0.9.0 : statut et note de version dans la SPEC, version et tag
-- [ ] Suite de la relecture : connecteurs, énumérations, typage et noms internes
+- [x] Connecteurs : clients en arguments nommés, `query()`, `dpe_by_*` ; `suggest_matches` sans
+      effet de bord et `assign_matches` ; `add_buildings_at_address` ; déplacements signalés par
+      `bdnb.enrich` ; correspondances internes (§8)
+- [x] Énumérations : familles (`.family`, `.variants()`, critère `attr__family`), `INDUSTRY` /
+      `AGRICULTURE`, format v3 ; production PV négative dans les bilans (§3.9, §6.5, §7)
+- [x] Petits points : `dpe.enrich` exporté (test de complétude des `__all__`), noms internes préfixés,
+      `ClassMismatchError`, typage de `park`, `find_meters`, `to_geodataframe`
+- [x] Finalisation 0.10.0 : statut et note de version dans la SPEC, version et tag
