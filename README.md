@@ -16,6 +16,9 @@ Common data structure for building stocks: sites, buildings, envelopes, systems 
   (energy performance certificates, ADEME), with RNB match suggestions for buildings without RNB id.
 - **Exports**: DataFrame with provenance, GeoDataFrame, GeoPackage and GeoParquet; footprints as
   GeoJSON with a dependency-free area computation.
+- **Readable in a console or a notebook**: a park or a site displays as a tree (foldable HTML in
+  Jupyter), other entities on one line, and `describe()` lists the effective values with their
+  source.
 
 The design reference is [`SPEC.md`](SPEC.md) (in French).
 
@@ -65,7 +68,33 @@ park.save("out/my_park", include_data=True)
 park = BuildingPark.load("out/my_park", building_cls=MyBuilding)
 ```
 
-A complete, runnable walk-through is in [`examples/bayonne.py`](examples/bayonne.py):
+## Looking at a park
+
+```python
+park                                   # tree of the sites and buildings, cut to 30 lines
+# BuildingPark 'My park': 2 sites, 1 building, 1 meter
+# └── [site] school-A  School A  (1 building)
+#     └── [site] bdnb-bg-1111-1HRT-8SVH  (1 building)
+#         └── [building] A1B2C3D4E5F6
+
+park.tree(systems=True, meters=True, fields=["construction_year"])   # full tree, with options
+park["A1B2C3D4E5F6"]                   # MyBuilding(id='A1B2C3D4E5F6', parent='bdnb-bg-1111-1HRT-8SVH')
+park["A1B2C3D4E5F6"].describe()        # value, unit, source, provider, inherited? per attribute
+```
+
+In Jupyter, the park, its sites and `tree()` display as a foldable HTML tree.
+
+## Examples
+
+Each example comes as a script and as an interactive version, to run cell by cell (`# %%`) in
+PyCharm or VS Code, or with `python -i`; both are kept in step and tested.
+
+- [`examples/bayonne.py`](examples/bayonne.py) /
+  [`bayonne_interactive.py`](examples/bayonne_interactive.py): project classes, provenance,
+  inheritance, envelope, shared systems, a meter, save and reload.
+- [`examples/connectors.py`](examples/connectors.py) /
+  [`connectors_interactive.py`](examples/connectors_interactive.py): RNB, BDNB and DPE on two real
+  sites, then exports (they call the real APIs).
 
 ```bash
 python examples/bayonne.py
@@ -92,8 +121,7 @@ park.to_geopackage("bayonne.gpkg")        # "sites" and "buildings" layers
 
 Each value keeps its source (`"rnb"`, `"bdnb"`, `"dpe"`), date and reference; running a connector
 again updates its values without duplicating anything. The BDNB open offer serves 10 rows per call:
-pass `bdnb.BdnbClient(api_key=...)` as `client=` for larger parks. The full workflow is in
-[`examples/connectors.py`](examples/connectors.py) (it calls the real APIs).
+pass `bdnb.BdnbClient(api_key=...)` as `client=` for larger parks.
 
 ## Development
 

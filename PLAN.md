@@ -7,7 +7,7 @@ Règles (voir `CLAUDE.md`) :
 
 Sommaire : [v1](#v1--terminée) (terminée, 0.1.0 puis ajustements d'API en 0.2.0) ·
 [v2](#v2--connecteurs-emprise-et-exports) (terminée, 0.3.0) ·
-[v3](#v3--lisibilité-sélection-analyse-consommations-graphiques) (en cours)
+[v3](#v3--lisibilité-sélection-analyse-consommations-graphiques) (en cours ; v3.a terminée, 0.4.0)
 
 ---
 
@@ -330,7 +330,7 @@ Reportées dans `SPEC.md` (§3.3, §3.6, §3.7, §6.1, §6.5, §11 à §14) à l
 ### Étape 24 — Finalisation 0.4.0
 - [x] Exemples interactifs versionnés et tenus en parallèle des scripts (testés) ; helper `tree()`
       remplacé par `park.tree()` et `describe()` montré dans les deux versions
-- [ ] Revue de l'API publique (`TreeView` exporté) et des docstrings ; README ; version `0.4.0` et tag
+- [x] Revue de l'API publique (`TreeView` exporté) et des docstrings ; README ; version `0.4.0` et tag
 
 ## v3.b — Sélection (0.5.0)
 

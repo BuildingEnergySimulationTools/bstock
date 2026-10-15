@@ -4,8 +4,9 @@
 > compteurs, persistance ; emprise §3.6, connecteurs §8, exports §9, annexe A). Issue des interviews de
 > conception du 2026-10-13 et ajustée pendant l'implémentation. Points ouverts : §13.
 >
-> **v3 en conception** (interview du 2026-10-15) : lisibilité, sélection, analyse et graphiques (§14),
-> consommations mesurées (§6.5), métadonnée `extensive` (§3.3). Découpage et versions : §12.
+> **v3 en cours** (interview du 2026-10-15) : lisibilité, sélection, analyse et graphiques (§14),
+> consommations mesurées (§6.5), métadonnée `extensive` (§3.3). Découpage et versions : §12. La
+> lisibilité (v3.a, §14.1) est implémentée par bstock 0.4.0 ; le reste est spécifié, pas encore implémenté.
 
 ---
 

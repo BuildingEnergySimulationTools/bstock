@@ -44,6 +44,9 @@ class TreeView:
 
     ``str()`` and the repr give the full text tree, without truncation. In Jupyter, the tree is
     shown as HTML: the first level is listed and every node with content can be unfolded.
+
+    It is built by :meth:`bstock.BuildingPark.tree` and :meth:`bstock.Site.tree`, not directly.
+    It is a snapshot: it does not follow later changes of the park.
     """
 
     def __init__(self, header: str, nodes: list[_Node]) -> None:
