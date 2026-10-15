@@ -1,14 +1,11 @@
 # bstock — Spécification
 
-> Statut : **v2.0**, implémentée par bstock 0.3.0 (périmètres v1 et v2 du §12 : modèle, provenance,
+> Statut : **v3.0**. v2 implémentée par bstock 0.3.0 (périmètres v1 et v2 du §12 : modèle, provenance,
 > compteurs, persistance ; emprise §3.6, connecteurs §8, exports §9, annexe A). Issue des interviews de
 > conception du 2026-10-13 et ajustée pendant l'implémentation. Points ouverts : §13.
 >
-> **v3 en cours** (interview du 2026-10-15) : lisibilité, sélection, analyse et graphiques (§14),
-> consommations mesurées (§6.5), métadonnée `extensive` (§3.3). Découpage et versions : §12. La
-> lisibilité (v3.a, §14.1) est implémentée par bstock 0.4.0, la sélection (v3.b, §14.2) par 0.5.0,
-> l'analyse (v3.c, §3.3, §14.3, §14.4) par 0.6.0, les consommations (v3.d, §6.5) par 0.7.0 ; les
-> graphiques (v3.e, §14.5) sont spécifiés, pas encore implémentés.
+> **v3** (interview du 2026-10-15), implémentée par bstock 0.4.0 à 0.8.0 (§12) : lisibilité, sélection,
+> analyse et graphiques (§14), consommations mesurées (§6.5), métadonnée `extensive` (§3.3).
 
 ---
 
@@ -1214,7 +1211,7 @@ src/bstock/
   _ids.py              # génération et contrôle des identifiants
 tests/                 # un fichier par module, plus test_examples.py
 tests/data/            # réponses d'API enregistrées (rnb/, bdnb/, dpe/) pour les tests hors réseau
-examples/              # exemples de bout en bout (bayonne, connectors), chacun en version script
+examples/              # exemples de bout en bout (bayonne, connectors, plots), chacun en version script
                        # (<nom>.py) et en version interactive par cellules (<nom>_interactive.py)
 scripts/               # outils de maintenance (régénération de dpe_generators.csv)
 ```

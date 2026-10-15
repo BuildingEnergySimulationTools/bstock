@@ -7,7 +7,7 @@ Règles (voir `CLAUDE.md`) :
 
 Sommaire : [v1](#v1--terminée) (terminée, 0.1.0 puis ajustements d'API en 0.2.0) ·
 [v2](#v2--connecteurs-emprise-et-exports) (terminée, 0.3.0) ·
-[v3](#v3--lisibilité-sélection-analyse-consommations-graphiques) (en cours ; v3.a à v3.d terminées, 0.7.0)
+[v3](#v3--lisibilité-sélection-analyse-consommations-graphiques) (terminée, 0.8.0)
 
 ---
 
@@ -391,5 +391,5 @@ Reportées dans `SPEC.md` (§3.3, §3.6, §3.7, §6.1, §6.5, §11 à §14) à l
       `consumption`, `intensity`
 - [x] Tests (sautés sans l'extra `[plot]`) : type `Figure`, traces et axes attendus, couverture dans le
       titre, erreur claire sans plotly
-- [ ] Finalisation 0.8.0 : exemple de graphiques dans `examples/`, README, statut de la SPEC passé en
-      v3, version et tag
+- [x] Finalisation 0.8.0 : exemple de graphiques dans `examples/` (`plots.py` et sa version
+      interactive), README, statut de la SPEC passé en v3, version et tag

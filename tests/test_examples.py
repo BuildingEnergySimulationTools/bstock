@@ -104,3 +104,30 @@ def test_connectors_interactive_example_matches_the_script(tmp_path, monkeypatch
     pd.testing.assert_frame_equal(
         namespace["park"].to_dataframe(provenance=True), park.to_dataframe(provenance=True)
     )
+
+
+requires_plotly = pytest.mark.skipif(
+    importlib.util.find_spec("plotly") is None, reason="needs the [plot] extra"
+)
+
+
+@requires_plotly
+def test_plots_example_writes_every_figure(tmp_path, capsys):
+    park = load_example("plots").main(tmp_path)
+    assert len(list(tmp_path.glob("*.html"))) == 9
+    assert len(list(park.iter_buildings())) == 6
+    assert "Wrote 9 figures" in capsys.readouterr().out
+
+
+@requires_plotly
+def test_plots_interactive_example_matches_the_script(tmp_path, monkeypatch):
+    from plotly.basedatatypes import BaseFigure
+
+    shown = []
+    monkeypatch.setattr(BaseFigure, "show", lambda figure, *args, **kwargs: shown.append(figure))
+    park = load_example("plots").main(tmp_path)
+    namespace = run_interactive("plots", tmp_path / "interactive", monkeypatch)
+    assert len(shown) == 9
+    pd.testing.assert_frame_equal(
+        namespace["park"].to_dataframe(provenance=True), park.to_dataframe(provenance=True)
+    )

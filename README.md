@@ -25,6 +25,8 @@ Common data structure for building stocks: sites, buildings, envelopes, systems 
 - **Measured consumption**: final energy per site or building, energy and end use over a period or
   per calendar month or year, sub-meters without double count, kWh/m²; nothing is integrated or
   extrapolated, a coverage shows the missing data.
+- **Figures** (plotly): completeness, sources, sums per site, distributions, maps of points or
+  footprints on OpenStreetMap, consumption and kWh/m².
 - **Readable in a console or a notebook**: a park or a site displays as a tree (foldable HTML in
   Jupyter), other entities on one line, and `describe()` lists the effective values with their
   source.
@@ -36,7 +38,7 @@ The design reference is [`SPEC.md`](SPEC.md) (in French).
 ```bash
 python -m pip install -e .            # library
 python -m pip install -e ".[dev]"     # + pytest, ruff
-python -m pip install -e ".[plot]"    # + plotly
+python -m pip install -e ".[plot]"    # + plotly: figures
 python -m pip install -e ".[connectors]"  # + requests: RNB, BDNB and DPE connectors
 python -m pip install -e ".[geo]"     # + shapely, geopandas, pyproj: BDNB geometries, geo exports
 ```
@@ -149,6 +151,25 @@ Only head meters are added up (`parent_meter=None`). An `energy` channel is summ
 channel gives its last reading minus the first; power is not integrated: convert it with tide first.
 A meter appears at the level of its scope: a site meter on the site row.
 
+## Figures
+
+With the `[plot]` extra, `sel.plot` builds plotly figures; each method returns a
+`plotly.graph_objects.Figure` without showing it (`fig.show()`, `fig.write_html(...)`):
+
+```python
+sel = park.select()
+sel.plot.completeness()                              # filled share per attribute, own / inherited
+sel.plot.provenance(["usage", "heated_area"])        # share of each source
+sel.plot.aggregate("heated_area")                    # total per site, park total in the subtitle
+sel.plot.distribution("construction_year", bins=10)  # histogram, or counts for categories
+sel.plot.map(color="usage")                          # points on OpenStreetMap, no API key
+sel.plot.map(geometry="footprint", color="heated_area")
+park.select(kind="site").plot.consumption(start="2024-01-01", end="2025-01-01")
+sel.plot.intensity(start="2024-01-01", end="2025-01-01", freq="MS")
+```
+
+Entities without a value are not drawn; the subtitle tells how many are.
+
 ## Examples
 
 Each example comes as a script and as an interactive version, to run cell by cell (`# %%`) in
@@ -160,6 +181,8 @@ PyCharm or VS Code, or with `python -i`; both are kept in step and tested.
 - [`examples/connectors.py`](examples/connectors.py) /
   [`connectors_interactive.py`](examples/connectors_interactive.py): RNB, BDNB and DPE on two real
   sites, then exports (they call the real APIs).
+- [`examples/plots.py`](examples/plots.py) / [`plots_interactive.py`](examples/plots_interactive.py):
+  every figure on a fictitious park (`[plot]` extra).
 
 ```bash
 python examples/bayonne.py

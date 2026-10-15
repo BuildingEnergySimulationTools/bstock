@@ -715,7 +715,8 @@ def _view(points: list[tuple[float, float]]) -> tuple[dict[str, float], float]:
     lats, lons = [p[0] for p in points], [p[1] for p in points]
     center = {"lat": (min(lats) + max(lats)) / 2, "lon": (min(lons) + max(lons)) / 2}
     extent = max(max(lats) - min(lats), max(lons) - min(lons), 0.002)
-    return center, max(1.0, min(17.0, math.log2(360 / extent) - 1))
+    # one level below the fit of the larger extent: the map is wider than high, and has margins
+    return center, max(1.0, min(17.0, math.log2(360 / extent) - 2))
 
 
 def _color_value(entity: Any, color: str | None) -> Any:
