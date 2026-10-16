@@ -29,7 +29,7 @@ Avant de considérer une tâche terminée : `ruff check`, `ruff format` et `pyte
 src/bstock/        # code de la lib (src layout)
 tests/             # miroir de src/bstock : tests/test_<module>.py
 examples/          # exemples de bout en bout, chacun en deux versions
-tutorial/          # notebook tutoriel (en français), versionné sans sorties
+tutorial/          # notebook tutoriel (en français), versionné avec ses sorties (figures en HTML + PNG)
 SPEC.md            # spécification
 ```
 

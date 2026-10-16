@@ -27,7 +27,14 @@ plot = ["plotly>=5.24"]
 connectors = ["requests>=2"]
 geo = ["shapely>=2", "geopandas>=1", "pyproj>=3"]
 dev = ["pytest>=8", "ruff"]
-tutorial = ["bstock[plot,connectors]", "jupyterlab>=4", "ipykernel", "nbformat>=5", "nbclient>=0.10"]
+tutorial = [
+    "bstock[plot,connectors]",
+    "jupyterlab>=4",
+    "ipykernel",
+    "nbformat>=5",
+    "nbclient>=0.10",
+    "kaleido>=1",
+]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/bstock"]
