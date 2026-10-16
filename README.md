@@ -41,6 +41,7 @@ python -m pip install -e ".[dev]"     # + pytest, ruff
 python -m pip install -e ".[plot]"    # + plotly: figures
 python -m pip install -e ".[connectors]"  # + requests: RNB, BDNB and DPE connectors
 python -m pip install -e ".[geo]"     # + shapely, geopandas, pyproj: BDNB geometries, geo exports
+python -m pip install -e ".[tutorial]"  # + Jupyter, plotly, requests: the tutorial notebook
 ```
 
 Requires Python ≥ 3.11.
@@ -169,6 +170,13 @@ sel.plot.intensity(start="2024-01-01", end="2025-01-01", freq="MS")
 ```
 
 Entities without a value are not drawn; the subtitle tells how many are.
+
+## Tutorial
+
+[`tutorial/bstock_tutorial.ipynb`](tutorial/bstock_tutorial.ipynb) (in French) walks through the
+whole workflow on the two Nobatek sites: project model, park creation, RNB / BDNB / DPE enrichment,
+representations, provenance, envelope and systems, selections, meters and consumption, figures,
+save and exports. It calls the real APIs; see [`tutorial/README.md`](tutorial/README.md).
 
 ## Examples
 

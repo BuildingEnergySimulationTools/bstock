@@ -1,0 +1,457 @@
+<mxfile host="app.diagrams.net">
+  <diagram id="bstock-overview" name="Vue d'ensemble">
+    <mxGraphModel dx="1600" dy="1000" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="0" pageScale="1" pageWidth="2600" pageHeight="1900" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="zone_prov" value="&lt;b&gt;Provenance des valeurs (bstock.provenance)&lt;/b&gt;" vertex="1" parent="1" style="rounded=1;arcSize=2;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;opacity=40;dashed=1;verticalAlign=top;align=left;spacingLeft=10;fontSize=14;">
+          <mxGeometry x="540" y="20" width="1840" height="350" as="geometry" />
+        </mxCell>
+        <mxCell id="zone_park" value="&lt;b&gt;Parc et analyse (bstock.park, bstock.selection)&lt;/b&gt;" vertex="1" parent="1" style="rounded=1;arcSize=2;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;opacity=40;dashed=1;verticalAlign=top;align=left;spacingLeft=10;fontSize=14;">
+          <mxGeometry x="20" y="360" width="480" height="902" as="geometry" />
+        </mxCell>
+        <mxCell id="zone_ent" value="&lt;b&gt;Entités (description, site, building)&lt;/b&gt;" vertex="1" parent="1" style="rounded=1;arcSize=2;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;opacity=40;dashed=1;verticalAlign=top;align=left;spacingLeft=10;fontSize=14;">
+          <mxGeometry x="560" y="360" width="630" height="736" as="geometry" />
+        </mxCell>
+        <mxCell id="zone_env" value="&lt;b&gt;Enveloppe (bstock.envelope)&lt;/b&gt;" vertex="1" parent="1" style="rounded=1;arcSize=2;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;opacity=40;dashed=1;verticalAlign=top;align=left;spacingLeft=10;fontSize=14;">
+          <mxGeometry x="1230" y="360" width="410" height="776" as="geometry" />
+        </mxCell>
+        <mxCell id="zone_sys" value="&lt;b&gt;Systèmes (bstock.systems)&lt;/b&gt;" vertex="1" parent="1" style="rounded=1;arcSize=2;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;opacity=40;dashed=1;verticalAlign=top;align=left;spacingLeft=10;fontSize=14;">
+          <mxGeometry x="1700" y="360" width="940" height="570" as="geometry" />
+        </mxCell>
+        <mxCell id="zone_met" value="&lt;b&gt;Compteurs et lecteurs (bstock.meters, bstock.readers)&lt;/b&gt;" vertex="1" parent="1" style="rounded=1;arcSize=2;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;opacity=40;dashed=1;verticalAlign=top;align=left;spacingLeft=10;fontSize=14;">
+          <mxGeometry x="1700" y="1000" width="1060" height="412" as="geometry" />
+        </mxCell>
+        <mxCell id="zone_con" value="&lt;b&gt;E/S, export et connecteurs&lt;/b&gt;" vertex="1" parent="1" style="rounded=1;arcSize=2;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;opacity=40;dashed=1;verticalAlign=top;align=left;spacingLeft=10;fontSize=14;">
+          <mxGeometry x="20" y="1520" width="2360" height="330" as="geometry" />
+        </mxCell>
+        <mxCell id="SourcedValue" value="&lt;span style=&quot;font-weight:normal&quot;&gt;«frozen»&lt;/span&gt;&lt;br&gt;SourcedValue" vertex="1" parent="1" style="swimlane;fontStyle=1;align=center;verticalAlign=top;childLayout=stackLayout;horizontal=1;startSize=40;horizontalStack=0;resizeParent=1;resizeParentMax=0;resizeLast=0;collapsible=1;marginBottom=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;swimlaneFillColor=#ffffff;">
+          <mxGeometry x="560" y="60" width="200" height="156" as="geometry" />
+        </mxCell>
+        <mxCell id="SourcedValue_attrs" value="+ value : Any&lt;br&gt;+ source : str&lt;br&gt;+ date : date | None&lt;br&gt;+ comment : str | None&lt;br&gt;+ ref : str | None&lt;br&gt;+ raw : Any | None" vertex="1" parent="SourcedValue" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=top;spacingLeft=4;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;whiteSpace=wrap;html=1;fontSize=11;fontFamily=Courier New;">
+          <mxGeometry y="40" width="200" height="116" as="geometry" />
+        </mxCell>
+        <mxCell id="SourcedModel" value="SourcedModel" vertex="1" parent="1" style="swimlane;fontStyle=1;align=center;verticalAlign=top;childLayout=stackLayout;horizontal=1;startSize=26;horizontalStack=0;resizeParent=1;resizeParentMax=0;resizeLast=0;collapsible=1;marginBottom=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;swimlaneFillColor=#ffffff;">
+          <mxGeometry x="800" y="60" width="450" height="248" as="geometry" />
+        </mxCell>
+        <mxCell id="SourcedModel_attrs" value="+ values : dict[str, list[SourcedValue]]&lt;br&gt;- _container : owner (parent)" vertex="1" parent="SourcedModel" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=top;spacingLeft=4;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;whiteSpace=wrap;html=1;fontSize=11;fontFamily=Courier New;">
+          <mxGeometry y="26" width="450" height="44" as="geometry" />
+        </mxCell>
+        <mxCell id="SourcedModel_div" value="" vertex="1" parent="SourcedModel" style="line;strokeWidth=1;fillColor=none;align=left;verticalAlign=middle;spacingTop=-1;spacingLeft=3;spacingRight=3;rotatable=0;labelPosition=right;points=[];portConstraint=eastwest;strokeColor=inherit;html=1;">
+          <mxGeometry y="70" width="450" height="8" as="geometry" />
+        </mxCell>
+        <mxCell id="SourcedModel_methods" value="+ sourced_fields() : dict[str, SourcedField]&lt;br&gt;+ set(name, value, *, source=&amp;#x27;manual&amp;#x27;, date, ref, …) : SourcedValue&lt;br&gt;+ unset(name, *, source=None)&lt;br&gt;+ candidates(name) : list[SourcedValue]&lt;br&gt;+ inherited_candidates(name) : list[(id, SourcedValue)]&lt;br&gt;+ effective(name) : SourcedValue | None&lt;br&gt;+ provider_id(name) : str | None&lt;br&gt;+ active_source_priority() : SourcePriority&lt;br&gt;+ describe() : DataFrame" vertex="1" parent="SourcedModel" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=top;spacingLeft=4;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;whiteSpace=wrap;html=1;fontSize=11;fontFamily=Courier New;">
+          <mxGeometry y="78" width="450" height="170" as="geometry" />
+        </mxCell>
+        <mxCell id="SourcePriority" value="&lt;span style=&quot;font-weight:normal&quot;&gt;«frozen»&lt;/span&gt;&lt;br&gt;SourcePriority" vertex="1" parent="1" style="swimlane;fontStyle=1;align=center;verticalAlign=top;childLayout=stackLayout;horizontal=1;startSize=40;horizontalStack=0;resizeParent=1;resizeParentMax=0;resizeLast=0;collapsible=1;marginBottom=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;swimlaneFillColor=#ffffff;">
+          <mxGeometry x="1290" y="60" width="330" height="190" as="geometry" />
+        </mxCell>
+        <mxCell id="SourcePriority_attrs" value="+ default : tuple[str, …]&lt;br&gt;&amp;nbsp; &amp;nbsp; = (manual, audit, computed, dpe,&lt;br&gt;&amp;nbsp; &amp;nbsp; &amp;nbsp;  bdnb, rnb, *, assumption)&lt;br&gt;+ per_field : Mapping[str, tuple[str, …]]" vertex="1" parent="SourcePriority" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=top;spacingLeft=4;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;whiteSpace=wrap;html=1;fontSize=11;fontFamily=Courier New;">
+          <mxGeometry y="40" width="330" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="SourcePriority_div" value="" vertex="1" parent="SourcePriority" style="line;strokeWidth=1;fillColor=none;align=left;verticalAlign=middle;spacingTop=-1;spacingLeft=3;spacingRight=3;rotatable=0;labelPosition=right;points=[];portConstraint=eastwest;strokeColor=inherit;html=1;">
+          <mxGeometry y="120" width="330" height="8" as="geometry" />
+        </mxCell>
+        <mxCell id="SourcePriority_methods" value="+ order_for(field) : tuple[str, …]&lt;br&gt;+ rank(field, source) : int&lt;br&gt;+ select(field, candidates) : SourcedValue | None" vertex="1" parent="SourcePriority" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=top;spacingLeft=4;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;whiteSpace=wrap;html=1;fontSize=11;fontFamily=Courier New;">
+          <mxGeometry y="128" width="330" height="62" as="geometry" />
+        </mxCell>
+        <mxCell id="SourcedField[T]" value="&lt;span style=&quot;font-weight:normal&quot;&gt;«descriptor»&lt;/span&gt;&lt;br&gt;SourcedField[T]" vertex="1" parent="1" style="swimlane;fontStyle=1;align=center;verticalAlign=top;childLayout=stackLayout;horizontal=1;startSize=40;horizontalStack=0;resizeParent=1;resizeParentMax=0;resizeLast=0;collapsible=1;marginBottom=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;swimlaneFillColor=#ffffff;">
+          <mxGeometry x="1660" y="60" width="240" height="190" as="geometry" />
+        </mxCell>
+        <mxCell id="SourcedField[T]_attrs" value="+ name : str&lt;br&gt;+ type_ : type[T]&lt;br&gt;+ unit : str | None&lt;br&gt;+ inherit : bool&lt;br&gt;+ extensive : bool&lt;br&gt;+ description : str | None" vertex="1" parent="SourcedField[T]" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=top;spacingLeft=4;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;whiteSpace=wrap;html=1;fontSize=11;fontFamily=Courier New;">
+          <mxGeometry y="40" width="240" height="116" as="geometry" />
+        </mxCell>
+        <mxCell id="SourcedField[T]_div" value="" vertex="1" parent="SourcedField[T]" style="line;strokeWidth=1;fillColor=none;align=left;verticalAlign=middle;spacingTop=-1;spacingLeft=3;spacingRight=3;rotatable=0;labelPosition=right;points=[];portConstraint=eastwest;strokeColor=inherit;html=1;">
+          <mxGeometry y="156" width="240" height="8" as="geometry" />
+        </mxCell>
+        <mxCell id="SourcedField[T]_methods" value="+ validate(value) : T" vertex="1" parent="SourcedField[T]" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=top;spacingLeft=4;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;whiteSpace=wrap;html=1;fontSize=11;fontFamily=Courier New;">
+          <mxGeometry y="164" width="240" height="26" as="geometry" />
+        </mxCell>
+        <mxCell id="BuildingPark" value="BuildingPark" vertex="1" parent="1" style="swimlane;fontStyle=1;align=center;verticalAlign=top;childLayout=stackLayout;horizontal=1;startSize=26;horizontalStack=0;resizeParent=1;resizeParentMax=0;resizeLast=0;collapsible=1;marginBottom=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;swimlaneFillColor=#ffffff;">
+          <mxGeometry x="40" y="400" width="440" height="464" as="geometry" />
+        </mxCell>
+        <mxCell id="BuildingPark_attrs" value="+ name : str&lt;br&gt;+ description : str | None&lt;br&gt;+ source_priority : SourcePriority&lt;br&gt;+ sites : list[Site]&lt;br&gt;+ buildings : list[Building]&lt;br&gt;+ meters : list[Meter]&lt;br&gt;+ site_cls / building_cls : type&lt;br&gt;- _index : dict[str, entity]&lt;br&gt;- _rnb_index : dict[str, Building]" vertex="1" parent="BuildingPark" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=top;spacingLeft=4;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;whiteSpace=wrap;html=1;fontSize=11;fontFamily=Courier New;">
+          <mxGeometry y="26" width="440" height="170" as="geometry" />
+        </mxCell>
+        <mxCell id="BuildingPark_div" value="" vertex="1" parent="BuildingPark" style="line;strokeWidth=1;fillColor=none;align=left;verticalAlign=middle;spacingTop=-1;spacingLeft=3;spacingRight=3;rotatable=0;labelPosition=right;points=[];portConstraint=eastwest;strokeColor=inherit;html=1;">
+          <mxGeometry y="196" width="440" height="8" as="geometry" />
+        </mxCell>
+        <mxCell id="BuildingPark_methods" value="+ get(id, cls=None) : entity | None&lt;br&gt;+ get_by_rnb(rnb_id) : Building | None&lt;br&gt;+ iter_sites() / iter_buildings() / iter_systems(kind)&lt;br&gt;+ new_site(id, *, parent, source, **attrs) : Site&lt;br&gt;+ new_building(*, id, rnb_id, parent, source, **attrs) : Building&lt;br&gt;+ add_site / add_building / add_system / add_meter&lt;br&gt;+ move(entity, new_parent, *, force)&lt;br&gt;+ remove(entity, *, force)&lt;br&gt;+ select(predicate, *, entity, **criteria) : Selection&lt;br&gt;+ timeseries(*, end_use, energy_type, …) : DataFrame&lt;br&gt;+ tree(…) : TreeView&lt;br&gt;+ to_json() / from_json(text) : BuildingPark&lt;br&gt;+ save(dir, *, include_data) / load(dir) : BuildingPark&lt;br&gt;+ to_dataframe / to_geodataframe / to_geopackage / to_geoparquet" vertex="1" parent="BuildingPark" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=top;spacingLeft=4;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;whiteSpace=wrap;html=1;fontSize=11;fontFamily=Courier New;">
+          <mxGeometry y="204" width="440" height="260" as="geometry" />
+        </mxCell>
+        <mxCell id="Selection" value="Selection" vertex="1" parent="1" style="swimlane;fontStyle=1;align=center;verticalAlign=top;childLayout=stackLayout;horizontal=1;startSize=26;horizontalStack=0;resizeParent=1;resizeParentMax=0;resizeLast=0;collapsible=1;marginBottom=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;swimlaneFillColor=#ffffff;">
+          <mxGeometry x="40" y="940" width="400" height="302" as="geometry" />
+        </mxCell>
+        <mxCell id="Selection_attrs" value="- _park : BuildingPark&lt;br&gt;- _entity_type : &amp;#x27;building&amp;#x27; | &amp;#x27;site&amp;#x27;&lt;br&gt;- _ids : tuple[str, …]&lt;br&gt;+ plot : SelectionPlot&amp;nbsp; «property»" vertex="1" parent="Selection" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=top;spacingLeft=4;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;whiteSpace=wrap;html=1;fontSize=11;fontFamily=Courier New;">
+          <mxGeometry y="26" width="400" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="Selection_div" value="" vertex="1" parent="Selection" style="line;strokeWidth=1;fillColor=none;align=left;verticalAlign=middle;spacingTop=-1;spacingLeft=3;spacingRight=3;rotatable=0;labelPosition=right;points=[];portConstraint=eastwest;strokeColor=inherit;html=1;">
+          <mxGeometry y="106" width="400" height="8" as="geometry" />
+        </mxCell>
+        <mxCell id="Selection_methods" value="+ filter(predicate, **criteria) : Selection&lt;br&gt;+ aggregate(fields, *, by, prefer) : DataFrame&lt;br&gt;+ completeness(fields, *, per) : DataFrame&lt;br&gt;+ provenance(fields, *, normalize) : DataFrame&lt;br&gt;+ conflicts(fields, *, rtol) : DataFrame&lt;br&gt;+ consumption(*, start, end, freq, breakdown, …) : DataFrame&lt;br&gt;+ intensity(*, area=&amp;#x27;heated_area&amp;#x27;, …) : DataFrame&lt;br&gt;+ to_dataframe(*, provenance) : DataFrame&lt;br&gt;+ tree(…) : TreeView&lt;br&gt;+ |, &amp;amp;, -&amp;nbsp; (opérations d&amp;#x27;ensemble)" vertex="1" parent="Selection" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=top;spacingLeft=4;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;whiteSpace=wrap;html=1;fontSize=11;fontFamily=Courier New;">
+          <mxGeometry y="114" width="400" height="188" as="geometry" />
+        </mxCell>
+        <mxCell id="DescribedEntity" value="DescribedEntity" vertex="1" parent="1" style="swimlane;fontStyle=1;align=center;verticalAlign=top;childLayout=stackLayout;horizontal=1;startSize=26;horizontalStack=0;resizeParent=1;resizeParentMax=0;resizeLast=0;collapsible=1;marginBottom=0;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;swimlaneFillColor=#ffffff;">
+          <mxGeometry x="580" y="400" width="430" height="410" as="geometry" />
+        </mxCell>
+        <mxCell id="DescribedEntity_attrs" value="+ id : str&amp;nbsp; {frozen}&lt;br&gt;+ name : str&amp;nbsp; {s}&lt;br&gt;+ address, municipality, insee_code : str&amp;nbsp; {s, inh}&lt;br&gt;+ lat, lon : float [°]&amp;nbsp; {s, inh}&lt;br&gt;+ usage : BuildingUsage&amp;nbsp; {s, inh}&lt;br&gt;+ sub_usages : list[str]&amp;nbsp; {s, inh}&lt;br&gt;+ construction_year, level_count : int&amp;nbsp; {s, inh}&lt;br&gt;+ height : float [m]&amp;nbsp; {s, inh}&lt;br&gt;+ dwelling_count : int&amp;nbsp; {s, ext}&lt;br&gt;+ footprint : Footprint (GeoJSON WGS84)&amp;nbsp; {s}&lt;br&gt;+ footprint_area, floor_area, heated_area : float [m²]&amp;nbsp; {s, ext}&lt;br&gt;+ dpe_ids : list[str]&lt;br&gt;+ envelope : Envelope&lt;br&gt;+ heating, cooling, dhw, ventilation, pv : list[System]" vertex="1" parent="DescribedEntity" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=top;spacingLeft=4;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;whiteSpace=wrap;html=1;fontSize=11;fontFamily=Courier New;">
+          <mxGeometry y="26" width="430" height="260" as="geometry" />
+        </mxCell>
+        <mxCell id="DescribedEntity_div" value="" vertex="1" parent="DescribedEntity" style="line;strokeWidth=1;fillColor=none;align=left;verticalAlign=middle;spacingTop=-1;spacingLeft=3;spacingRight=3;rotatable=0;labelPosition=right;points=[];portConstraint=eastwest;strokeColor=inherit;html=1;">
+          <mxGeometry y="286" width="430" height="8" as="geometry" />
+        </mxCell>
+        <mxCell id="DescribedEntity_methods" value="+ parent : Site | None&amp;nbsp; «property»&lt;br&gt;+ park : BuildingPark | None&amp;nbsp; «property»&lt;br&gt;+ iter_systems(kind=None) : Iterator[System]&lt;br&gt;+ add_system(system) / remove_system(system)&lt;br&gt;+ find_meters() : list[Meter]&lt;br&gt;+ compute_footprint_area() : SourcedValue" vertex="1" parent="DescribedEntity" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=top;spacingLeft=4;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;whiteSpace=wrap;html=1;fontSize=11;fontFamily=Courier New;">
+          <mxGeometry y="294" width="430" height="116" as="geometry" />
+        </mxCell>
+        <mxCell id="Site" value="Site" vertex="1" parent="1" style="swimlane;fontStyle=1;align=center;verticalAlign=top;childLayout=stackLayout;horizontal=1;startSize=26;horizontalStack=0;resizeParent=1;resizeParentMax=0;resizeLast=0;collapsible=1;marginBottom=0;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;swimlaneFillColor=#ffffff;">
+          <mxGeometry x="580" y="900" width="260" height="176" as="geometry" />
+        </mxCell>
+        <mxCell id="Site_attrs" value="+ bdnb_batiment_groupe_id : str | None&lt;br&gt;+ sites : list[Site]&lt;br&gt;+ buildings : list[Building]" vertex="1" parent="Site" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=top;spacingLeft=4;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;whiteSpace=wrap;html=1;fontSize=11;fontFamily=Courier New;">
+          <mxGeometry y="26" width="260" height="62" as="geometry" />
+        </mxCell>
+        <mxCell id="Site_div" value="" vertex="1" parent="Site" style="line;strokeWidth=1;fillColor=none;align=left;verticalAlign=middle;spacingTop=-1;spacingLeft=3;spacingRight=3;rotatable=0;labelPosition=right;points=[];portConstraint=eastwest;strokeColor=inherit;html=1;">
+          <mxGeometry y="88" width="260" height="8" as="geometry" />
+        </mxCell>
+        <mxCell id="Site_methods" value="+ iter_sites() / iter_buildings()&lt;br&gt;+ add_site() / add_building()&lt;br&gt;+ remove_site() / remove_building()&lt;br&gt;+ tree(…) : TreeView" vertex="1" parent="Site" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=top;spacingLeft=4;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;whiteSpace=wrap;html=1;fontSize=11;fontFamily=Courier New;">
+          <mxGeometry y="96" width="260" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="Building" value="Building" vertex="1" parent="1" style="swimlane;fontStyle=1;align=center;verticalAlign=top;childLayout=stackLayout;horizontal=1;startSize=26;horizontalStack=0;resizeParent=1;resizeParentMax=0;resizeLast=0;collapsible=1;marginBottom=0;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;swimlaneFillColor=#ffffff;">
+          <mxGeometry x="870" y="900" width="300" height="158" as="geometry" />
+        </mxCell>
+        <mxCell id="Building_attrs" value="+ id = rnb_id, sinon &amp;#x27;bldg-…&amp;#x27;&lt;br&gt;+ rnb_id : str | None&amp;nbsp; (12 car., unique)&lt;br&gt;+ bdnb_batiment_groupe_id : str | None&lt;br&gt;+ bdnb_batiment_construction_id : str | None" vertex="1" parent="Building" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=top;spacingLeft=4;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;whiteSpace=wrap;html=1;fontSize=11;fontFamily=Courier New;">
+          <mxGeometry y="26" width="300" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="Building_div" value="" vertex="1" parent="Building" style="line;strokeWidth=1;fillColor=none;align=left;verticalAlign=middle;spacingTop=-1;spacingLeft=3;spacingRight=3;rotatable=0;labelPosition=right;points=[];portConstraint=eastwest;strokeColor=inherit;html=1;">
+          <mxGeometry y="106" width="300" height="8" as="geometry" />
+        </mxCell>
+        <mxCell id="Building_methods" value="+ find_serving_systems(kind=None, *,&lt;br&gt;&amp;nbsp; &amp;nbsp; &amp;nbsp; include_shared=True) : list[System]" vertex="1" parent="Building" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=top;spacingLeft=4;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;whiteSpace=wrap;html=1;fontSize=11;fontFamily=Courier New;">
+          <mxGeometry y="114" width="300" height="44" as="geometry" />
+        </mxCell>
+        <mxCell id="Envelope" value="Envelope" vertex="1" parent="1" style="swimlane;fontStyle=1;align=center;verticalAlign=top;childLayout=stackLayout;horizontal=1;startSize=26;horizontalStack=0;resizeParent=1;resizeParentMax=0;resizeLast=0;collapsible=1;marginBottom=0;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;swimlaneFillColor=#ffffff;">
+          <mxGeometry x="1250" y="400" width="370" height="266" as="geometry" />
+        </mxCell>
+        <mxCell id="Envelope_attrs" value="+ loss_area : float [m²]&amp;nbsp; {s, ext}&lt;br&gt;+ heat_loss_coefficient : float [W/K]&amp;nbsp; {s, ext}&lt;br&gt;+ u_bat : float [W/(m².K)]&amp;nbsp; {s, inh}&lt;br&gt;+ inertia : Inertia&amp;nbsp; {s, inh}&lt;br&gt;+ window_shgc : float&amp;nbsp; {s, inh}&lt;br&gt;+ infiltration_q4pa : float [m³/(h.m²)]&amp;nbsp; {s, inh}&lt;br&gt;+ components : list[EnvelopeComponent]" vertex="1" parent="Envelope" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=top;spacingLeft=4;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;whiteSpace=wrap;html=1;fontSize=11;fontFamily=Courier New;">
+          <mxGeometry y="26" width="370" height="134" as="geometry" />
+        </mxCell>
+        <mxCell id="Envelope_div" value="" vertex="1" parent="Envelope" style="line;strokeWidth=1;fillColor=none;align=left;verticalAlign=middle;spacingTop=-1;spacingLeft=3;spacingRight=3;rotatable=0;labelPosition=right;points=[];portConstraint=eastwest;strokeColor=inherit;html=1;">
+          <mxGeometry y="160" width="370" height="8" as="geometry" />
+        </mxCell>
+        <mxCell id="Envelope_methods" value="+ add_component() / remove_component()&lt;br&gt;+ find_components(kind, orientation)&lt;br&gt;+ compute_u_bat() / compute_loss_area() : SourcedValue&lt;br&gt;+ compute_heat_loss_coefficient() : SourcedValue&lt;br&gt;+ compute_window_shgc() : SourcedValue" vertex="1" parent="Envelope" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=top;spacingLeft=4;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;whiteSpace=wrap;html=1;fontSize=11;fontFamily=Courier New;">
+          <mxGeometry y="168" width="370" height="98" as="geometry" />
+        </mxCell>
+        <mxCell id="EnvelopeComponent" value="EnvelopeComponent" vertex="1" parent="1" style="swimlane;fontStyle=1;align=center;verticalAlign=top;childLayout=stackLayout;horizontal=1;startSize=26;horizontalStack=0;resizeParent=1;resizeParentMax=0;resizeLast=0;collapsible=1;marginBottom=0;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;swimlaneFillColor=#ffffff;">
+          <mxGeometry x="1250" y="720" width="320" height="212" as="geometry" />
+        </mxCell>
+        <mxCell id="EnvelopeComponent_attrs" value="+ id : str&amp;nbsp; {frozen}&lt;br&gt;+ kind : ComponentKind&lt;br&gt;+ area : float [m²]&amp;nbsp; {s}&lt;br&gt;+ u_value : float [W/(m².K)]&amp;nbsp; {s}&lt;br&gt;+ heat_loss_coefficient : float [W/K]&amp;nbsp; {s}&lt;br&gt;+ orientation : Orientation&amp;nbsp; {s}&lt;br&gt;+ adjacency : Adjacency&amp;nbsp; {s}&lt;br&gt;+ insulation : InsulationLevel&amp;nbsp; {s}" vertex="1" parent="EnvelopeComponent" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=top;spacingLeft=4;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;whiteSpace=wrap;html=1;fontSize=11;fontFamily=Courier New;">
+          <mxGeometry y="26" width="320" height="152" as="geometry" />
+        </mxCell>
+        <mxCell id="EnvelopeComponent_div" value="" vertex="1" parent="EnvelopeComponent" style="line;strokeWidth=1;fillColor=none;align=left;verticalAlign=middle;spacingTop=-1;spacingLeft=3;spacingRight=3;rotatable=0;labelPosition=right;points=[];portConstraint=eastwest;strokeColor=inherit;html=1;">
+          <mxGeometry y="178" width="320" height="8" as="geometry" />
+        </mxCell>
+        <mxCell id="EnvelopeComponent_methods" value="+ heat_loss_coefficient_or_ua() : float | None" vertex="1" parent="EnvelopeComponent" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=top;spacingLeft=4;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;whiteSpace=wrap;html=1;fontSize=11;fontFamily=Courier New;">
+          <mxGeometry y="186" width="320" height="26" as="geometry" />
+        </mxCell>
+        <mxCell id="Window" value="Window" vertex="1" parent="1" style="swimlane;fontStyle=1;align=center;verticalAlign=top;childLayout=stackLayout;horizontal=1;startSize=26;horizontalStack=0;resizeParent=1;resizeParentMax=0;resizeLast=0;collapsible=1;marginBottom=0;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;swimlaneFillColor=#ffffff;">
+          <mxGeometry x="1250" y="1010" width="260" height="106" as="geometry" />
+        </mxCell>
+        <mxCell id="Window_attrs" value="+ kind = window&lt;br&gt;+ shgc : float&amp;nbsp; {s}&lt;br&gt;+ glazing : GlazingType&amp;nbsp; {s}&lt;br&gt;+ frame : FrameType&amp;nbsp; {s}" vertex="1" parent="Window" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=top;spacingLeft=4;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;whiteSpace=wrap;html=1;fontSize=11;fontFamily=Courier New;">
+          <mxGeometry y="26" width="260" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="System" value="System" vertex="1" parent="1" style="swimlane;fontStyle=1;align=center;verticalAlign=top;childLayout=stackLayout;horizontal=1;startSize=26;horizontalStack=0;resizeParent=1;resizeParentMax=0;resizeLast=0;collapsible=1;marginBottom=0;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;swimlaneFillColor=#ffffff;">
+          <mxGeometry x="2030" y="400" width="350" height="106" as="geometry" />
+        </mxCell>
+        <mxCell id="System_attrs" value="+ kind : SystemKind&amp;nbsp; «ClassVar»&lt;br&gt;+ id : str&amp;nbsp; {frozen} = &amp;#x27;&amp;lt;kind&amp;gt;-xxxxxxxx&amp;#x27;&lt;br&gt;+ serves : list[str] | None&amp;nbsp; (ids, systèmes de site)&lt;br&gt;+ name : str&amp;nbsp; {s}" vertex="1" parent="System" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=top;spacingLeft=4;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;whiteSpace=wrap;html=1;fontSize=11;fontFamily=Courier New;">
+          <mxGeometry y="26" width="350" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="Generator" value="Generator" vertex="1" parent="1" style="swimlane;fontStyle=1;align=center;verticalAlign=top;childLayout=stackLayout;horizontal=1;startSize=26;horizontalStack=0;resizeParent=1;resizeParentMax=0;resizeLast=0;collapsible=1;marginBottom=0;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;swimlaneFillColor=#ffffff;">
+          <mxGeometry x="1720" y="600" width="280" height="158" as="geometry" />
+        </mxCell>
+        <mxCell id="Generator_attrs" value="+ technology : GeneratorTechnology&amp;nbsp; {s}&lt;br&gt;+ energy_type : EnergyType&amp;nbsp; {s}&lt;br&gt;+ nominal_power : float [kW]&amp;nbsp; {s, ext}&lt;br&gt;+ nominal_performance_ratio : float&amp;nbsp; {s}&lt;br&gt;+ seasonal_performance_ratio : float&amp;nbsp; {s}" vertex="1" parent="Generator" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=top;spacingLeft=4;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;whiteSpace=wrap;html=1;fontSize=11;fontFamily=Courier New;">
+          <mxGeometry y="26" width="280" height="98" as="geometry" />
+        </mxCell>
+        <mxCell id="Generator_div" value="" vertex="1" parent="Generator" style="line;strokeWidth=1;fillColor=none;align=left;verticalAlign=middle;spacingTop=-1;spacingLeft=3;spacingRight=3;rotatable=0;labelPosition=right;points=[];portConstraint=eastwest;strokeColor=inherit;html=1;">
+          <mxGeometry y="124" width="280" height="8" as="geometry" />
+        </mxCell>
+        <mxCell id="Generator_methods" value="+ check_performance_ratios() : list[str]" vertex="1" parent="Generator" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=top;spacingLeft=4;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;whiteSpace=wrap;html=1;fontSize=11;fontFamily=Courier New;">
+          <mxGeometry y="132" width="280" height="26" as="geometry" />
+        </mxCell>
+        <mxCell id="Ventilation" value="Ventilation" vertex="1" parent="1" style="swimlane;fontStyle=1;align=center;verticalAlign=top;childLayout=stackLayout;horizontal=1;startSize=26;horizontalStack=0;resizeParent=1;resizeParentMax=0;resizeLast=0;collapsible=1;marginBottom=0;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;swimlaneFillColor=#ffffff;">
+          <mxGeometry x="2030" y="600" width="310" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="Ventilation_attrs" value="+ air_change_rate : float [1/h]&amp;nbsp; {s}&lt;br&gt;+ heat_recovery_efficiency : float [0–1]&amp;nbsp; {s}" vertex="1" parent="Ventilation" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=top;spacingLeft=4;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;whiteSpace=wrap;html=1;fontSize=11;fontFamily=Courier New;">
+          <mxGeometry y="26" width="310" height="44" as="geometry" />
+        </mxCell>
+        <mxCell id="SolarPV" value="SolarPV" vertex="1" parent="1" style="swimlane;fontStyle=1;align=center;verticalAlign=top;childLayout=stackLayout;horizontal=1;startSize=26;horizontalStack=0;resizeParent=1;resizeParentMax=0;resizeLast=0;collapsible=1;marginBottom=0;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;swimlaneFillColor=#ffffff;">
+          <mxGeometry x="2370" y="600" width="250" height="106" as="geometry" />
+        </mxCell>
+        <mxCell id="SolarPV_attrs" value="+ peak_power : float [kWp]&amp;nbsp; {s, ext}&lt;br&gt;+ area : float [m²]&amp;nbsp; {s}&lt;br&gt;+ azimuth : float [°]&amp;nbsp; {s}&lt;br&gt;+ tilt : float [°]&amp;nbsp; {s}" vertex="1" parent="SolarPV" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=top;spacingLeft=4;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;whiteSpace=wrap;html=1;fontSize=11;fontFamily=Courier New;">
+          <mxGeometry y="26" width="250" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="HeatingGenerator" value="HeatingGenerator" vertex="1" parent="1" style="swimlane;fontStyle=1;align=center;verticalAlign=top;childLayout=stackLayout;horizontal=1;startSize=26;horizontalStack=0;resizeParent=1;resizeParentMax=0;resizeLast=0;collapsible=1;marginBottom=0;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;swimlaneFillColor=#ffffff;">
+          <mxGeometry x="1720" y="840" width="150" height="52" as="geometry" />
+        </mxCell>
+        <mxCell id="HeatingGenerator_attrs" value="+ kind = heating" vertex="1" parent="HeatingGenerator" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=top;spacingLeft=4;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;whiteSpace=wrap;html=1;fontSize=11;fontFamily=Courier New;">
+          <mxGeometry y="26" width="150" height="26" as="geometry" />
+        </mxCell>
+        <mxCell id="CoolingGenerator" value="CoolingGenerator" vertex="1" parent="1" style="swimlane;fontStyle=1;align=center;verticalAlign=top;childLayout=stackLayout;horizontal=1;startSize=26;horizontalStack=0;resizeParent=1;resizeParentMax=0;resizeLast=0;collapsible=1;marginBottom=0;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;swimlaneFillColor=#ffffff;">
+          <mxGeometry x="1890" y="840" width="150" height="52" as="geometry" />
+        </mxCell>
+        <mxCell id="CoolingGenerator_attrs" value="+ kind = cooling" vertex="1" parent="CoolingGenerator" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=top;spacingLeft=4;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;whiteSpace=wrap;html=1;fontSize=11;fontFamily=Courier New;">
+          <mxGeometry y="26" width="150" height="26" as="geometry" />
+        </mxCell>
+        <mxCell id="DHWGenerator" value="DHWGenerator" vertex="1" parent="1" style="swimlane;fontStyle=1;align=center;verticalAlign=top;childLayout=stackLayout;horizontal=1;startSize=26;horizontalStack=0;resizeParent=1;resizeParentMax=0;resizeLast=0;collapsible=1;marginBottom=0;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;swimlaneFillColor=#ffffff;">
+          <mxGeometry x="2070" y="840" width="230" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="DHWGenerator_attrs" value="+ kind = dhw&lt;br&gt;+ storage_volume : float [L]&amp;nbsp; {s}" vertex="1" parent="DHWGenerator" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=top;spacingLeft=4;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;whiteSpace=wrap;html=1;fontSize=11;fontFamily=Courier New;">
+          <mxGeometry y="26" width="230" height="44" as="geometry" />
+        </mxCell>
+        <mxCell id="Meter" value="Meter" vertex="1" parent="1" style="swimlane;fontStyle=1;align=center;verticalAlign=top;childLayout=stackLayout;horizontal=1;startSize=26;horizontalStack=0;resizeParent=1;resizeParentMax=0;resizeLast=0;collapsible=1;marginBottom=0;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;swimlaneFillColor=#ffffff;">
+          <mxGeometry x="1720" y="1040" width="420" height="302" as="geometry" />
+        </mxCell>
+        <mxCell id="Meter_attrs" value="+ id : str&amp;nbsp; {frozen}&lt;br&gt;+ scope : list[str]&amp;nbsp; (ids site / bâtiment / système)&lt;br&gt;+ parent_meter : str | None&amp;nbsp; (id compteur)&lt;br&gt;+ channels : list[Channel]&amp;nbsp; (1..*)&lt;br&gt;+ reader, original_reader : DataReader | None&lt;br&gt;+ bloc, sub_bloc : str | None&amp;nbsp; (tags tide)&lt;br&gt;+ name : str&amp;nbsp; {s}&lt;br&gt;+ energy_type : EnergyType&amp;nbsp; {s}&lt;br&gt;+ end_use : EndUse&amp;nbsp; {s}&lt;br&gt;+ timestep : str (offset pandas)&amp;nbsp; {s}&lt;br&gt;+ data : DataFrame | None&amp;nbsp; «property»" vertex="1" parent="Meter" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=top;spacingLeft=4;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;whiteSpace=wrap;html=1;fontSize=11;fontFamily=Courier New;">
+          <mxGeometry y="26" width="420" height="206" as="geometry" />
+        </mxCell>
+        <mxCell id="Meter_div" value="" vertex="1" parent="Meter" style="line;strokeWidth=1;fillColor=none;align=left;verticalAlign=middle;spacingTop=-1;spacingLeft=3;spacingRight=3;rotatable=0;labelPosition=right;points=[];portConstraint=eastwest;strokeColor=inherit;html=1;">
+          <mxGeometry y="232" width="420" height="8" as="geometry" />
+        </mxCell>
+        <mxCell id="Meter_methods" value="+ load_data() : DataFrame&lt;br&gt;+ tide_tags() : (bloc, sub_bloc)&lt;br&gt;+ tide_columns() : dict[str, str]&amp;nbsp; (name__unit__bloc__sub_bloc)" vertex="1" parent="Meter" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=top;spacingLeft=4;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;whiteSpace=wrap;html=1;fontSize=11;fontFamily=Courier New;">
+          <mxGeometry y="240" width="420" height="62" as="geometry" />
+        </mxCell>
+        <mxCell id="Channel" value="&lt;span style=&quot;font-weight:normal&quot;&gt;«frozen»&lt;/span&gt;&lt;br&gt;Channel" vertex="1" parent="1" style="swimlane;fontStyle=1;align=center;verticalAlign=top;childLayout=stackLayout;horizontal=1;startSize=40;horizontalStack=0;resizeParent=1;resizeParentMax=0;resizeLast=0;collapsible=1;marginBottom=0;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;swimlaneFillColor=#ffffff;">
+          <mxGeometry x="2180" y="1040" width="210" height="136" as="geometry" />
+        </mxCell>
+        <mxCell id="Channel_attrs" value="+ name : str&lt;br&gt;+ unit : str&lt;br&gt;+ column : str | None" vertex="1" parent="Channel" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=top;spacingLeft=4;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;whiteSpace=wrap;html=1;fontSize=11;fontFamily=Courier New;">
+          <mxGeometry y="40" width="210" height="62" as="geometry" />
+        </mxCell>
+        <mxCell id="Channel_div" value="" vertex="1" parent="Channel" style="line;strokeWidth=1;fillColor=none;align=left;verticalAlign=middle;spacingTop=-1;spacingLeft=3;spacingRight=3;rotatable=0;labelPosition=right;points=[];portConstraint=eastwest;strokeColor=inherit;html=1;">
+          <mxGeometry y="102" width="210" height="8" as="geometry" />
+        </mxCell>
+        <mxCell id="Channel_methods" value="+ raw_column : str&amp;nbsp; «property»" vertex="1" parent="Channel" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=top;spacingLeft=4;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;whiteSpace=wrap;html=1;fontSize=11;fontFamily=Courier New;">
+          <mxGeometry y="110" width="210" height="26" as="geometry" />
+        </mxCell>
+        <mxCell id="DataReader" value="&lt;span style=&quot;font-weight:normal&quot;&gt;«abstract»&lt;/span&gt;&lt;br&gt;&lt;i&gt;DataReader&lt;/i&gt;" vertex="1" parent="1" style="swimlane;fontStyle=1;align=center;verticalAlign=top;childLayout=stackLayout;horizontal=1;startSize=40;horizontalStack=0;resizeParent=1;resizeParentMax=0;resizeLast=0;collapsible=1;marginBottom=0;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;swimlaneFillColor=#ffffff;">
+          <mxGeometry x="2180" y="1220" width="280" height="172" as="geometry" />
+        </mxCell>
+        <mxCell id="DataReader_attrs" value="+ registry : dict[str, type]&amp;nbsp; «ClassVar»&lt;br&gt;+ type : str&lt;br&gt;+ tz : str | None" vertex="1" parent="DataReader" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=top;spacingLeft=4;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;whiteSpace=wrap;html=1;fontSize=11;fontFamily=Courier New;">
+          <mxGeometry y="40" width="280" height="62" as="geometry" />
+        </mxCell>
+        <mxCell id="DataReader_div" value="" vertex="1" parent="DataReader" style="line;strokeWidth=1;fillColor=none;align=left;verticalAlign=middle;spacingTop=-1;spacingLeft=3;spacingRight=3;rotatable=0;labelPosition=right;points=[];portConstraint=eastwest;strokeColor=inherit;html=1;">
+          <mxGeometry y="102" width="280" height="8" as="geometry" />
+        </mxCell>
+        <mxCell id="DataReader_methods" value="+ read_raw() : DataFrame&amp;nbsp; {abstract}&lt;br&gt;+ read() : DataFrame&lt;br&gt;+ resolve_path(path) : Path" vertex="1" parent="DataReader" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=top;spacingLeft=4;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;whiteSpace=wrap;html=1;fontSize=11;fontFamily=Courier New;">
+          <mxGeometry y="110" width="280" height="62" as="geometry" />
+        </mxCell>
+        <mxCell id="CsvReader" value="CsvReader" vertex="1" parent="1" style="swimlane;fontStyle=1;align=center;verticalAlign=top;childLayout=stackLayout;horizontal=1;startSize=26;horizontalStack=0;resizeParent=1;resizeParentMax=0;resizeLast=0;collapsible=1;marginBottom=0;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;swimlaneFillColor=#ffffff;">
+          <mxGeometry x="2500" y="1120" width="240" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="CsvReader_attrs" value="+ type = &amp;#x27;csv&amp;#x27;&lt;br&gt;+ path, index_col, sep, decimal, …" vertex="1" parent="CsvReader" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=top;spacingLeft=4;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;whiteSpace=wrap;html=1;fontSize=11;fontFamily=Courier New;">
+          <mxGeometry y="26" width="240" height="44" as="geometry" />
+        </mxCell>
+        <mxCell id="ParquetReader" value="ParquetReader" vertex="1" parent="1" style="swimlane;fontStyle=1;align=center;verticalAlign=top;childLayout=stackLayout;horizontal=1;startSize=26;horizontalStack=0;resizeParent=1;resizeParentMax=0;resizeLast=0;collapsible=1;marginBottom=0;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;swimlaneFillColor=#ffffff;">
+          <mxGeometry x="2500" y="1220" width="220" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="ParquetReader_attrs" value="+ type = &amp;#x27;parquet&amp;#x27;&lt;br&gt;+ path, index_col" vertex="1" parent="ParquetReader" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=top;spacingLeft=4;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;whiteSpace=wrap;html=1;fontSize=11;fontFamily=Courier New;">
+          <mxGeometry y="26" width="220" height="44" as="geometry" />
+        </mxCell>
+        <mxCell id="UnregisteredReader" value="UnregisteredReader" vertex="1" parent="1" style="swimlane;fontStyle=1;align=center;verticalAlign=top;childLayout=stackLayout;horizontal=1;startSize=26;horizontalStack=0;resizeParent=1;resizeParentMax=0;resizeLast=0;collapsible=1;marginBottom=0;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;swimlaneFillColor=#ffffff;">
+          <mxGeometry x="2500" y="1320" width="220" height="52" as="geometry" />
+        </mxCell>
+        <mxCell id="UnregisteredReader_attrs" value="+ type inconnu (extra=&amp;#x27;allow&amp;#x27;)" vertex="1" parent="UnregisteredReader" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=top;spacingLeft=4;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;whiteSpace=wrap;html=1;fontSize=11;fontFamily=Courier New;">
+          <mxGeometry y="26" width="220" height="26" as="geometry" />
+        </mxCell>
+        <mxCell id="bstock.io" value="&lt;span style=&quot;font-weight:normal&quot;&gt;«module»&lt;/span&gt;&lt;br&gt;bstock.io" vertex="1" parent="1" style="swimlane;fontStyle=1;align=center;verticalAlign=top;childLayout=stackLayout;horizontal=1;startSize=40;horizontalStack=0;resizeParent=1;resizeParentMax=0;resizeLast=0;collapsible=1;marginBottom=0;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;swimlaneFillColor=#ffffff;">
+          <mxGeometry x="40" y="1560" width="400" height="138" as="geometry" />
+        </mxCell>
+        <mxCell id="bstock.io_methods" value="+ to_json(park) : str&lt;br&gt;+ from_json(text, *, site_cls, building_cls) : BuildingPark&lt;br&gt;+ save(park, dir, *, include_data) : Path&lt;br&gt;+ load(dir, …) : BuildingPark&lt;br&gt;+ json_schema(…) : dict" vertex="1" parent="bstock.io" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=top;spacingLeft=4;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;whiteSpace=wrap;html=1;fontSize=11;fontFamily=Courier New;">
+          <mxGeometry y="40" width="400" height="98" as="geometry" />
+        </mxCell>
+        <mxCell id="bstock.export" value="&lt;span style=&quot;font-weight:normal&quot;&gt;«module»&lt;/span&gt;&lt;br&gt;bstock.export" vertex="1" parent="1" style="swimlane;fontStyle=1;align=center;verticalAlign=top;childLayout=stackLayout;horizontal=1;startSize=40;horizontalStack=0;resizeParent=1;resizeParentMax=0;resizeLast=0;collapsible=1;marginBottom=0;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;swimlaneFillColor=#ffffff;">
+          <mxGeometry x="480" y="1560" width="400" height="120" as="geometry" />
+        </mxCell>
+        <mxCell id="bstock.export_methods" value="+ to_dataframe(park, entity, *, provenance) : DataFrame&lt;br&gt;+ to_geodataframe(park, entity, *, geometry) : GeoDataFrame&lt;br&gt;+ to_geopackage(park, path, …) : Path&lt;br&gt;+ to_geoparquet(park, path, entity, …) : Path" vertex="1" parent="bstock.export" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=top;spacingLeft=4;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;whiteSpace=wrap;html=1;fontSize=11;fontFamily=Courier New;">
+          <mxGeometry y="40" width="400" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="connectors.rnb" value="&lt;span style=&quot;font-weight:normal&quot;&gt;«module»&lt;/span&gt;&lt;br&gt;connectors.rnb" vertex="1" parent="1" style="swimlane;fontStyle=1;align=center;verticalAlign=top;childLayout=stackLayout;horizontal=1;startSize=40;horizontalStack=0;resizeParent=1;resizeParentMax=0;resizeLast=0;collapsible=1;marginBottom=0;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;swimlaneFillColor=#ffffff;">
+          <mxGeometry x="920" y="1560" width="380" height="190" as="geometry" />
+        </mxCell>
+        <mxCell id="connectors.rnb_attrs" value="+ SOURCE = &amp;#x27;rnb&amp;#x27;&lt;br&gt;+ RnbClient" vertex="1" parent="connectors.rnb" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=top;spacingLeft=4;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;whiteSpace=wrap;html=1;fontSize=11;fontFamily=Courier New;">
+          <mxGeometry y="40" width="380" height="44" as="geometry" />
+        </mxCell>
+        <mxCell id="connectors.rnb_div" value="" vertex="1" parent="connectors.rnb" style="line;strokeWidth=1;fillColor=none;align=left;verticalAlign=middle;spacingTop=-1;spacingLeft=3;spacingRight=3;rotatable=0;labelPosition=right;points=[];portConstraint=eastwest;strokeColor=inherit;html=1;">
+          <mxGeometry y="84" width="380" height="8" as="geometry" />
+        </mxCell>
+        <mxCell id="connectors.rnb_methods" value="+ add_buildings(park, rnb_ids, parent) : ImportReport&lt;br&gt;+ add_buildings_at_address(park, address) : ImportReport&lt;br&gt;+ enrich(park, buildings) : ImportReport&lt;br&gt;+ suggest_matches(park, *, method, radius) : DataFrame&lt;br&gt;+ assign_matches(park, matches)" vertex="1" parent="connectors.rnb" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=top;spacingLeft=4;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;whiteSpace=wrap;html=1;fontSize=11;fontFamily=Courier New;">
+          <mxGeometry y="92" width="380" height="98" as="geometry" />
+        </mxCell>
+        <mxCell id="connectors.bdnb" value="&lt;span style=&quot;font-weight:normal&quot;&gt;«module»&lt;/span&gt;&lt;br&gt;connectors.bdnb" vertex="1" parent="1" style="swimlane;fontStyle=1;align=center;verticalAlign=top;childLayout=stackLayout;horizontal=1;startSize=40;horizontalStack=0;resizeParent=1;resizeParentMax=0;resizeLast=0;collapsible=1;marginBottom=0;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;swimlaneFillColor=#ffffff;">
+          <mxGeometry x="1340" y="1560" width="380" height="118" as="geometry" />
+        </mxCell>
+        <mxCell id="connectors.bdnb_attrs" value="+ SOURCE = &amp;#x27;bdnb&amp;#x27;&lt;br&gt;+ BdnbClient" vertex="1" parent="connectors.bdnb" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=top;spacingLeft=4;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;whiteSpace=wrap;html=1;fontSize=11;fontFamily=Courier New;">
+          <mxGeometry y="40" width="380" height="44" as="geometry" />
+        </mxCell>
+        <mxCell id="connectors.bdnb_div" value="" vertex="1" parent="connectors.bdnb" style="line;strokeWidth=1;fillColor=none;align=left;verticalAlign=middle;spacingTop=-1;spacingLeft=3;spacingRight=3;rotatable=0;labelPosition=right;points=[];portConstraint=eastwest;strokeColor=inherit;html=1;">
+          <mxGeometry y="84" width="380" height="8" as="geometry" />
+        </mxCell>
+        <mxCell id="connectors.bdnb_methods" value="+ enrich(park, buildings, *, group_sites) : ImportReport" vertex="1" parent="connectors.bdnb" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=top;spacingLeft=4;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;whiteSpace=wrap;html=1;fontSize=11;fontFamily=Courier New;">
+          <mxGeometry y="92" width="380" height="26" as="geometry" />
+        </mxCell>
+        <mxCell id="connectors.dpe" value="&lt;span style=&quot;font-weight:normal&quot;&gt;«module»&lt;/span&gt;&lt;br&gt;connectors.dpe" vertex="1" parent="1" style="swimlane;fontStyle=1;align=center;verticalAlign=top;childLayout=stackLayout;horizontal=1;startSize=40;horizontalStack=0;resizeParent=1;resizeParentMax=0;resizeLast=0;collapsible=1;marginBottom=0;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;swimlaneFillColor=#ffffff;">
+          <mxGeometry x="1760" y="1560" width="280" height="136" as="geometry" />
+        </mxCell>
+        <mxCell id="connectors.dpe_attrs" value="+ SOURCE = &amp;#x27;dpe&amp;#x27;&lt;br&gt;+ DATASETS&lt;br&gt;+ DpeClient" vertex="1" parent="connectors.dpe" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=top;spacingLeft=4;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;whiteSpace=wrap;html=1;fontSize=11;fontFamily=Courier New;">
+          <mxGeometry y="40" width="280" height="62" as="geometry" />
+        </mxCell>
+        <mxCell id="connectors.dpe_div" value="" vertex="1" parent="connectors.dpe" style="line;strokeWidth=1;fillColor=none;align=left;verticalAlign=middle;spacingTop=-1;spacingLeft=3;spacingRight=3;rotatable=0;labelPosition=right;points=[];portConstraint=eastwest;strokeColor=inherit;html=1;">
+          <mxGeometry y="102" width="280" height="8" as="geometry" />
+        </mxCell>
+        <mxCell id="connectors.dpe_methods" value="+ enrich(park, buildings) : ImportReport" vertex="1" parent="connectors.dpe" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=top;spacingLeft=4;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;whiteSpace=wrap;html=1;fontSize=11;fontFamily=Courier New;">
+          <mxGeometry y="110" width="280" height="26" as="geometry" />
+        </mxCell>
+        <mxCell id="ImportReport" value="ImportReport" vertex="1" parent="1" style="swimlane;fontStyle=1;align=center;verticalAlign=top;childLayout=stackLayout;horizontal=1;startSize=26;horizontalStack=0;resizeParent=1;resizeParentMax=0;resizeLast=0;collapsible=1;marginBottom=0;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;swimlaneFillColor=#ffffff;">
+          <mxGeometry x="2100" y="1560" width="260" height="176" as="geometry" />
+        </mxCell>
+        <mxCell id="ImportReport_attrs" value="+ source : str&lt;br&gt;+ created, enriched : list[str]&lt;br&gt;+ not_found, ambiguous : list[str]&lt;br&gt;+ messages : dict[str, list[str]]" vertex="1" parent="ImportReport" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=top;spacingLeft=4;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;whiteSpace=wrap;html=1;fontSize=11;fontFamily=Courier New;">
+          <mxGeometry y="26" width="260" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="ImportReport_div" value="" vertex="1" parent="ImportReport" style="line;strokeWidth=1;fillColor=none;align=left;verticalAlign=middle;spacingTop=-1;spacingLeft=3;spacingRight=3;rotatable=0;labelPosition=right;points=[];portConstraint=eastwest;strokeColor=inherit;html=1;">
+          <mxGeometry y="106" width="260" height="8" as="geometry" />
+        </mxCell>
+        <mxCell id="ImportReport_methods" value="+ add(status, entity_id, message)&lt;br&gt;+ note(entity_id, message)&lt;br&gt;+ to_dataframe() : DataFrame" vertex="1" parent="ImportReport" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=top;spacingLeft=4;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;whiteSpace=wrap;html=1;fontSize=11;fontFamily=Courier New;">
+          <mxGeometry y="114" width="260" height="62" as="geometry" />
+        </mxCell>
+        <mxCell id="n_enum" value="&lt;b&gt;Énumérations&lt;/b&gt; (bstock.enums, StrEnum insensibles à la casse)&lt;br&gt;BuildingUsage, EnergyType, GeneratorTechnology, EndUse, SystemKind, ComponentKind, Orientation, Adjacency, Inertia, InsulationLevel, GlazingType, FrameType&lt;br&gt;Les membres génériques (ex. HEAT_PUMP, WOOD) exposent &lt;i&gt;family&lt;/i&gt; et &lt;i&gt;variants()&lt;/i&gt;." vertex="1" parent="1" style="shape=note;size=14;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacingLeft=6;fontSize=11;fillColor=#fffde7;strokeColor=#b0a060;">
+          <mxGeometry x="40" y="60" width="440" height="120" as="geometry" />
+        </mxCell>
+        <mxCell id="n_legend" value="&lt;b&gt;Légende&lt;/b&gt;&lt;br&gt;{s} : champ sourcé (SourcedField), valeur choisie parmi des candidats multi-sources&lt;br&gt;{inh} : hérité du site parent si absent&lt;br&gt;{ext} : extensif (sommé par Selection.aggregate)&lt;br&gt;[unité] : unité fixée du champ&lt;br&gt;Toutes les entités héritent de SourcedModel." vertex="1" parent="1" style="shape=note;size=14;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacingLeft=6;fontSize=11;fillColor=#fffde7;strokeColor=#b0a060;">
+          <mxGeometry x="40" y="200" width="440" height="130" as="geometry" />
+        </mxCell>
+        <mxCell id="n_sourced" value="Créé par &lt;b&gt;sourced&lt;/b&gt;(type, *, unit, inherit, extensive, …) dans le corps des classes." vertex="1" parent="1" style="shape=note;size=14;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacingLeft=6;fontSize=11;fillColor=#fffde7;strokeColor=#b0a060;">
+          <mxGeometry x="1660" y="300" width="240" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="n_resol" value="&lt;b&gt;Lecture de obj.x = effective('x')&lt;/b&gt;&lt;br&gt;1. Fournisseur : l'entité elle-même, ou (champ {inh}) l'ancêtre le plus proche qui a un candidat (site → bâtiment ; enveloppe du site → enveloppe du bâtiment).&lt;br&gt;2. Priorité : source_priority du parc (per_field, sinon default ; '*' = sources non listées).&lt;br&gt;3. Départage : meilleur rang de source, puis date la plus récente, puis dernier ajout.&lt;br&gt;Écriture : obj.x = v (source 'manual'), obj.set('x', v, source='dpe'), compute_*() ('computed'), connecteurs ('rnb', 'bdnb', 'dpe')." vertex="1" parent="1" style="shape=note;size=14;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacingLeft=6;fontSize=11;fillColor=#fffde7;strokeColor=#b0a060;">
+          <mxGeometry x="1940" y="60" width="420" height="200" as="geometry" />
+        </mxCell>
+        <mxCell id="n_conn" value="Les connecteurs créent ou enrichissent les entités du parc (bâtiments, sites, systèmes, composants) avec des valeurs sourcées, et rendent un ImportReport." vertex="1" parent="1" style="shape=note;size=14;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacingLeft=6;fontSize=11;fillColor=#fffde7;strokeColor=#b0a060;">
+          <mxGeometry x="920" y="1790" width="1120" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="e0" value="" edge="1" parent="1" source="DescribedEntity" target="SourcedModel" style="html=1;edgeStyle=orthogonalEdgeStyle;rounded=1;fontSize=10;labelBackgroundColor=default;endArrow=block;endFill=0;endSize=12;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e1" value="" edge="1" parent="1" source="Envelope" target="SourcedModel" style="html=1;edgeStyle=orthogonalEdgeStyle;rounded=1;fontSize=10;labelBackgroundColor=default;endArrow=block;endFill=0;endSize=12;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e2" value="" edge="1" parent="1" source="System" target="SourcedModel" style="html=1;edgeStyle=orthogonalEdgeStyle;rounded=1;fontSize=10;labelBackgroundColor=default;endArrow=block;endFill=0;endSize=12;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e3" value="" edge="1" parent="1" source="Site" target="DescribedEntity" style="html=1;edgeStyle=orthogonalEdgeStyle;rounded=1;fontSize=10;labelBackgroundColor=default;endArrow=block;endFill=0;endSize=12;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e4" value="" edge="1" parent="1" source="Building" target="DescribedEntity" style="html=1;edgeStyle=orthogonalEdgeStyle;rounded=1;fontSize=10;labelBackgroundColor=default;endArrow=block;endFill=0;endSize=12;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e5" value="" edge="1" parent="1" source="Window" target="EnvelopeComponent" style="html=1;edgeStyle=orthogonalEdgeStyle;rounded=1;fontSize=10;labelBackgroundColor=default;endArrow=block;endFill=0;endSize=12;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e6" value="" edge="1" parent="1" source="Generator" target="System" style="html=1;edgeStyle=orthogonalEdgeStyle;rounded=1;fontSize=10;labelBackgroundColor=default;endArrow=block;endFill=0;endSize=12;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e7" value="" edge="1" parent="1" source="Ventilation" target="System" style="html=1;edgeStyle=orthogonalEdgeStyle;rounded=1;fontSize=10;labelBackgroundColor=default;endArrow=block;endFill=0;endSize=12;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e8" value="" edge="1" parent="1" source="SolarPV" target="System" style="html=1;edgeStyle=orthogonalEdgeStyle;rounded=1;fontSize=10;labelBackgroundColor=default;endArrow=block;endFill=0;endSize=12;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e9" value="" edge="1" parent="1" source="HeatingGenerator" target="Generator" style="html=1;edgeStyle=orthogonalEdgeStyle;rounded=1;fontSize=10;labelBackgroundColor=default;endArrow=block;endFill=0;endSize=12;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e10" value="" edge="1" parent="1" source="CoolingGenerator" target="Generator" style="html=1;edgeStyle=orthogonalEdgeStyle;rounded=1;fontSize=10;labelBackgroundColor=default;endArrow=block;endFill=0;endSize=12;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e11" value="" edge="1" parent="1" source="DHWGenerator" target="Generator" style="html=1;edgeStyle=orthogonalEdgeStyle;rounded=1;fontSize=10;labelBackgroundColor=default;endArrow=block;endFill=0;endSize=12;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e12" value="" edge="1" parent="1" source="CsvReader" target="DataReader" style="html=1;edgeStyle=orthogonalEdgeStyle;rounded=1;fontSize=10;labelBackgroundColor=default;endArrow=block;endFill=0;endSize=12;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e13" value="" edge="1" parent="1" source="ParquetReader" target="DataReader" style="html=1;edgeStyle=orthogonalEdgeStyle;rounded=1;fontSize=10;labelBackgroundColor=default;endArrow=block;endFill=0;endSize=12;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e14" value="" edge="1" parent="1" source="UnregisteredReader" target="DataReader" style="html=1;edgeStyle=orthogonalEdgeStyle;rounded=1;fontSize=10;labelBackgroundColor=default;endArrow=block;endFill=0;endSize=12;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e15" value="values  0..*" edge="1" parent="1" source="SourcedModel" target="SourcedValue" style="html=1;edgeStyle=orthogonalEdgeStyle;rounded=1;fontSize=10;labelBackgroundColor=default;startArrow=diamondThin;startFill=1;startSize=14;endArrow=open;endFill=0;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e16" value="source_priority  1" edge="1" parent="1" source="BuildingPark" target="SourcePriority" style="html=1;edgeStyle=orthogonalEdgeStyle;rounded=1;fontSize=10;labelBackgroundColor=default;startArrow=diamondThin;startFill=1;startSize=14;endArrow=open;endFill=0;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e17" value="sites  0..*" edge="1" parent="1" source="BuildingPark" target="Site" style="html=1;edgeStyle=orthogonalEdgeStyle;rounded=1;fontSize=10;labelBackgroundColor=default;startArrow=diamondThin;startFill=1;startSize=14;endArrow=open;endFill=0;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e18" value="buildings  0..*" edge="1" parent="1" source="BuildingPark" target="Building" style="html=1;edgeStyle=orthogonalEdgeStyle;rounded=1;fontSize=10;labelBackgroundColor=default;startArrow=diamondThin;startFill=1;startSize=14;endArrow=open;endFill=0;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e19" value="meters  0..*" edge="1" parent="1" source="BuildingPark" target="Meter" style="html=1;edgeStyle=orthogonalEdgeStyle;rounded=1;fontSize=10;labelBackgroundColor=default;startArrow=diamondThin;startFill=1;startSize=14;endArrow=open;endFill=0;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e20" value="sites  0..*" edge="1" parent="1" source="Site" target="Site" style="html=1;edgeStyle=orthogonalEdgeStyle;rounded=1;fontSize=10;labelBackgroundColor=default;startArrow=diamondThin;startFill=1;startSize=14;endArrow=open;endFill=0;exitX=1;exitY=0.25;entryX=1;entryY=0.6;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e21" value="buildings  0..*" edge="1" parent="1" source="Site" target="Building" style="html=1;edgeStyle=orthogonalEdgeStyle;rounded=1;fontSize=10;labelBackgroundColor=default;startArrow=diamondThin;startFill=1;startSize=14;endArrow=open;endFill=0;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e22" value="envelope  1" edge="1" parent="1" source="DescribedEntity" target="Envelope" style="html=1;edgeStyle=orthogonalEdgeStyle;rounded=1;fontSize=10;labelBackgroundColor=default;startArrow=diamondThin;startFill=1;startSize=14;endArrow=open;endFill=0;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e23" value="heating, cooling, dhw,&lt;br&gt;ventilation, pv  0..*" edge="1" parent="1" source="DescribedEntity" target="System" style="html=1;edgeStyle=orthogonalEdgeStyle;rounded=1;fontSize=10;labelBackgroundColor=default;startArrow=diamondThin;startFill=1;startSize=14;endArrow=open;endFill=0;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e24" value="components  0..*" edge="1" parent="1" source="Envelope" target="EnvelopeComponent" style="html=1;edgeStyle=orthogonalEdgeStyle;rounded=1;fontSize=10;labelBackgroundColor=default;startArrow=diamondThin;startFill=1;startSize=14;endArrow=open;endFill=0;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e25" value="channels  1..*" edge="1" parent="1" source="Meter" target="Channel" style="html=1;edgeStyle=orthogonalEdgeStyle;rounded=1;fontSize=10;labelBackgroundColor=default;startArrow=diamondThin;startFill=1;startSize=14;endArrow=open;endFill=0;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e26" value="reader  0..1" edge="1" parent="1" source="Meter" target="DataReader" style="html=1;edgeStyle=orthogonalEdgeStyle;rounded=1;fontSize=10;labelBackgroundColor=default;startArrow=diamondThin;startFill=1;startSize=14;endArrow=open;endFill=0;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e27" value="scope (ids)" edge="1" parent="1" source="Meter" target="DescribedEntity" style="html=1;edgeStyle=orthogonalEdgeStyle;rounded=1;fontSize=10;labelBackgroundColor=default;dashed=1;endArrow=open;endFill=0;strokeColor=#9673a6;fontColor=#9673a6;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e28" value="parent_meter (id)" edge="1" parent="1" source="Meter" target="Meter" style="html=1;edgeStyle=orthogonalEdgeStyle;rounded=1;fontSize=10;labelBackgroundColor=default;dashed=1;endArrow=open;endFill=0;strokeColor=#9673a6;fontColor=#9673a6;exitX=1;exitY=0.25;entryX=1;entryY=0.6;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e29" value="serves (ids)" edge="1" parent="1" source="System" target="Building" style="html=1;edgeStyle=orthogonalEdgeStyle;rounded=1;fontSize=10;labelBackgroundColor=default;dashed=1;endArrow=open;endFill=0;strokeColor=#9673a6;fontColor=#9673a6;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e30" value="«use» effective()" edge="1" parent="1" source="SourcedModel" target="SourcePriority" style="html=1;edgeStyle=orthogonalEdgeStyle;rounded=1;fontSize=10;labelBackgroundColor=default;dashed=1;endArrow=open;endFill=0;strokeColor=#666666;fontColor=#666666;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e31" value="«declare»" edge="1" parent="1" source="SourcedModel" target="SourcedField[T]" style="html=1;edgeStyle=orthogonalEdgeStyle;rounded=1;fontSize=10;labelBackgroundColor=default;dashed=1;endArrow=open;endFill=0;strokeColor=#666666;fontColor=#666666;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e32" value="_park" edge="1" parent="1" source="Selection" target="BuildingPark" style="html=1;edgeStyle=orthogonalEdgeStyle;rounded=1;fontSize=10;labelBackgroundColor=default;dashed=1;endArrow=open;endFill=0;strokeColor=#666666;fontColor=#666666;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e33" value="«delegate»" edge="1" parent="1" source="BuildingPark" target="bstock.io" style="html=1;edgeStyle=orthogonalEdgeStyle;rounded=1;fontSize=10;labelBackgroundColor=default;dashed=1;endArrow=open;endFill=0;strokeColor=#666666;fontColor=#666666;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e34" value="«delegate»" edge="1" parent="1" source="BuildingPark" target="bstock.export" style="html=1;edgeStyle=orthogonalEdgeStyle;rounded=1;fontSize=10;labelBackgroundColor=default;dashed=1;endArrow=open;endFill=0;strokeColor=#666666;fontColor=#666666;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e35" value="" edge="1" parent="1" source="connectors.rnb" target="ImportReport" style="html=1;edgeStyle=orthogonalEdgeStyle;rounded=1;fontSize=10;labelBackgroundColor=default;dashed=1;endArrow=open;endFill=0;strokeColor=#666666;fontColor=#666666;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e36" value="" edge="1" parent="1" source="connectors.bdnb" target="ImportReport" style="html=1;edgeStyle=orthogonalEdgeStyle;rounded=1;fontSize=10;labelBackgroundColor=default;dashed=1;endArrow=open;endFill=0;strokeColor=#666666;fontColor=#666666;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e37" value="«create»" edge="1" parent="1" source="connectors.dpe" target="ImportReport" style="html=1;edgeStyle=orthogonalEdgeStyle;rounded=1;fontSize=10;labelBackgroundColor=default;dashed=1;endArrow=open;endFill=0;strokeColor=#666666;fontColor=#666666;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e38" value="«enrich»" edge="1" parent="1" source="zone_con" target="BuildingPark" style="html=1;edgeStyle=orthogonalEdgeStyle;rounded=1;fontSize=10;labelBackgroundColor=default;dashed=1;endArrow=open;endFill=0;strokeColor=#666666;fontColor=#666666;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
