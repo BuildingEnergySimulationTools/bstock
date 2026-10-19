@@ -1,0 +1,75 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "id": "parcelle.92669523",
+      "geometry": {
+        "type": "MultiPolygon",
+        "coordinates": [
+          [
+            [
+              [
+                -1.45485903,
+                43.4882094
+              ],
+              [
+                -1.45483758,
+                43.48828706
+              ],
+              [
+                -1.45480354,
+                43.48840993
+              ],
+              [
+                -1.45476052,
+                43.48840413
+              ],
+              [
+                -1.45458614,
+                43.48838039
+              ],
+              [
+                -1.45463943,
+                43.4881786
+              ],
+              [
+                -1.45481536,
+                43.48820327
+              ],
+              [
+                -1.45485903,
+                43.4882094
+              ]
+            ]
+          ]
+        ]
+      },
+      "geometry_name": "geom",
+      "properties": {
+        "gid": 92862752,
+        "numero": "0095",
+        "feuille": 1,
+        "section": "AO",
+        "code_dep": "64",
+        "nom_com": "Bayonne",
+        "code_com": "102",
+        "com_abs": "000",
+        "code_arr": "000",
+        "idu": "64102000AO0095",
+        "contenance": 405,
+        "code_insee": "64102"
+      }
+    }
+  ],
+  "totalFeatures": 1,
+  "numberMatched": 1,
+  "numberReturned": 1,
+  "timeStamp": "2026-10-19T08:45:33.945Z",
+  "crs": {
+    "type": "name",
+    "properties": {
+      "name": "urn:ogc:def:crs:EPSG::4326"
+    }
+  }
+}

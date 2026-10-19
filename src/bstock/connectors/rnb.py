@@ -8,6 +8,7 @@ one building into candidate values, and the other public functions work on a par
 from __future__ import annotations
 
 import logging
+import math
 from collections.abc import Iterable, Iterator
 from typing import TYPE_CHECKING, Any, Literal
 
@@ -19,6 +20,7 @@ from bstock.building import Building
 from bstock.connectors._http import HttpClient
 from bstock.connectors._report import ImportReport
 from bstock.connectors._sync import put, select_buildings
+from bstock.connectors.cadastre import EARTH_RADIUS, CadastreClient, plot_id
 from bstock.exceptions import ConnectorError, InvalidArgumentError
 from bstock.provenance import SourcedValue
 
@@ -32,9 +34,11 @@ __all__ = [
     "add_buildings",
     "add_buildings_at_address",
     "assign_matches",
+    "assign_site_matches",
     "enrich",
     "normalize_rnb_id",
     "suggest_matches",
+    "suggest_site_matches",
 ]
 
 logger = logging.getLogger(__name__)
@@ -49,6 +53,18 @@ SUGGESTION_COLUMNS = [
     "rnb_id",
     "distance",
     "score",
+    "address",
+    "used_by",
+]
+
+SITE_MATCH_COLUMNS = [
+    "site_id",
+    "rnb_id",
+    "status",
+    "method",
+    "plot_id",
+    "cover_ratio",
+    "distance",
     "address",
     "used_by",
 ]
@@ -104,6 +120,29 @@ class RnbClient:
     def search_address(self, address: str) -> dict[str, Any]:
         """Return the address search response: ``status``, ``score_ban`` and ``results``."""
         return self.http.get_json("buildings/address/", {"q": address}) or {}
+
+    def plot_buildings(self, plot_id: str) -> list[dict[str, Any]]:
+        """Return the buildings on a cadastral plot, with their ``bdg_cover_ratio``.
+
+        Parameters
+        ----------
+        plot_id
+            Plot id of 14 characters (e.g. ``"33063000KE0078"``), as given by
+            :meth:`bstock.connectors.cadastre.CadastreClient.plots`.
+
+        Returns
+        -------
+        list of dict
+            Buildings as :meth:`building` gives them, plus ``bdg_cover_ratio``: share of the
+            building footprint on the plot (0 to 1). Empty for a plot unknown to the RNB.
+        """
+        first = self.http.get_json(f"buildings/plot/{plot_id}/", not_found_ok=True)
+        if first is None:
+            return []
+        records = list(first.get("results") or [])
+        if first.get("next"):
+            records.extend(self.http.paginate(first["next"]))
+        return records
 
 
 # --- correspondences --------------------------------------------------------------------------
@@ -234,21 +273,8 @@ def add_buildings(
     """
     if parent is not None:
         park._resolve_site(parent)  # fail before any request
-    client = client or RnbClient()
     report = ImportReport(source=SOURCE)
-    for rnb_id in dict.fromkeys(normalize_rnb_id(i) for i in rnb_ids):
-        existing = _find(park, rnb_id)
-        record = _fetch_usable(client, rnb_id, report, None if existing is None else existing.id)
-        if record is None:
-            continue
-        building = existing or _find(park, record["rnb_id"])
-        if building is None:
-            building = park.new_building(rnb_id=record["rnb_id"], parent=parent)
-            _apply(building, record)
-            report.add("created", building.id)
-        else:
-            _apply(building, record)
-            report.add("enriched", building.id)
+    _add_buildings(park, rnb_ids, parent, client or RnbClient(), report)
     return report
 
 
@@ -480,7 +506,264 @@ def assign_matches(
     return report
 
 
+def suggest_site_matches(
+    park: BuildingPark,
+    sites: Iterable[Site | str] | None = None,
+    *,
+    method: Literal["plot", "point"] = "plot",
+    radius: float = 0.0,
+    min_cover: float = 0.5,
+    fallback_radius: float | None = None,
+    client: RnbClient | None = None,
+    cadastre: CadastreClient | None = None,
+) -> pd.DataFrame:
+    """Propose the RNB buildings of park sites, from their point (SPEC §8.3).
+
+    Nothing is changed in the park: review the table, then pass the rows kept to
+    :func:`assign_site_matches`. Unlike :func:`suggest_matches`, which needs park buildings, this
+    starts from the sites, which may have no building yet.
+
+    Parameters
+    ----------
+    park
+        Park whose sites are matched.
+    sites
+        Sites (objects or ids) to match; every site of the park when ``None``.
+    method
+        ``"plot"``: the RNB buildings on the cadastral plots at the effective ``lat`` / ``lon``
+        of the site (plot containing the point, or plots within ``radius``). ``"point"``: the
+        RNB buildings within ``radius`` of the point.
+    radius
+        Search radius around the point, in m (at most 1000): ``0`` for the plot containing the
+        point (``"plot"``); more than 0 with ``"point"``.
+    min_cover
+        Share of a building footprint on the plot (0 to 1) below which the candidate gets the
+        ``low_cover`` status (``"plot"``).
+    fallback_radius
+        With ``"plot"``: when no candidate reaches ``min_cover`` (e.g. a point on the road), add
+        the RNB buildings within this radius of the point, in m. No fallback when ``None``.
+    client
+        RNB client; a default one is created when omitted.
+    cadastre
+        Cadastre client (``"plot"``); a default one is created when omitted.
+
+    Returns
+    -------
+    pandas.DataFrame
+        One row per (site, candidate): ``site_id``, ``rnb_id``, ``status``, ``method``
+        (``"plot"`` or ``"point"``), ``plot_id`` and ``cover_ratio`` (largest share on one plot;
+        plot search), ``distance`` (m, from the site point to the RNB point; 0 inside the
+        footprint for a point search), ``address`` (RNB) and ``used_by`` (park building already
+        holding this ``rnb_id``). ``status``: ``ok``; ``low_cover``; ``shared`` (a candidate
+        otherwise ``ok`` proposed for several sites). A site without candidate has one row with
+        ``rnb_id`` ``None`` and the status ``none``, or ``no_point`` without ``lat`` / ``lon``.
+
+    Raises
+    ------
+    InvalidArgumentError
+        If ``method``, ``radius``, ``min_cover`` or ``fallback_radius`` is invalid.
+    UnknownIdError
+        If a site id is not in the park.
+    ConnectorError
+        If an API fails persistently.
+    """
+    if method not in ("plot", "point"):
+        raise InvalidArgumentError(f"method must be 'plot' or 'point', not {method!r}")
+    above_minimum = radius >= 0 if method == "plot" else radius > 0
+    if not above_minimum or radius > MAX_RADIUS:
+        raise InvalidArgumentError(f"radius {radius!r} m is out of range for method {method!r}")
+    if not 0 <= min_cover <= 1:
+        raise InvalidArgumentError(f"min_cover must be in [0, 1], not {min_cover!r}")
+    if fallback_radius is not None and not 0 < fallback_radius <= MAX_RADIUS:
+        raise InvalidArgumentError(
+            f"fallback_radius must be in ]0, {MAX_RADIUS:g}] m, not {fallback_radius!r}"
+        )
+    targets = list(park.iter_sites()) if sites is None else [park._resolve_site(s) for s in sites]
+    client = client or RnbClient()
+    if method == "plot":
+        cadastre = cadastre or CadastreClient()
+    rows: list[dict[str, Any]] = []
+    for site in targets:
+        if site.lat is None or site.lon is None:
+            logger.info("%s: no lat/lon, no RNB suggestion", site.id)
+            rows.append({"site_id": site.id, "rnb_id": None, "status": "no_point"})
+            continue
+        found: dict[str, dict[str, Any]] = {}
+        if cadastre is not None and method == "plot":
+            found = _plot_candidates(client, cadastre, site.lat, site.lon, radius, min_cover)
+        point_radius = radius if method == "point" else fallback_radius
+        if point_radius is not None and all(r["status"] != "ok" for r in found.values()):
+            for record in client.closest(site.lat, site.lon, point_radius):
+                rnb_id = normalize_rnb_id(record["rnb_id"])
+                found[rnb_id] = {
+                    **_suggestion(record, distance=record.get("distance")),
+                    "rnb_id": rnb_id,
+                    "method": "point",
+                    "status": "ok",
+                }
+        if not found:
+            rows.append({"site_id": site.id, "rnb_id": None, "status": "none"})
+        for row in found.values():
+            used = _find(park, row["rnb_id"])
+            rows.append({**row, "site_id": site.id, "used_by": used and used.id})
+    table = pd.DataFrame(rows, columns=SITE_MATCH_COLUMNS)
+    ok = table["status"] == "ok"
+    sites_per_id = table[ok].groupby("rnb_id")["site_id"].nunique()
+    table.loc[ok & table["rnb_id"].isin(sites_per_id.index[sites_per_id > 1]), "status"] = "shared"
+    return table
+
+
+def assign_site_matches(
+    park: BuildingPark,
+    matches: pd.DataFrame,
+    *,
+    client: RnbClient | None = None,
+) -> ImportReport:
+    """Add the RNB buildings of a table of proposals under their sites (SPEC §8.3).
+
+    ``matches`` is typically the result of :func:`suggest_site_matches`, reviewed by the user:
+    every row with an ``rnb_id`` is applied, whatever its ``status``. Each site receives its
+    buildings as with :func:`add_buildings` (one request per id).
+
+    Parameters
+    ----------
+    park
+        Park whose sites receive the buildings.
+    matches
+        Table with at least the columns ``site_id`` and ``rnb_id``, one row per building; rows
+        without ``rnb_id`` are ignored.
+    client
+        RNB client; a default one is created when omitted.
+
+    Returns
+    -------
+    ImportReport
+        As :func:`add_buildings`; ``ambiguous`` under the RNB id when it is given for several
+        sites (nothing done for it). A message when the building is already in the park under
+        another site: it is left there (use ``park.move``).
+
+    Raises
+    ------
+    InvalidArgumentError
+        If ``matches`` lacks a column.
+    UnknownIdError
+        If a ``site_id`` is not a site of the park.
+    ConnectorError
+        If the API fails persistently.
+    """
+    missing = [c for c in ("site_id", "rnb_id") if c not in matches.columns]
+    if missing:
+        raise InvalidArgumentError(f"matches lacks the columns {missing}")
+    kept = matches[matches["rnb_id"].notna()]
+    sites_of: dict[str, list[str]] = {}
+    for site_id, rnb_id in zip(kept["site_id"], kept["rnb_id"], strict=True):
+        ids = sites_of.setdefault(normalize_rnb_id(rnb_id), [])
+        if site_id not in ids:
+            ids.append(site_id)
+    sites = {s: park._resolve_site(s) for ids in sites_of.values() for s in ids}  # fail first
+    client = client or RnbClient()
+    report = ImportReport(source=SOURCE)
+    plan: dict[str, list[str]] = {}
+    for rnb_id, site_ids in sites_of.items():
+        if len(site_ids) > 1:
+            report.add("ambiguous", rnb_id, f"matched to several sites: {', '.join(site_ids)}")
+            continue
+        [site_id] = site_ids
+        existing = _find(park, rnb_id)
+        if existing is not None and not _is_under(existing, sites[site_id]):
+            where = existing.parent.id if existing.parent is not None else "the top level"
+            report.note(existing.id, f"RNB id {rnb_id} is under {where}, not {site_id}: not moved")
+            continue
+        plan.setdefault(site_id, []).append(rnb_id)
+    for site_id, rnb_ids in plan.items():
+        _add_buildings(park, rnb_ids, sites[site_id], client, report)
+    return report
+
+
 # --- helpers ----------------------------------------------------------------------------------
+
+
+def _add_buildings(
+    park: BuildingPark,
+    rnb_ids: Iterable[str],
+    parent: Site | str | None,
+    client: RnbClient,
+    report: ImportReport,
+) -> None:
+    for rnb_id in dict.fromkeys(normalize_rnb_id(i) for i in rnb_ids):
+        existing = _find(park, rnb_id)
+        record = _fetch_usable(client, rnb_id, report, None if existing is None else existing.id)
+        if record is None:
+            continue
+        building = existing or _find(park, record["rnb_id"])
+        if building is None:
+            building = park.new_building(rnb_id=record["rnb_id"], parent=parent)
+            _apply(building, record)
+            report.add("created", building.id)
+        else:
+            _apply(building, record)
+            report.add("enriched", building.id)
+
+
+def _is_under(building: Building, site: Site) -> bool:
+    """Return whether ``site`` is the parent of ``building`` or one of its ancestors."""
+    parent = building.parent
+    while parent is not None:
+        if parent is site:
+            return True
+        parent = parent.parent
+    return False
+
+
+def _distance(lat: float, lon: float, point: dict[str, Any] | None) -> float | None:
+    """Return the great-circle distance from (lat, lon) to a GeoJSON ``Point``, in m."""
+    point = point or {}
+    coordinates = point.get("coordinates") or []
+    if point.get("type") != "Point" or len(coordinates) < 2:
+        return None
+    lon2, lat2 = coordinates[:2]
+    phi1, phi2 = math.radians(lat), math.radians(lat2)
+    a = (
+        math.sin((phi2 - phi1) / 2) ** 2
+        + math.cos(phi1) * math.cos(phi2) * math.sin(math.radians(lon2 - lon) / 2) ** 2
+    )
+    return 2 * EARTH_RADIUS * math.asin(math.sqrt(a))
+
+
+def _plot_candidates(
+    client: RnbClient,
+    cadastre: CadastreClient,
+    lat: float,
+    lon: float,
+    radius: float,
+    min_cover: float,
+) -> dict[str, dict[str, Any]]:
+    """Return the usable RNB buildings on the plots at the point, by RNB id.
+
+    A building on several plots keeps the plot where its ``bdg_cover_ratio`` is the largest.
+    Demolished and inactive buildings are left aside.
+    """
+    found: dict[str, dict[str, Any]] = {}
+    for feature in cadastre.plots(lat, lon, radius):
+        plot = plot_id(feature)
+        if not plot:
+            continue
+        for record in client.plot_buildings(plot):
+            if record.get("status") == "demolished" or record.get("is_active") is False:
+                continue
+            rnb_id = normalize_rnb_id(record["rnb_id"])
+            cover = float(record.get("bdg_cover_ratio") or 0.0)
+            if rnb_id in found and found[rnb_id]["cover_ratio"] >= cover:
+                continue
+            found[rnb_id] = {
+                **_suggestion(record, distance=_distance(lat, lon, record.get("point"))),
+                "rnb_id": rnb_id,
+                "method": "plot",
+                "plot_id": plot,
+                "cover_ratio": cover,
+                "status": "ok" if cover >= min_cover else "low_cover",
+            }
+    return found
 
 
 def _fetch_usable(

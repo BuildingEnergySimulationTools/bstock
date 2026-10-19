@@ -317,7 +317,7 @@ class SelectionPlot:
     def map(
         self,
         *,
-        geometry: Literal["point", "footprint"] = "point",
+        geometry: Literal["point", "footprint", "both"] = "point",
         color: str | None = None,
     ) -> Figure:
         """Plot the entities on an OpenStreetMap background (no API key).
@@ -327,7 +327,9 @@ class SelectionPlot:
         geometry
             ``"point"``: the effective ``lat`` / ``lon`` (inherited from the site if needed).
             ``"footprint"``: the effective ``footprint`` (GeoJSON in WGS84; no ``[geo]`` extra
-            needed).
+            needed). ``"both"``: the footprints, plus a marker at each point so that small
+            footprints can be found on a zoomed-out map; footprints and markers share their
+            colours and legend.
         color
             Sourced field colouring the entities: a number on a blue ramp, other values in
             categorical colours (the three most frequent, the rest in grey as "Other").
@@ -347,63 +349,39 @@ class SelectionPlot:
             If plotly is not installed.
         """
         go = _plotly()
-        if geometry not in ("point", "footprint"):
-            raise InvalidArgumentError(f"geometry must be 'point' or 'footprint', not {geometry!r}")
+        if geometry not in ("point", "footprint", "both"):
+            raise InvalidArgumentError(
+                f"geometry must be 'point', 'footprint' or 'both', not {geometry!r}"
+            )
         if color is not None:
             _check_field(self._selection, color)
+        kinds = ("footprint", "point") if geometry == "both" else (geometry,)
         entities = list(self._selection)
-        shapes = [(e, _geometry(e, geometry)) for e in entities]
-        shapes = [(e, g) for e, g in shapes if g is not None]
-        values = [_color_value(e, color) for e, _ in shapes]
+        shapes = {e.id: {k: _geometry(e, k) for k in kinds} for e in entities}
+        located = [e for e in entities if any(g is not None for g in shapes[e.id].values())]
+        values = [_color_value(e, color) for e in located]
         numeric = color is not None and _all_numbers(values)
         unit = _unit_of(self._selection, color) if color else None
+        groups = [] if numeric else _map_groups(values, color)
         fig = go.Figure()
-        hover = [_hover_name(e) for e, _ in shapes]
-        if geometry == "point":
-            lats = [g[0] for _, g in shapes]
-            lons = [g[1] for _, g in shapes]
-            if numeric:
-                fig.add_trace(_points(go, lats, lons, hover, values, color, unit))
+        positions: list[tuple[float, float]] = []
+        for kind in kinds:
+            drawn = [i for i, e in enumerate(located) if shapes[e.id][kind] is not None]
+            geometries = [shapes[located[i].id][kind] for i in drawn]
+            legend = color is not None and kind == kinds[-1]  # one legend: the last layer
+            if kind == "point":
+                positions += geometries
+                traces = _point_traces(
+                    go, located, drawn, geometries, values, groups, color, unit, legend
+                )
             else:
-                for name, indexes, colour in _map_groups(values, color):
-                    fig.add_trace(
-                        go.Scattermap(
-                            lat=[lats[i] for i in indexes],
-                            lon=[lons[i] for i in indexes],
-                            mode="markers",
-                            name=name,
-                            marker={"size": 10, "color": colour},
-                            text=[hover[i] for i in indexes],
-                            hovertemplate="%{text}<extra>" + name + "</extra>",
-                            showlegend=color is not None,
-                        )
-                    )
-            center, zoom = _view([g for _, g in shapes])
-        else:
-            features = [
-                {"type": "Feature", "id": e.id, "geometry": g, "properties": {}} for e, g in shapes
-            ]
-            geojson = {"type": "FeatureCollection", "features": features}
-            ids = [e.id for e, _ in shapes]
-            if numeric:
-                z = [math.nan if v is None else v for v in values]
-                fig.add_trace(_choropleth(go, geojson, ids, z, hover, SEQUENTIAL, color, unit))
-            else:
-                for name, indexes, colour in _map_groups(values, color):
-                    trace = _choropleth(
-                        go,
-                        geojson,
-                        [ids[i] for i in indexes],
-                        [0.0] * len(indexes),
-                        [hover[i] for i in indexes],
-                        (colour, colour),
-                        name,
-                        None,
-                    )
-                    trace.update(showscale=False, showlegend=color is not None, name=name)
-                    fig.add_trace(trace)
-            center, zoom = _view([p for _, g in shapes for p in _positions(g)])
-        subtitle = f"{len(shapes)} / {len(entities)} {self._selection.entity}s located"
+                positions += [p for g in geometries for p in _positions(g)]
+                traces = _footprint_traces(
+                    go, located, drawn, geometries, values, groups, color, unit, legend
+                )
+            fig.add_traces(traces)
+        center, zoom = _view(positions)
+        subtitle = f"{len(located)} / {len(entities)} {self._selection.entity}s located"
         _style(fig, f"Map of {_plural(len(entities), self._selection.entity)}", subtitle)
         fig.update_layout(
             map={"style": "open-street-map", "center": center, "zoom": zoom},
@@ -656,6 +634,101 @@ def _map_groups(values: list[Any], color: str | None) -> list[tuple[str, list[in
         name = OTHER if len(ranked) > len(kept) else "(no value)"
         groups.append((name, rest, OTHER_COLOR))
     return groups
+
+
+def _point_traces(
+    go: Any,
+    entities: list[Any],
+    drawn: list[int],
+    points: list[tuple[float, float]],
+    values: list[Any],
+    groups: list[tuple[str, list[int], str]],
+    color: str | None,
+    unit: str | None,
+    legend: bool,
+) -> list[Any]:
+    """Markers of the entities ``drawn`` (indexes in ``entities``), at ``points`` (lat, lon)."""
+    lats = [p[0] for p in points]
+    lons = [p[1] for p in points]
+    hover = [_hover_name(entities[i]) for i in drawn]
+    if not groups:  # numbers on a ramp
+        assert color is not None
+        trace = _points(go, lats, lons, hover, [values[i] for i in drawn], color, unit)
+        cmin, cmax = _range(values)
+        trace.marker.update(cmin=cmin, cmax=cmax, showscale=legend)
+        return [trace]
+    traces = []
+    for name, indexes, colour in groups:
+        members = set(indexes)
+        kept = [j for j, i in enumerate(drawn) if i in members]
+        if not kept:
+            continue
+        traces.append(
+            go.Scattermap(
+                lat=[lats[j] for j in kept],
+                lon=[lons[j] for j in kept],
+                mode="markers",
+                name=name,
+                legendgroup=name,
+                marker={"size": 10, "color": colour},
+                text=[hover[j] for j in kept],
+                hovertemplate="%{text}<extra>" + name + "</extra>",
+                showlegend=legend,
+            )
+        )
+    return traces
+
+
+def _footprint_traces(
+    go: Any,
+    entities: list[Any],
+    drawn: list[int],
+    footprints: list[dict[str, Any]],
+    values: list[Any],
+    groups: list[tuple[str, list[int], str]],
+    color: str | None,
+    unit: str | None,
+    legend: bool,
+) -> list[Any]:
+    """Footprints of the entities ``drawn`` (indexes in ``entities``)."""
+    ids = [entities[i].id for i in drawn]
+    features = [
+        {"type": "Feature", "id": i, "geometry": g, "properties": {}}
+        for i, g in zip(ids, footprints, strict=True)
+    ]
+    geojson = {"type": "FeatureCollection", "features": features}
+    hover = [_hover_name(entities[i]) for i in drawn]
+    if not groups:  # numbers on a ramp
+        z = [math.nan if values[i] is None else values[i] for i in drawn]
+        trace = _choropleth(go, geojson, ids, z, hover, SEQUENTIAL, color, unit)
+        zmin, zmax = _range(values)
+        trace.update(zmin=zmin, zmax=zmax, showscale=legend)
+        return [trace]
+    traces = []
+    for name, indexes, colour in groups:
+        members = set(indexes)
+        kept = [j for j, i in enumerate(drawn) if i in members]
+        if not kept:
+            continue
+        trace = _choropleth(
+            go,
+            geojson,
+            [ids[j] for j in kept],
+            [0.0] * len(kept),
+            [hover[j] for j in kept],
+            (colour, colour),
+            name,
+            None,
+        )
+        trace.update(showscale=False, showlegend=legend, name=name, legendgroup=name)
+        traces.append(trace)
+    return traces
+
+
+def _range(values: list[Any]) -> tuple[float | None, float | None]:
+    """Return the smallest and largest known values, or ``(None, None)``."""
+    known = [v for v in values if v is not None]
+    return (min(known), max(known)) if known else (None, None)
 
 
 def _points(

@@ -69,6 +69,37 @@ class FakeRnbClient:
             return self.recorded(self.addresses[address])
         return self.address_response or self.recorded("rnb/address_search_ok.json")
 
+    def plot_buildings(self, plot_id):
+        self.calls.append(("plot", plot_id))
+        try:
+            return self.recorded(f"rnb/plot_{plot_id}.json")["results"]
+        except FileNotFoundError:
+            return []
+
+
+# --- cadastre ---------------------------------------------------------------------------------
+
+GABARRE_POINT = (43.48829, -1.45472)  # lat, lon
+GABARRE_PLOT = "64102000AO0095"  # holds Gabarre (cover 0.98) and a sliver of NEIGHBOUR
+NEXT_PLOT = "64102000AO0148"  # holds HJ3QCGD13V13 (cover 1.0) and slivers of the two others
+NEXT_PLOT_BUILDING = "HJ3QCGD13V13"
+
+
+class FakeCadastreClient:
+    """Serve the recorded plots around the Gabarre building and record the calls."""
+
+    def __init__(self, recorded, plots=None):
+        self.recorded = recorded
+        self.plots_response = plots
+        self.calls = []
+
+    def plots(self, lat, lon, radius=0.0):
+        self.calls.append(("plots", lat, lon, radius))
+        if self.plots_response is not None:
+            return self.plots_response
+        name = "point" if radius == 0 else "radius20"
+        return self.recorded(f"cadastre/parcelle_{name}_gabarre.json")["features"]
+
 
 # --- BDNB -------------------------------------------------------------------------------------
 

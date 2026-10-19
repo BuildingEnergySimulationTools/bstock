@@ -10,10 +10,15 @@ from fakes import (
     DEACTIVATED,
     DEMOLISHED,
     GABARRE,
+    GABARRE_PLOT,
+    GABARRE_POINT,
     INACTIVE_FILES,
     MERGED,
     NEIGHBOUR,
+    NEXT_PLOT,
+    NEXT_PLOT_BUILDING,
     SPLIT,
+    FakeCadastreClient,
     FakeRnbClient,
 )
 
@@ -367,6 +372,185 @@ def test_assign_arguments_are_checked(park, unmatched, frame, kwargs, error):
     assert unmatched.rnb_id is None
 
 
+# --- suggest_site_matches / assign_site_matches -----------------------------------------------
+
+
+@pytest.fixture
+def cadastre(recorded):
+    return FakeCadastreClient(recorded)
+
+
+@pytest.fixture
+def located(park):
+    site = park["ecole"]
+    site.lat, site.lon = GABARRE_POINT
+    return site
+
+
+def suggest_sites(park, client, cadastre, **kwargs):
+    return rnb.suggest_site_matches(park, client=client, cadastre=cadastre, **kwargs)
+
+
+def test_plot_suggestions_list_the_buildings_of_the_plot(park, client, cadastre, located):
+    table = suggest_sites(park, client, cadastre)
+    assert list(table.columns) == rnb.SITE_MATCH_COLUMNS
+    frame = table.set_index("rnb_id")
+    assert set(frame.index) == {GABARRE, NEIGHBOUR}
+    assert frame.loc[GABARRE, "status"] == "ok"
+    assert frame.loc[GABARRE, "plot_id"] == GABARRE_PLOT
+    assert frame.loc[GABARRE, "cover_ratio"] == pytest.approx(0.979, abs=1e-3)
+    assert frame.loc[GABARRE, "distance"] < 20
+    assert frame.loc[GABARRE, "address"] == "4 Rue de la Gabarre, 64100 Bayonne"
+    assert frame.loc[NEIGHBOUR, "status"] == "low_cover"
+    assert set(frame["site_id"]) == {"ecole"}
+    assert cadastre.calls == [("plots", *GABARRE_POINT, 0.0)]
+    assert park["ecole"].buildings == []  # nothing changed
+
+
+def test_min_cover_sets_the_low_cover_status(park, client, cadastre, located):
+    frame = suggest_sites(park, client, cadastre, min_cover=0.0)
+    assert set(frame["status"]) == {"ok"}
+
+
+def test_building_on_several_plots_keeps_its_largest_cover(park, client, cadastre, located):
+    frame = suggest_sites(park, client, cadastre, radius=20).set_index("rnb_id")
+    assert frame.index.is_unique
+    assert frame.loc[GABARRE, "plot_id"] == GABARRE_PLOT
+    assert frame.loc[NEXT_PLOT_BUILDING, "plot_id"] == NEXT_PLOT
+    assert ("plot", NEXT_PLOT) in client.calls
+
+
+def test_unknown_plot_gives_no_candidate(park, client, recorded, located):
+    plots = [{"properties": {"idu": "64102000ZZ9999"}}]
+    frame = suggest_sites(park, client, FakeCadastreClient(recorded, plots=plots))
+    assert frame[["site_id", "status"]].to_dict("records") == [
+        {"site_id": "ecole", "status": "none"}
+    ]
+    assert frame["rnb_id"].isna().all()
+
+
+def test_site_without_point_has_a_no_point_row(park, client, cadastre):
+    frame = suggest_sites(park, client, cadastre)
+    assert frame["status"].tolist() == ["no_point"]
+    assert cadastre.calls == []
+
+
+def test_fallback_searches_around_the_point_when_no_plot_building(park, client, recorded, located):
+    cadastre = FakeCadastreClient(recorded, plots=[])
+    frame = suggest_sites(park, client, cadastre, fallback_radius=30)
+    assert set(frame["method"]) == {"point"}
+    assert frame.iloc[0]["rnb_id"] == GABARRE
+    assert frame.iloc[0]["distance"] == 0
+    assert ("closest", *GABARRE_POINT, 30) in client.calls
+
+
+def test_no_fallback_when_the_plot_gives_a_building(park, client, cadastre, located):
+    suggest_sites(park, client, cadastre, fallback_radius=30)
+    assert not [c for c in client.calls if c[0] == "closest"]
+
+
+def test_point_method_needs_no_cadastre(park, client, located):
+    frame = rnb.suggest_site_matches(park, method="point", radius=50, client=client)
+    assert set(frame["method"]) == {"point"}
+    assert frame.iloc[0]["rnb_id"] == GABARRE
+
+
+def test_candidate_of_several_sites_is_shared(park, client, cadastre, located):
+    park.new_site("ecole-bis", lat=GABARRE_POINT[0], lon=GABARRE_POINT[1])
+    frame = suggest_sites(park, client, cadastre).set_index(["site_id", "rnb_id"])
+    assert frame.loc[("ecole", GABARRE), "status"] == "shared"
+    assert frame.loc[("ecole-bis", GABARRE), "status"] == "shared"
+    assert frame.loc[("ecole", NEIGHBOUR), "status"] == "low_cover"
+
+
+def test_site_suggestions_can_be_restricted(park, client, cadastre, located):
+    park.new_site("autre", lat=1.0, lon=1.0)
+    frame = suggest_sites(park, client, cadastre, sites=["ecole"])
+    assert set(frame["site_id"]) == {"ecole"}
+    with pytest.raises(UnknownIdError):
+        suggest_sites(park, client, cadastre, sites=["inconnu"])
+
+
+@pytest.mark.parametrize(
+    "kwargs",
+    [
+        {"method": "address"},
+        {"radius": -1},
+        {"radius": 2000},
+        {"method": "point", "radius": 0},
+        {"min_cover": 1.5},
+        {"fallback_radius": 0},
+    ],
+)
+def test_invalid_site_suggestion_options_are_rejected(park, client, cadastre, kwargs):
+    with pytest.raises(InvalidArgumentError):
+        suggest_sites(park, client, cadastre, **kwargs)
+
+
+def test_assign_site_matches_adds_the_buildings_under_their_site(park, client, cadastre, located):
+    frame = suggest_sites(park, client, cadastre)
+    report = rnb.assign_site_matches(park, frame[frame["status"] == "ok"], client=client)
+    assert report.created == [GABARRE]
+    assert park[GABARRE].parent is located
+    assert isinstance(park[GABARRE], ProjectBuilding)
+
+
+def test_assign_site_matches_is_idempotent(park, client, cadastre, located):
+    frame = suggest_sites(park, client, cadastre, min_cover=0.0)
+    rnb.assign_site_matches(park, frame, client=client)
+    report = rnb.assign_site_matches(park, frame, client=client)
+    assert report.created == []
+    assert set(report.enriched) == {GABARRE, NEIGHBOUR}
+    assert len(located.buildings) == 2
+
+
+def test_assign_site_matches_ignores_rows_without_rnb_id(park, client):
+    frame = pd.DataFrame({"site_id": ["ecole"], "rnb_id": [None]})
+    report = rnb.assign_site_matches(park, frame, client=client)
+    assert report.created == []
+    assert client.calls == []
+
+
+def test_rnb_id_given_for_several_sites_is_ambiguous(park, client):
+    park.new_site("ecole-bis")
+    frame = pd.DataFrame({"site_id": ["ecole", "ecole-bis"], "rnb_id": [GABARRE, GABARRE]})
+    report = rnb.assign_site_matches(park, frame, client=client)
+    assert report.ambiguous == [GABARRE]
+    assert GABARRE not in park
+    assert client.calls == []
+
+
+def test_building_under_another_site_is_not_moved(park, client):
+    park.new_site("ecole-bis")
+    rnb.add_buildings(park, [GABARRE], parent="ecole-bis", client=client)
+    frame = pd.DataFrame({"site_id": ["ecole"], "rnb_id": [GABARRE]})
+    report = rnb.assign_site_matches(park, frame, client=client)
+    assert park[GABARRE].parent.id == "ecole-bis"
+    assert "not moved" in report.messages[GABARRE][0]
+
+
+def test_building_in_a_sub_site_stays_there(park, client):
+    park.new_site("groupe", parent="ecole")
+    rnb.add_buildings(park, [GABARRE], parent="groupe", client=client)
+    frame = pd.DataFrame({"site_id": ["ecole"], "rnb_id": [GABARRE]})
+    report = rnb.assign_site_matches(park, frame, client=client)
+    assert report.enriched == [GABARRE]
+    assert park[GABARRE].parent.id == "groupe"
+
+
+@pytest.mark.parametrize(
+    ("frame", "error"),
+    [
+        (pd.DataFrame({"site_id": ["ecole"]}), InvalidArgumentError),
+        (pd.DataFrame({"site_id": ["inconnu"], "rnb_id": [GABARRE]}), UnknownIdError),
+    ],
+)
+def test_assign_site_matches_arguments_are_checked(park, client, frame, error):
+    with pytest.raises(error):
+        rnb.assign_site_matches(park, frame, client=client)
+    assert client.calls == []
+
+
 # --- real API ---------------------------------------------------------------------------------
 
 
@@ -376,6 +560,15 @@ def test_real_rnb_building_is_added():
     report = rnb.add_buildings(park, [GABARRE])
     assert report.created == [GABARRE]
     assert park[GABARRE].insee_code == "64102"
+
+
+@pytest.mark.network
+def test_real_plot_buildings_are_suggested():
+    park = BuildingPark(name="réseau")
+    park.new_site("ecole", lat=GABARRE_POINT[0], lon=GABARRE_POINT[1])
+    frame = rnb.suggest_site_matches(park)
+    assert GABARRE in set(frame.loc[frame["status"] == "ok", "rnb_id"])
+    assert rnb.RnbClient().plot_buildings("64102000ZZ9999") == []
 
 
 def test_client_arguments_are_keywords():

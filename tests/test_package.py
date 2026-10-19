@@ -54,6 +54,7 @@ PUBLIC_SUBMODULES = {
     "bstock.connectors.rnb",
     "bstock.connectors.bdnb",
     "bstock.connectors.dpe",
+    "bstock.connectors.cadastre",
 }
 OTHER_MODULES = sorted(
     info.name

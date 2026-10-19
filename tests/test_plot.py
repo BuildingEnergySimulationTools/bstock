@@ -202,6 +202,37 @@ def test_map_of_footprints_draws_located_entities_only(park):
 
 
 @requires_plotly
+def test_map_of_both_draws_footprints_then_markers(park):
+    park["b5"].lat, park["b5"].lon = 43.6, -1.4  # a point but no footprint
+    fig = park.select().plot.map(geometry="both")
+    assert [t.type for t in fig.data] == ["choroplethmap", "scattermap"]
+    assert list(fig.data[0].locations) == ["b0", "b1", "b2", "b3", "b4"]
+    assert set(fig.data[1].text) == {"b0", "b1", "b2", "b3", "b4", "b5"}
+    assert subtitle(fig) == "6 / 6 buildings located"
+
+
+@requires_plotly
+def test_map_of_both_shares_colours_with_one_legend(park):
+    fig = park.select().plot.map(geometry="both", color="usage")
+    footprints = [t for t in fig.data if t.type == "choroplethmap"]
+    markers = [t for t in fig.data if t.type == "scattermap"]
+    assert [t.name for t in footprints] == [t.name for t in markers]
+    assert [t.colorscale[0][1] for t in footprints] == [t.marker.color for t in markers]
+    assert not any(t.showlegend for t in footprints)
+    assert all(t.showlegend for t in markers)
+    assert [t.legendgroup for t in markers] == [t.name for t in markers]
+
+
+@requires_plotly
+def test_map_of_both_has_one_colour_scale_for_numbers(park):
+    fig = park.select().plot.map(geometry="both", color="heated_area")
+    footprints, markers = fig.data
+    assert footprints.showscale is False
+    assert markers.marker.showscale is True
+    assert (footprints.zmin, footprints.zmax) == (markers.marker.cmin, markers.marker.cmax)
+
+
+@requires_plotly
 def test_map_refuses_an_unknown_geometry(park):
     with pytest.raises(InvalidArgumentError):
         park.select().plot.map(geometry="polygon")

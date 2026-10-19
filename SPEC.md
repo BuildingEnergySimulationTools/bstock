@@ -984,7 +984,8 @@ src/bstock/connectors/
   _mappings.py     # tables de correspondance de l'annexe A (fonctions pures)
   data/            # dpe_generators.csv (annexe A.5)
   rnb.py           # RnbClient, add_buildings, add_buildings_at_address, enrich, suggest_matches,
-                   # assign_matches
+                   # assign_matches, suggest_site_matches, assign_site_matches
+  cadastre.py      # CadastreClient (parcelles de l'API Carto IGN, client brut seulement)
   bdnb.py          # BdnbClient, enrich
   dpe.py           # DpeClient, enrich
 ```
@@ -1100,6 +1101,37 @@ Précisions d'implémentation :
 La recherche par adresse s'appuie sur l'API RNB, qui géocode elle-même l'adresse avec la BAN et ne garde
 que la meilleure adresse : il n'y a pas de géocodage séparé dans bstock. Une adresse sans numéro ou mal
 reconnue ne donne aucun candidat.
+
+**Sites sans bâtiment : appariement par parcelle.** Un site client (école, gymnase) a souvent plusieurs
+bâtiments RNB et pas encore de `Building` dans le parc ; `suggest_matches` ne s'y applique donc pas. Les
+deux mêmes temps partent alors du site :
+
+```python
+matches = rnb.suggest_site_matches(park, fallback_radius=30)   # ne modifie rien
+kept = matches[matches["status"] == "ok"]                       # revue par l'utilisateur
+report = rnb.assign_site_matches(park, kept)
+```
+
+- `rnb.suggest_site_matches(park, sites=None, *, method="plot", radius=0.0, min_cover=0.5,
+  fallback_radius=None, client=None, cadastre=None) -> pd.DataFrame` : avec `"plot"`, les parcelles
+  cadastrales au point effectif du site (celle qui contient le point, ou celles qui coupent un cercle de
+  `radius` m), puis les bâtiments RNB de chaque parcelle avec leur part d'emprise sur la parcelle
+  (`bdg_cover_ratio`) ; avec `"point"`, les bâtiments RNB à moins de `radius` m (`closest`). Une ligne par
+  couple (site, candidat) : `site_id`, `rnb_id`, `status`, `method`, `plot_id`, `cover_ratio` (la plus
+  grande part sur une parcelle, quand le bâtiment en chevauche plusieurs), `distance` (m, du point du
+  site au point RNB ; 0 dans l'emprise pour `"point"`), `address`, `used_by`. Statuts : `ok`,
+  `low_cover` (part < `min_cover` : bâtiment voisin qui déborde sur la parcelle), `shared` (candidat `ok`
+  proposé pour plusieurs sites), `none` (aucun candidat, `rnb_id` vide) et `no_point` (site sans
+  `lat` / `lon`). `fallback_radius` ajoute la recherche par point quand aucun candidat de parcelle n'est
+  `ok` (point sur la voirie). Bâtiments démolis et ids inactifs écartés.
+- `rnb.assign_site_matches(park, matches, *, client=None) -> ImportReport` ajoute sous chaque site les
+  bâtiments de toutes les lignes qui ont un `rnb_id` (le filtre par statut est laissé à
+  l'utilisateur), comme `add_buildings` (une requête par id). Un `rnb_id` donné pour plusieurs sites
+  donne `ambiguous` sous ce `rnb_id`, sans rien faire ; un bâtiment déjà dans le parc sous un autre site
+  n'est pas déplacé (message ; `park.move` sinon). Relancer enrichit au lieu de créer.
+- Le passage du point aux parcelles est le client brut `cadastre.CadastreClient.plots(lat, lon,
+  radius=0.0)` (API Carto IGN, annexe A.6 ; cercle approché par un polygone à 16 côtés) ; il n'écrit rien
+  dans le parc. `cadastre.plot_id(feature)` donne l'identifiant de parcelle (`idu`, 14 caractères).
 
 ### 8.4 BDNB
 
@@ -1309,8 +1341,8 @@ scripts/               # outils de maintenance (régénération de dpe_generator
 ```
 
 - **API publique** : `bstock.__all__`, plus les `__all__` des sous-modules documentés `bstock.io`,
-  `bstock.export`, `bstock.connectors`, `bstock.connectors.rnb`, `bstock.connectors.bdnb` et
-  `bstock.connectors.dpe`. Les `__all__` des autres modules ne listent que des noms réexportés par
+  `bstock.export`, `bstock.connectors`, `bstock.connectors.rnb`, `bstock.connectors.bdnb`,
+  `bstock.connectors.dpe` et `bstock.connectors.cadastre`. Les `__all__` des autres modules ne listent que des noms réexportés par
   `bstock` ; leurs autres noms, et les modules préfixés par `_`, sont internes.
 - Python ≥ 3.11.
 - Dépendances : `pydantic>=2`, `pandas`, `pyarrow` (Parquet). Extras : `[plot]` (plotly, seule lib de
@@ -1660,7 +1692,7 @@ On la personnalise ensuite avec `fig.update_layout(...)`.
 | `plot.provenance(fields=None)` | Barres empilées des sources par attribut (parts) | §14.4 |
 | `plot.aggregate(field, *, by=None, prefer="buildings")` | Barres de `total` par site (ou par groupe `by`), avec la couverture au survol | §14.3 |
 | `plot.distribution(field, *, bins=None)` | Histogramme pour un nombre ; barres de fréquence pour une enum ou une chaîne | Valeurs effectives |
-| `plot.map(*, geometry="point", color=None)` | Carte sur fond OpenStreetMap (sans clé d'API) : points `lat` / `lon` ou emprises `footprint` (GeoJSON WGS84, sans l'extra `[geo]`), colorés par un attribut | Valeurs effectives |
+| `plot.map(*, geometry="point", color=None)` | Carte sur fond OpenStreetMap (sans clé d'API) : points `lat` / `lon`, emprises `footprint` (GeoJSON WGS84, sans l'extra `[geo]`) ou les deux (`geometry="both"` : emprises plus un marqueur par entité, pour les retrouver sur une carte dézoomée ; mêmes couleurs, une seule légende), colorés par un attribut | Valeurs effectives |
 | `plot.consumption(*, start, end, freq=None, by="energy_type", tz, breakdown, split, load_data)` | Barres empilées de la consommation (kWh) par entité, empilées par énergie (`by="energy_type"`) ou par usage (`by="end_use"`) ; une barre par période avec `freq` | §6.5 |
 | `plot.intensity(*, start, end, area="heated_area", prefer, freq=None, tz, breakdown, split, load_data)` | Barres du kWh/m² par entité, empilées par énergie | §6.5 |
 
@@ -1831,6 +1863,7 @@ authentification, limite de 20 requêtes par seconde (429 au-delà). Toujours te
 | `buildings/?insee_code=` ou `?bbox=lon_min,lat_min,lon_max,lat_max` | Liste | Un filtre obligatoire ; pas de filtre par liste d'ids. Bâtiments démolis exclus sauf `status=constructed,notUsable,demolished` ; ids inactifs exclus |
 | `buildings/closest/?point=lat,lon&radius=` | Suggestions par point | **lat,lon** (l'inverse des géométries) ; un ordre inversé renvoie une liste vide sans erreur. `radius` obligatoire, ≤ 1000 m. Résultats triés par `distance` (m), sans `is_active` |
 | `buildings/address/?q=&min_score=` | Suggestions par adresse | Géocodage BAN interne, meilleure adresse seulement : `status` (`ok`, `geocoding_score_is_too_low`, `geocoding_no_result`), `cle_interop_ban`, `score_ban`, `results` (`null` en cas d'échec) |
+| `buildings/plot/{plot_id}/` | Bâtiments d'une parcelle (vérifié le 2026-10-19) | Paginé ; 404 `{"detail": "Plot unknown"}` pour une parcelle inconnue. Champs d'un bâtiment, plus `bdg_cover_ratio` (part de l'emprise sur la parcelle, 0 à 1) ; un bâtiment à cheval sur deux parcelles figure dans les deux |
 | `buildings/{rnb_id}/history/` | Successeurs d'un id inactif | Non documenté. Versions de la plus récente à la plus ancienne ; `event.type` ∈ `creation`, `update`, `merge`, `split`, `deactivation` ; `event.details.merge_child` ou `split_children` |
 
 - Pagination par curseur : `{"next", "previous", "results"}`, paramètre `limit` (20 par défaut, 100 au
@@ -1845,6 +1878,14 @@ authentification, limite de 20 requêtes par seconde (429 au-delà). Toujours te
   dans la réponse. Les ids sont acceptés en minuscules ou avec tirets ; la réponse les donne en
   majuscules sur 12 caractères.
 - Messages d'erreur en français, au format Django REST Framework (`detail`, `non_field_errors`).
+
+**Cadastre (API Carto IGN)** : `https://apicarto.ign.fr/api/cadastre/parcelle?geom=<GeoJSON>`
+(vérifié le 2026-10-19), sans authentification. `geom` est une géométrie GeoJSON WGS84 (`[lon, lat]`) :
+un `Point` donne la parcelle qui le contient, un `Polygon` celles qui le coupent. Réponse : une
+`FeatureCollection` WGS84 (`MultiPolygon`) ; `properties.idu` = identifiant de parcelle sur 14
+caractères (INSEE, préfixe, section, numéro, ex. `33063000KE0078`), aussi `code_insee`, `section`,
+`numero`, `contenance` (m²). Pagination `_start` / `_limit` (500 par défaut), inutile à l'échelle d'un
+site.
 
 **BDNB** : `https://api.bdnb.io/v1/bdnb/donnees/<table>` (PostgREST derrière une passerelle Gravitee),
 métadonnées sous `metadonnees/<table>` (`colonne`, `jeu_de_donnees`). Seul le dernier millésime est servi

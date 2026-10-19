@@ -1,0 +1,248 @@
+{
+  "next": null,
+  "previous": null,
+  "results": [
+    {
+      "rnb_id": "HJ3QCGD13V13",
+      "status": "constructed",
+      "point": {
+        "type": "Point",
+        "coordinates": [
+          -1.454582307969751,
+          43.48805064920724
+        ]
+      },
+      "shape": {
+        "type": "MultiPolygon",
+        "coordinates": [
+          [
+            [
+              [
+                -1.454664502290371,
+                43.48817793036508
+              ],
+              [
+                -1.454675683890251,
+                43.488130612012526
+              ],
+              [
+                -1.454978425300381,
+                43.488172230781274
+              ],
+              [
+                -1.455014854783415,
+                43.488035563729625
+              ],
+              [
+                -1.454464284434227,
+                43.48795817794265
+              ],
+              [
+                -1.454468243913636,
+                43.48794539937299
+              ],
+              [
+                -1.454194088570959,
+                43.487905307326955
+              ],
+              [
+                -1.454149598775056,
+                43.48806573468486
+              ],
+              [
+                -1.454428829079625,
+                43.4881074204653
+              ],
+              [
+                -1.454417975287479,
+                43.488143010662874
+              ],
+              [
+                -1.454664502290371,
+                43.48817793036508
+              ]
+            ]
+          ]
+        ]
+      },
+      "addresses": [
+        {
+          "id": "64102_0898_00010",
+          "ban_id": "2b33c2b7-bfe6-434e-a56f-56d0da28989f",
+          "source": "BAN",
+          "street_number": "10",
+          "street_rep": null,
+          "street": "Rue de la Galupe",
+          "city_name": "Bayonne",
+          "city_zipcode": "64100",
+          "city_insee_code": "64102"
+        }
+      ],
+      "ext_ids": [
+        {
+          "id": "bdnb-bc-BX5F-QZL4-D4XG",
+          "source": "bdnb",
+          "created_at": "2023-12-10T08:51:21.628205+00:00",
+          "source_version": "2023_01"
+        },
+        {
+          "id": "BATIMENT0000000332681429",
+          "source": "bdtopo",
+          "created_at": "2023-12-22T05:38:58.273085+00:00",
+          "source_version": "bdtopo_2023_09"
+        }
+      ],
+      "is_active": true,
+      "validated_by": [],
+      "bdg_cover_ratio": 1.0
+    },
+    {
+      "rnb_id": "6X3K8HHY9FFC",
+      "status": "constructed",
+      "point": {
+        "type": "Point",
+        "coordinates": [
+          -1.454724899498216,
+          43.488290777150084
+        ]
+      },
+      "shape": {
+        "type": "MultiPolygon",
+        "coordinates": [
+          [
+            [
+              [
+                -1.454664502290371,
+                43.48817793036508
+              ],
+              [
+                -1.454610811648641,
+                43.48837928701195
+              ],
+              [
+                -1.454784668734437,
+                43.48840277649428
+              ],
+              [
+                -1.454839662189694,
+                43.488202267288216
+              ],
+              [
+                -1.454664502290371,
+                43.48817793036508
+              ]
+            ]
+          ]
+        ]
+      },
+      "addresses": [
+        {
+          "id": "64102_0885_00004",
+          "ban_id": "a94caf21-8a34-4d3a-b7ef-001f443b14cb",
+          "source": "BAN",
+          "street_number": "4",
+          "street_rep": null,
+          "street": "Rue de la Gabarre",
+          "city_name": "Bayonne",
+          "city_zipcode": "64100",
+          "city_insee_code": "64102"
+        }
+      ],
+      "ext_ids": [
+        {
+          "id": "bdnb-bc-3WE8-8JQV-DFE3",
+          "source": "bdnb",
+          "created_at": "2023-12-10T08:51:13.578779+00:00",
+          "source_version": "2023_01"
+        },
+        {
+          "id": "BATIMENT0000000332681430",
+          "source": "bdtopo",
+          "created_at": "2023-12-21T20:36:38.758491+00:00",
+          "source_version": "bdtopo_2023_09"
+        }
+      ],
+      "is_active": true,
+      "validated_by": [],
+      "bdg_cover_ratio": 0.020772628856615925
+    },
+    {
+      "rnb_id": "GTV1GBN4PVR4",
+      "status": "constructed",
+      "point": {
+        "type": "Point",
+        "coordinates": [
+          -1.454356579055344,
+          43.4882721073972
+        ]
+      },
+      "shape": {
+        "type": "MultiPolygon",
+        "coordinates": [
+          [
+            [
+              [
+                -1.454116398493089,
+                43.48810044134564
+              ],
+              [
+                -1.454050380046538,
+                43.48836628442932
+              ],
+              [
+                -1.454593690721325,
+                43.48844577323467
+              ],
+              [
+                -1.454610811648641,
+                43.48837928701195
+              ],
+              [
+                -1.454664502290371,
+                43.48817793036508
+              ],
+              [
+                -1.454417975287479,
+                43.488143010662874
+              ],
+              [
+                -1.454116398493089,
+                43.48810044134564
+              ]
+            ]
+          ]
+        ]
+      },
+      "addresses": [
+        {
+          "id": "64102_0885_00006",
+          "ban_id": "780dc4b8-945c-42fd-bc98-68d67056a286",
+          "source": "BAN",
+          "street_number": "6",
+          "street_rep": null,
+          "street": "Rue de la Gabarre",
+          "city_name": "Bayonne",
+          "city_zipcode": "64100",
+          "city_insee_code": "64102"
+        }
+      ],
+      "ext_ids": [
+        {
+          "id": "bdnb-bc-DC6A-K7C4-HD9F",
+          "source": "bdnb",
+          "created_at": "2023-12-10T08:51:23.054112+00:00",
+          "source_version": "2023_01"
+        },
+        {
+          "id": "BATIMENT0000000332681431",
+          "source": "bdtopo",
+          "created_at": "2023-12-22T05:38:58.276562+00:00",
+          "source_version": "bdtopo_2023_09"
+        }
+      ],
+      "is_active": true,
+      "validated_by": [],
+      "bdg_cover_ratio": 0.01656607611010891
+    }
+  ]
+}

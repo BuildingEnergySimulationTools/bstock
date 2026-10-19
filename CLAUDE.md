@@ -40,7 +40,7 @@ SPEC.md            # spécification
   exécute les deux et vérifie qu'elles produisent le même parc. Quand une fonction de la lib remplace
   un helper d'exemple, utiliser la fonction de la lib dans les deux versions.
 - L'API publique est exportée explicitement dans `src/bstock/__init__.py` (`__all__`), plus les `__all__`
-  des sous-modules documentés : `bstock.io`, `bstock.export`, `bstock.connectors` et ses modules `rnb`,
+  des sous-modules documentés : `bstock.io`, `bstock.export`, `bstock.connectors` et ses modules `rnb`, `cadastre`,
   `bdnb`, `dpe` (SPEC §11). Les `__all__` des autres modules ne listent que des noms réexportés par
   `bstock`. Tout le reste est considéré comme interne.
 - Les modules privés ou les helpers internes sont préfixés par `_`.

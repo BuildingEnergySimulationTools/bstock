@@ -8,11 +8,13 @@ date above when an API contract changes.
 |---|---|---|
 | `rnb/` | RNB API, `https://rnb-api.beta.gouv.fr/api/alpha/` | Licence Ouverte 2.0 |
 | `bdnb/` | BDNB open API, `https://api.bdnb.io/v1/bdnb/donnees/` (vintage 2026-02.a) | Licence Ouverte 2.0 |
+| `cadastre/` | IGN API Carto, `https://apicarto.ign.fr/api/cadastre/parcelle` | Licence Ouverte 2.0 |
 | `dpe/` | ADEME data-fair, datasets `dpe03existant`, `dpe02neuf`, `dpe01tertiaire` | Licence Ouverte 2.0 |
 
 The `*nobatek*` files and the RNB buildings `GJ2P6KGVQGAA`, `QEQC8WX97T4B`, `8PDAQ6GZAHZ3` and
 `TRKDH5MARXP4` were recorded on 2026-10-14 for `examples/connectors.py` (Nobatek sites in Anglet and
-Bordeaux). The BDNB files hold the rows as returned by `BdnbClient`, with its selected columns.
+Bordeaux). `cadastre/*_gabarre.json` and `rnb/plot_*.json` were recorded on 2026-10-19 around
+the Gabarre building (plot search). The BDNB files hold the rows as returned by `BdnbClient`, with its selected columns.
 
 Files that are not raw responses:
 - `bdnb/enum_values.json`: distinct values of the coded columns (`modalite_enum` of
