@@ -599,3 +599,27 @@ def test_coverage_counts_real_hours_on_dst_day():
     meter.data = hourly(start="2024-03-31", periods=23, tz="Europe/Paris", temperature=[1.0] * 23)
     row = meter.coverage(start="2024-03-31", end="2024-04-01").iloc[0]
     assert (row.present, row.expected) == (23, 23)
+
+
+def test_coverage_per_day_and_week():
+    meter = daily_meter(pd.date_range("2024-01-01", "2024-01-14").delete([2, 3]))
+    days = meter.coverage(start="2024-01-01", end="2024-01-15", freq="1D")
+    assert len(days) == 14
+    assert days["coverage"].tolist()[:5] == [1.0, 1.0, 0.0, 0.0, 1.0]
+    weeks = meter.coverage(start="2024-01-01", end="2024-01-15", freq="W-MON")
+    # 2024-01-01 is a Monday: two full weeks
+    assert weeks["present"].tolist() == [5, 7]
+    assert weeks["expected"].tolist() == [7, 7]
+
+
+def test_coverage_of_hourly_data_per_day():
+    meter = Meter(id="m", channels=[Channel(name="temperature", unit="°C")], timestep="1h")
+    meter.data = hourly(start="2024-01-01", periods=36, tz="UTC", temperature=[1.0] * 36)
+    frame = meter.coverage(start="2024-01-01", end="2024-01-03", freq="1D", tz="UTC")
+    assert frame["present"].tolist() == [24, 12]
+    assert frame["coverage"].tolist() == [1.0, 0.5]
+
+
+def test_coverage_refuses_an_invalid_freq():
+    with pytest.raises(InvalidArgumentError, match="freq"):
+        daily_meter(["2024-01-01"]).coverage(start="2024-01-01", end="2024-02-01", freq="bad")

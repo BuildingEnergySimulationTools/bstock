@@ -5,7 +5,12 @@ import sys
 import pandas as pd
 import pytest
 
-from bstock.exceptions import InvalidArgumentError, MissingDependencyError, UnknownFieldError
+from bstock.exceptions import (
+    InvalidArgumentError,
+    MissingDependencyError,
+    NoDataWarning,
+    UnknownFieldError,
+)
 from bstock.meters import Channel, Meter
 from bstock.park import BuildingPark
 from bstock.plot import CATEGORICAL, OTHER, OTHER_COLOR
@@ -336,3 +341,93 @@ def test_consumption_plots_reject_an_unknown_argument(park, method):
 def test_consumption_plot_passes_its_arguments(park):
     fig = park.select(entity="site").plot.consumption(**YEAR, tz="UTC", breakdown=True)
     assert fig.data
+
+
+# --- coverage heatmap ---------------------------------------------------------------------------
+
+
+def heatmap(fig):
+    (trace,) = fig.data
+    return trace
+
+
+@requires_plotly
+def test_coverage_has_one_row_per_meter_and_one_column_per_day(park):
+    fig = park.select(entity="site").plot.coverage(start="2024-01-01", end="2024-01-11")
+    trace = heatmap(fig)
+    assert trace.type == "heatmap"
+    # sorted by energy type, then id
+    assert list(trace.y) == ["s0-electricity", "s0-natural_gas", "s1-natural_gas"]
+    assert len(trace.x) == 10
+    assert {v for row in trace.z for v in row} == {100.0}
+    assert fig.layout.yaxis.autorange == "reversed"
+
+
+@requires_plotly
+def test_coverage_shows_the_gaps(park):
+    meter = park["s1-natural_gas"]
+    meter.data = meter.data.iloc[::2]
+    trace = heatmap(park.select(entity="site").plot.coverage(start="2024-01-01", end="2024-01-05"))
+    row = list(trace.z[list(trace.y).index("s1-natural_gas")])
+    assert row == [100.0, 0.0, 100.0, 0.0]
+
+
+@requires_plotly
+def test_coverage_per_month_over_the_data_span(park):
+    trace = heatmap(park.select(entity="site").plot.coverage(freq="MS"))
+    assert len(trace.x) == 12  # data of 2024: up to the day after 2024-12-31
+    assert {v for row in trace.z for v in row} == {100.0}
+
+
+@requires_plotly
+@pytest.mark.parametrize(
+    ("kwargs", "expected"),
+    [
+        ({"energy_type": "electricity"}, ["s0-electricity"]),
+        ({"energy_type": ["natural_gas"]}, ["s0-natural_gas", "s1-natural_gas"]),
+        ({"unit": "kWh"}, ["s0-electricity", "s0-natural_gas", "s1-natural_gas"]),
+        ({"unit": "°C"}, []),
+        ({"meters": ["s1-natural_gas"]}, ["s1-natural_gas"]),
+    ],
+)
+def test_coverage_filters(park, kwargs, expected):
+    fig = park.select(entity="site").plot.coverage(start="2024-01-01", end="2024-01-03", **kwargs)
+    assert (list(fig.data[0].y) if fig.data else []) == expected
+
+
+@requires_plotly
+def test_coverage_of_a_selection_keeps_its_meters(park):
+    fig = park.select(lambda s: s.id == "s1", entity="site").plot.coverage(
+        start="2024-01-01", end="2024-01-03"
+    )
+    assert list(heatmap(fig).y) == ["s1-natural_gas"]
+
+
+@requires_plotly
+def test_coverage_skips_meters_without_data(park):
+    park["s0-electricity"].data = None
+    with pytest.warns(NoDataWarning, match="s0-electricity"):
+        fig = park.select(entity="site").plot.coverage(start="2024-01-01", end="2024-01-03")
+    assert "s0-electricity" not in list(heatmap(fig).y)
+
+
+@requires_plotly
+def test_coverage_of_mixed_time_steps(park):
+    sensor = park.add_meter(
+        Meter(
+            id="t0",
+            scope=["s0"],
+            timestep="1h",
+            channels=[Channel(name="temperature", unit="°C")],
+        )
+    )
+    hours = pd.date_range("2024-01-01", periods=48, freq="h", tz="Europe/Paris")
+    sensor.data = pd.DataFrame({"temperature": 20.0}, index=hours)
+    trace = heatmap(park.select(entity="site").plot.coverage(start="2024-01-01", end="2024-01-03"))
+    assert {v for row in trace.z for v in row} == {100.0}
+
+
+@requires_plotly
+def test_coverage_refuses_an_invalid_window(park):
+    with pytest.raises(InvalidArgumentError):
+        park.select(entity="site").plot.coverage(start="2024-02-01", end="2024-01-01")

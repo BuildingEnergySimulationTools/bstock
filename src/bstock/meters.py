@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 from datetime import date, datetime
-from typing import Annotated, Any, ClassVar, Literal
+from typing import Annotated, Any, ClassVar
 
+import numpy as np
 import pandas as pd
 from pydantic import (
     AfterValidator,
@@ -20,7 +21,12 @@ from pydantic import (
 
 from bstock._ids import TIDE_SEPARATOR, check_id, new_id
 from bstock.enums import EndUse, EnergyType
-from bstock.exceptions import DataReadError, InvalidTagError, TimeSeriesError
+from bstock.exceptions import (
+    DataReadError,
+    InvalidArgumentError,
+    InvalidTagError,
+    TimeSeriesError,
+)
 from bstock.provenance import SourcedModel, sourced
 from bstock.readers import DataReader, _ensure_time_index, _reader_from_dict
 
@@ -263,23 +269,26 @@ class Meter(SourcedModel):
         *,
         start: str | date | datetime | pd.Timestamp,
         end: str | date | datetime | pd.Timestamp,
-        freq: Literal["YS", "MS"] | None = None,
+        freq: str | None = None,
         tz: str = "Europe/Paris",
     ) -> pd.DataFrame:
         """Return the share of the expected time steps that have data, per period.
 
-        A time step is present when one of the channels has a value. The expected count is the
-        number of ``timestep`` steps from the period start, in the period time zone: a local day
-        counts once even across a daylight saving time change. Without ``timestep``, it is the
-        period length divided by the median gap between samples, rounded. Periods follow the
-        rules of :meth:`bstock.Selection.consumption` (SPEC §6.5).
+        A time step is present when one of the channels has a value. The expected count of a
+        period is the number of ``timestep`` steps, counted from ``start`` in the time zone
+        ``tz``, that fall in the period: a local day counts once even across a daylight saving
+        time change. Without ``timestep``, it is the period length divided by the median gap
+        between samples, rounded.
 
         Parameters
         ----------
         start, end
             Window ``[start, end)``; naive values are read in ``tz``.
         freq
-            ``"YS"`` (calendar years) or ``"MS"`` (months) to split the window; ``None``: one row.
+            Calendar periods splitting the window, as a pandas offset alias in ``tz``: ``"1D"``
+            (days), ``"W-MON"`` (weeks from Monday), ``"MS"`` (months), ``"YS"`` (years),
+            ``"1h"``...; ``None``: one row. Periods start on the dates of the offset; the first
+            and last ones are cut by the window.
         tz
             Time zone of the periods.
 
@@ -287,8 +296,8 @@ class Meter(SourcedModel):
         -------
         pandas.DataFrame
             Indexed by period start (``period``): ``present`` (time steps with data),
-            ``expected`` (time steps in the period) and ``coverage`` (``present / expected``,
-            at most 1).
+            ``expected`` (time steps in the period, at least 1) and ``coverage``
+            (``present / expected``, at most 1).
 
         Raises
         ------
@@ -296,24 +305,56 @@ class Meter(SourcedModel):
             If the data is not in memory (call :meth:`load_data`), or the time step is unknown
             (no ``timestep`` and fewer than two samples).
         InvalidArgumentError
-            If ``start >= end`` or ``freq`` is not ``"YS"``, ``"MS"`` or ``None``.
+            If ``start >= end`` or ``freq`` is not a valid offset alias.
         """
-        from bstock.consumption import _periods
-
         if self._data is None:
             raise TimeSeriesError(f"meter {self.id!r} has no data in memory: call load_data()")
-        times = self._data.index[self._data.notna().any(axis=1)]
+        bounds = _period_bounds(start, end, freq, tz)
+        times = self._data.index[self._data.notna().any(axis=1)].tz_convert(tz)
         gap = None if len(times) < 2 else pd.Series(times).diff().median()
         if self.timestep is None and gap is None:
             raise TimeSeriesError(f"meter {self.id!r}: unknown time step")
-        rows = []
-        for first, last in _periods(start, end, freq, tz):
-            present = int(((times >= first) & (times < last)).sum())
-            if self.timestep is not None:
-                steps = pd.date_range(first, last, freq=self.timestep, inclusive="left")
-                expected = max(1, len(steps))
-            else:
-                expected = max(1, round((last - first) / gap))
-            rows.append((first, present, expected, min(1.0, present / expected)))
-        frame = pd.DataFrame(rows, columns=["period", "present", "expected", "coverage"])
-        return frame.set_index("period")
+        present = np.diff(times.searchsorted(bounds))
+        if self.timestep is not None:
+            grid = pd.date_range(bounds[0], bounds[-1], freq=self.timestep, inclusive="left")
+            expected = np.diff(grid.searchsorted(bounds))
+        else:
+            expected = np.rint((bounds[1:] - bounds[:-1]) / gap)
+        expected = np.maximum(1, expected).astype(int)
+        frame = pd.DataFrame(
+            {
+                "present": present.astype(int),
+                "expected": expected,
+                "coverage": np.minimum(1.0, present / expected),
+            },
+            index=pd.DatetimeIndex(bounds[:-1], name="period"),
+        )
+        return frame
+
+
+def _period_bounds(
+    start: str | date | datetime | pd.Timestamp,
+    end: str | date | datetime | pd.Timestamp,
+    freq: str | None,
+    tz: str,
+) -> pd.DatetimeIndex:
+    """Return the bounds ``[start, t1, ..., end]`` of the calendar periods of ``freq`` in ``tz``.
+
+    Raises
+    ------
+    InvalidArgumentError
+        If ``start >= end`` or ``freq`` is not a valid offset alias.
+    """
+    first, last = (pd.Timestamp(v) for v in (start, end))
+    first = first.tz_localize(tz) if first.tzinfo is None else first.tz_convert(tz)
+    last = last.tz_localize(tz) if last.tzinfo is None else last.tz_convert(tz)
+    if first >= last:
+        raise InvalidArgumentError(f"start ({first}) must be before end ({last})")
+    inner: list[pd.Timestamp] = []
+    if freq is not None:
+        try:
+            offset = pd.tseries.frequencies.to_offset(freq)
+        except ValueError as error:
+            raise InvalidArgumentError(f"invalid freq {freq!r}: {error}") from error
+        inner = [t for t in pd.date_range(first, last, freq=offset) if first < t < last]
+    return pd.DatetimeIndex([first, *inner, last])

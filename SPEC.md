@@ -736,12 +736,16 @@ m.coverage(start="2022-01-01", end="2025-01-01", freq="YS")   # pas présents / 
 ```
 
 `meter.coverage(start=, end=, freq=None, tz="Europe/Paris")` décrit la complétude des données en
-mémoire, par période (mêmes règles de période que §6.5) : `present` (pas de temps où au moins un canal a
+mémoire, par période : `freq` est un alias d'offset pandas quelconque, en périodes calendaires dans
+`tz` (`"1D"`, `"W-MON"`, `"MS"`, `"YS"`, `"1h"`… ; les périodes commencent aux dates de l'offset, la
+première et la dernière sont coupées par la fenêtre ; `None` : une ligne) : `present` (pas de temps où au moins un canal a
 une valeur), `expected` (nombre de pas `timestep` depuis le début de la période, dans son fuseau : un jour
 local compte une fois même au changement d'heure ; sans `timestep`, durée / écart médian entre
 échantillons, arrondi) et `coverage`
 (`present / expected`, au plus 1). Données absentes de la mémoire ou pas de temps inconnu :
-`TimeSeriesError`. Les trous eux-mêmes se décrivent avec tide (`Plumber.get_gaps_description`).
+`TimeSeriesError` ; `start >= end` ou `freq` invalide : `InvalidArgumentError`. Le calcul est
+vectorisé (bornes des périodes et `searchsorted`) : une heatmap de couverture (§14.5) sur des
+centaines de compteurs et des milliers de jours reste rapide. Les trous eux-mêmes se décrivent avec tide (`Plumber.get_gaps_description`).
 
 Contraintes sur `m.data` :
 - index `pd.DatetimeIndex` trié, **avec fuseau horaire** (n'importe lequel : UTC, Europe/Paris…). Un index
@@ -1755,6 +1759,7 @@ On la personnalise ensuite avec `fig.update_layout(...)`.
 | `plot.map(*, geometry="point", color=None)` | Carte sur fond OpenStreetMap (sans clé d'API) : points `lat` / `lon`, emprises `footprint` (GeoJSON WGS84, sans l'extra `[geo]`) ou les deux (`geometry="both"` : emprises plus un marqueur par entité, pour les retrouver sur une carte dézoomée ; mêmes couleurs, une seule légende), colorés par un attribut | Valeurs effectives |
 | `plot.consumption(*, start, end, freq=None, by="energy_type", tz, breakdown, split, load_data, orientation="v", sort=False)` | Barres empilées de la consommation (kWh) par entité, empilées par énergie (`by="energy_type"`) ou par usage (`by="end_use"`) ; une barre par période avec `freq` ; `orientation="h"` : barres horizontales, une ligne par entité ; `sort=True` : par total décroissant | §6.5 |
 | `plot.intensity(*, start, end, area="heated_area", prefer, freq=None, tz, breakdown, split, load_data, orientation="v", sort=False)` | Barres du kWh/m² par entité, empilées par énergie ; mêmes `orientation` et `sort` | §6.5 |
+| `plot.coverage(*, start=None, end=None, freq="1D", tz, energy_type=None, unit=None, meters=None, load_data=False)` | Heatmap de couverture : une ligne par compteur, une colonne par période, couleur = part des pas présents (0–100 %) | `Meter.coverage` (§6.3) |
 
 Une entité sans valeur n'est pas tracée, et le titre indique la couverture (« 34 / 42 bâtiments »). Les
 unités des champs (métadonnée `unit`) étiquettent les axes.
@@ -1778,6 +1783,19 @@ Précisions (implémentation 0.8.0) :
   haut en bas (la première, ou la plus grosse avec `sort=True`, en haut), valeurs sur l'axe x avec la
   grille ; hauteur de 18 px par barre (400 px au moins), pour des centaines de sites ; le survol
   ajoute le nom de l'entité à son id. Une autre valeur d'`orientation` lève `InvalidArgumentError`.
+- Heatmap de couverture (`plot.coverage`, ajout 2026-10-19), pendant de `tide` `plot_gaps_heatmap`
+  mais calculée par compteur avec son `timestep` : un compteur journalier à côté de capteurs horaires
+  est couvert à 100 % s'il a une valeur chaque jour (sur un index joint, il paraîtrait à 1/24).
+  - Compteurs retenus : ceux qui mesurent la sélection, avec la règle de `consumption` (porteur du
+    `scope` dans le sous-arbre d'un site sélectionné, ou bâtiment sélectionné et ses sites), **y
+    compris les sous-compteurs** ; filtres `energy_type`, `unit` (au moins un canal dans cette unité,
+    ex. `"°C"` pour les capteurs) et `meters` (ids ou objets). Un compteur sans données en mémoire est
+    ignoré avec un `NoDataWarning`, sauf avec `load_data=True` (comme `timeseries`).
+  - Fenêtre par défaut : du jour local du premier échantillon au lendemain du dernier, sur les
+    compteurs tracés. Lignes triées par `energy_type` puis id, lues de haut en bas ; hauteur de
+    18 px par ligne (400 px au moins) ; rampe bleue unique de 0 à 100 % ; survol : id, nom, énergie,
+    période, % et pas présents / attendus ; sous-titre : nombre de compteurs et couverture moyenne.
+    Aucun compteur avec données : figure vide, sous-titre « no meter with data ».
 - `plot.distribution` d'un attribut liste ou dict lève `InvalidArgumentError` ; un attribut inconnu lève
   `UnknownFieldError`, comme `color=` de `plot.map`.
 

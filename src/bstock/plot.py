@@ -10,6 +10,7 @@ neutral grey for "Other" and missing values. Categories past the palette fold in
 from __future__ import annotations
 
 import math
+import warnings
 from collections import Counter
 from collections.abc import Sequence
 from enum import Enum
@@ -18,11 +19,12 @@ from typing import TYPE_CHECKING, Any, Literal
 import pandas as pd
 
 from bstock._deps import require
-from bstock.exceptions import InvalidArgumentError, UnknownFieldError
+from bstock.exceptions import InvalidArgumentError, NoDataWarning, UnknownFieldError
 
 if TYPE_CHECKING:
     from plotly.graph_objects import Figure
 
+    from bstock.meters import Meter
     from bstock.selection import Selection, TimeLike
 
 __all__: list[str] = []
@@ -541,6 +543,116 @@ class SelectionPlot:
         _style_bars(fig, title, subtitle, f"Intensity (kWh/{unit})", orientation, len(table))
         return fig
 
+    def coverage(
+        self,
+        *,
+        start: TimeLike | None = None,
+        end: TimeLike | None = None,
+        freq: str = "1D",
+        tz: str = "Europe/Paris",
+        energy_type: str | Sequence[str] | None = None,
+        unit: str | Sequence[str] | None = None,
+        meters: Sequence[Meter | str] | None = None,
+        load_data: bool = False,
+    ) -> Figure:
+        """Plot the data coverage of the meters of the selection (heatmap).
+
+        One row per meter, one column per period of ``freq``; the colour is the share of the
+        expected time steps that have data (:meth:`bstock.Meter.coverage`), from 0 to 100 %.
+        Unlike a coverage computed on a joined index, a daily meter next to hourly sensors is
+        fully covered when it has a value every day.
+
+        Parameters
+        ----------
+        start, end
+            Window ``[start, end)``; naive values are read in ``tz``. Default: from the local
+            day of the first sample to the day after the last one, over the meters plotted.
+        freq
+            Period of a column, as a pandas offset alias (``"1D"``, ``"W-MON"``, ``"MS"``,
+            ``"1h"``...).
+        tz
+            Time zone of the periods.
+        energy_type
+            Keep the meters of these energy types (``"electricity"``...).
+        unit
+            Keep the meters having a channel in one of these units (``"°C"``: the temperature
+            sensors).
+        meters
+            Keep these meters (objects or ids).
+        load_data
+            Call :meth:`bstock.Meter.load_data` on the meters without data in memory; without
+            it, they are skipped with a :class:`NoDataWarning`.
+
+        Returns
+        -------
+        plotly.graph_objects.Figure
+            The meters measuring the selection: a scope entity is a selected building (or a
+            site above it) or is in the subtree of a selected site, sub-meters included. Rows
+            are sorted by energy type, then id; the figure height grows with the rows.
+
+        Raises
+        ------
+        InvalidArgumentError
+            If ``start >= end`` or ``freq`` is invalid.
+        MissingDependencyError
+            If plotly is not installed.
+        """
+        go = _plotly()
+        candidates = _measuring_meters(self._selection, energy_type, unit, meters)
+        plotted = []
+        for meter in candidates:
+            if meter.data is None and load_data:
+                meter.load_data()
+            if meter.data is None:
+                warnings.warn(f"meter {meter.id!r} has no data", NoDataWarning, stacklevel=2)
+                continue
+            plotted.append(meter)
+        plotted.sort(key=lambda m: (_plain_value(m.energy_type) or "", m.id))
+        fig = go.Figure()
+        if not plotted:
+            _style(fig, "Data coverage", "no meter with data", value_axis=None)
+            return fig
+        if start is None or end is None:
+            first, last = _data_span(plotted, tz)
+            start = first if start is None else start
+            end = last if end is None else end
+        frames = [m.coverage(start=start, end=end, freq=freq, tz=tz) for m in plotted]
+        periods = [_x_label(t) for t in frames[0].index]
+        z = [(f["coverage"] * 100).to_list() for f in frames]
+        steps = [list(zip(f["present"], f["expected"], strict=True)) for f in frames]
+        labels = [
+            f"{m.name or ''} · {_plain_value(m.energy_type) or 'no energy type'}".strip(" ·")
+            for m in plotted
+        ]
+        customdata = [
+            [[label, present, expected] for present, expected in row]
+            for label, row in zip(labels, steps, strict=True)
+        ]
+        fig.add_trace(
+            go.Heatmap(
+                x=periods,
+                y=[m.id for m in plotted],
+                z=z,
+                zmin=0,
+                zmax=100,
+                colorscale=_colorscale(SEQUENTIAL),
+                colorbar={"title": {"text": "%"}, "ticksuffix": " %"},
+                customdata=customdata,
+                hovertemplate=(
+                    "%{y} %{customdata[0]}<br>%{x}: %{z:.0f} %"
+                    " (%{customdata[1]} / %{customdata[2]} steps)<extra></extra>"
+                ),
+                xgap=0,
+                ygap=1,
+            )
+        )
+        mean = sum(sum(row) for row in z) / sum(len(row) for row in z)
+        subtitle = f"{len(plotted)} meters · mean coverage {mean:.0f} % · periods of {freq}"
+        _style(fig, "Data coverage", subtitle, value_axis=None)
+        fig.update_yaxes(autorange="reversed", automargin=True, type="category")
+        fig.update_layout(height=max(MIN_HEIGHT, ROW_HEIGHT * len(plotted) + 150))
+        return fig
+
     def _names(self, labels: pd.Index) -> list[str]:
         """Return the name of each entity label (empty for a joined label or a nameless one)."""
         park = self._selection.park
@@ -921,6 +1033,69 @@ def _check_field(selection: Selection, name: str) -> None:
         known.update(entity.sourced_fields())
     if name not in known:
         raise UnknownFieldError(f"{name!r} is not a field of the {selection.entity}s")
+
+
+def _as_set(value: str | Sequence[str] | None) -> set[str] | None:
+    if value is None:
+        return None
+    return {value} if isinstance(value, str) else {str(v) for v in value}
+
+
+def _plain_value(value: Any) -> Any:
+    return value.value if isinstance(value, Enum) else value
+
+
+def _measuring_meters(
+    selection: Selection,
+    energy_type: str | Sequence[str] | None,
+    unit: str | Sequence[str] | None,
+    meters: Sequence[Meter | str] | None,
+) -> list[Meter]:
+    """Return the meters of the park measuring the selection, filtered (SPEC §14.5)."""
+    from bstock.consumption import _owners
+
+    park = selection.park
+    entities = selection._entities()
+    if selection.entity == "building":
+        relevant = {b.id for b in entities} | {s.id for b in entities for s in b._ancestor_sites()}
+    else:
+        relevant = {
+            i
+            for site in entities
+            for i in (
+                site.id,
+                *(s.id for s in site.iter_sites()),
+                *(b.id for b in site.iter_buildings()),
+            )
+        }
+    energies, units = _as_set(energy_type), _as_set(unit)
+    wanted = None if meters is None else {m if isinstance(m, str) else m.id for m in meters}
+    kept = []
+    for meter in park.meters:
+        if not meter.scope or not any(o.id in relevant for o in _owners(park, meter)):
+            continue
+        if wanted is not None and meter.id not in wanted:
+            continue
+        if energies is not None and _plain_value(meter.energy_type) not in energies:
+            continue
+        if units is not None and not any(c.unit in units for c in meter.channels):
+            continue
+        kept.append(meter)
+    return kept
+
+
+def _data_span(meters: Sequence[Meter], tz: str) -> tuple[pd.Timestamp, pd.Timestamp]:
+    """Return the local day of the first sample and the day after the last one."""
+    firsts, lasts = [], []
+    for meter in meters:
+        index = meter.data.index[meter.data.notna().any(axis=1)]
+        if len(index):
+            firsts.append(index[0].tz_convert(tz))
+            lasts.append(index[-1].tz_convert(tz))
+    if not firsts:
+        today = pd.Timestamp.now(tz=tz).normalize()
+        return today, today + pd.DateOffset(days=1)
+    return min(firsts).normalize(), max(lasts).normalize() + pd.DateOffset(days=1)
 
 
 def _check_orientation(orientation: str) -> None:
