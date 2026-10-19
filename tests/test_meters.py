@@ -542,3 +542,60 @@ def test_timeseries_accepts_the_variants_of_a_family(park):
         meter.data = hourly(energy=[1.0, 2.0, 3.0])
     frame = park.timeseries(energy_type=EnergyType.WOOD.variants())
     assert [c.split("__")[0] for c in frame.columns] == ["logs_energy"]
+
+
+# --- coverage -----------------------------------------------------------------------------------
+
+
+def daily_meter(days, timestep="1D"):
+    meter = Meter(id="m", channels=[Channel(name="energy", unit="kWh")], timestep=timestep)
+    index = pd.DatetimeIndex(pd.to_datetime(days)).tz_localize("Europe/Paris")
+    meter.data = pd.DataFrame({"energy": 1.0}, index=index)
+    return meter
+
+
+def test_coverage_counts_present_and_expected_time_steps():
+    meter = daily_meter(pd.date_range("2024-01-01", "2024-01-10"))
+    row = meter.coverage(start="2024-01-01", end="2024-02-01").iloc[0]
+    assert (row.present, row.expected) == (10, 31)
+    assert row.coverage == pytest.approx(10 / 31)
+
+
+def test_coverage_per_month_counts_local_days_across_dst():
+    meter = daily_meter(pd.date_range("2024-03-01", "2024-04-30"))
+    frame = meter.coverage(start="2024-03-01", end="2024-05-01", freq="MS")
+    assert frame["expected"].tolist() == [31, 30]
+    assert frame["coverage"].tolist() == [1.0, 1.0]
+
+
+def test_coverage_ignores_rows_without_value():
+    meter = daily_meter(pd.date_range("2024-01-01", "2024-01-04"))
+    meter.data = meter.data.assign(**{meter.tide_columns()["energy"]: [1.0, None, 1.0, None]})
+    assert meter.coverage(start="2024-01-01", end="2024-01-05").iloc[0].present == 2
+
+
+def test_coverage_uses_median_gap_without_timestep():
+    meter = Meter(id="m", channels=[Channel(name="temperature", unit="°C")])
+    meter.data = hourly(periods=12, tz="UTC", temperature=[20.0] * 12)
+    row = meter.coverage(start="2024-01-01", end="2024-01-02", tz="UTC").iloc[0]
+    assert (row.present, row.expected) == (12, 24)
+
+
+def test_coverage_requires_data():
+    with pytest.raises(TimeSeriesError, match="load_data"):
+        Meter(id="m", channels=[Channel(name="energy", unit="kWh")]).coverage(
+            start="2024-01-01", end="2024-02-01"
+        )
+
+
+def test_coverage_of_a_daily_meter_without_data_in_the_window():
+    meter = daily_meter(["2024-01-01"])
+    row = meter.coverage(start="2025-01-01", end="2026-01-01").iloc[0]
+    assert (row.present, row.expected, row.coverage) == (0, 365, 0.0)
+
+
+def test_coverage_counts_real_hours_on_dst_day():
+    meter = Meter(id="m", channels=[Channel(name="temperature", unit="°C")], timestep="1h")
+    meter.data = hourly(start="2024-03-31", periods=23, tz="Europe/Paris", temperature=[1.0] * 23)
+    row = meter.coverage(start="2024-03-31", end="2024-04-01").iloc[0]
+    assert (row.present, row.expected) == (23, 23)

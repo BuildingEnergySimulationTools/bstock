@@ -689,7 +689,16 @@ park.add_meter(Meter(id="PDL_123", scope=["site-ecole-A"], energy_type="electric
 park.add_meter(Meter(id="SUB_chauff", scope=["heating-chaufferie-A"],
                      energy_type="natural_gas", end_use="heating", timestep="1D",
                      channels=[Channel(name="energy", unit="kWh")]))
+
+park.add_meter(Meter(id="T_salle_1", scope=["site-ecole-A"], timestep="1h", sub_bloc="ambiance",
+                     channels=[Channel(name="temperature", unit="°C")]))
 ```
+
+**Capteur** (température, hygrométrie…) : un `Meter` **sans `energy_type`**, avec un canal de la grandeur
+mesurée (`temperature`, °C). Le modèle, `timeseries`, `save` / `load` l'acceptent tels quels ;
+`consumption` l'ignore sans avertissement (ce n'est pas un compteur d'énergie, §6.5). `sub_bloc` peut
+porter son rôle (ex. `ambiance`), sinon `other`. Vérifié le 2026-10-19 : pas de grandeur mesurée
+explicite à ajouter.
 
 ### 6.2 Lecture des données (readers)
 
@@ -723,7 +732,16 @@ m.load_data()            # reader.read() -> sélection et renommage des colonnes
 m.data                   # DataFrame au format décrit ci-dessous
 m.data = df_nettoye      # affectation directe (validée) ; colonnes nommées par channel.name
                          # ou déjà au format tide
+m.coverage(start="2022-01-01", end="2025-01-01", freq="YS")   # pas présents / attendus
 ```
+
+`meter.coverage(start=, end=, freq=None, tz="Europe/Paris")` décrit la complétude des données en
+mémoire, par période (mêmes règles de période que §6.5) : `present` (pas de temps où au moins un canal a
+une valeur), `expected` (nombre de pas `timestep` depuis le début de la période, dans son fuseau : un jour
+local compte une fois même au changement d'heure ; sans `timestep`, durée / écart médian entre
+échantillons, arrondi) et `coverage`
+(`present / expected`, au plus 1). Données absentes de la mémoire ou pas de temps inconnu :
+`TimeSeriesError`. Les trous eux-mêmes se décrivent avec tide (`Plumber.get_gaps_description`).
 
 Contraintes sur `m.data` :
 - index `pd.DatetimeIndex` trié, **avec fuseau horaire** (n'importe lequel : UTC, Europe/Paris…). Un index
@@ -785,7 +803,8 @@ sel.intensity(start="2024-01-01", end="2025-01-01", area="heated_area")  # kWh/m
   (compteur remis à zéro) donne une valeur manquante et un `NoDataWarning` ;
 - une puissance (`"power"`) n'est **pas** intégrée. Il faut la convertir en énergie avec tide, puis
   l'affecter par `meter.data = ...` (§6.3). Un compteur sans canal `energy` ni `index` est ignoré avec un
-  `NoDataWarning`. S'il a les deux canaux, `energy` est utilisé ;
+  `NoDataWarning`, sauf un capteur (sans `energy_type`, §6.1), ignoré sans avertissement. S'il a les
+  deux canaux, `energy` est utilisé ;
 - unités acceptées : `Wh`, `kWh`, `MWh`, `GWh`, converties en **kWh**. Une autre unité lève
   `TimeSeriesError` ;
 - énergie finale seulement : pas de coefficient d'énergie primaire, pas de correction climatique (DJU).
@@ -869,6 +888,46 @@ d'un compteur qui en a d'autres pour parent lève `EntityInUseError`, sauf avec 
 leur `parent_meter` à `None` (ils deviennent compteurs de tête). Dans le JSON, la clé est absente pour un
 compteur de tête : un parc sans sous-compteur s'écrit comme en 0.6.0, et le format est resté en
 `schema_version` 1. Un parc qui utilise `parent_meter` n'est pas lisible par une version antérieure.
+
+### 6.6 Cache Parquet incrémental des séries d'une API
+
+Un projet qui télécharge ses séries depuis une API (Enedis, data lake…) les garde dans un fichier
+Parquet par compteur, lu par un `ParquetReader` : charger le parc n'appelle jamais l'API. Le module
+`bstock.cache` met ce fichier à jour sans retélécharger ce qu'il contient.
+
+```python
+from bstock.cache import update_cache, read_period
+
+def fetch(start, end):          # données de [start, end[, index avec fuseau ; vide si aucune
+    ...
+
+result = update_cache("cache/PDL_123.parquet", fetch, start="2022-01-01", end="2026-10-19",
+                      timestep="1D", chunk="365D", tz="Europe/Paris")
+result.fetched, result.rows, result.period     # fenêtres demandées, lignes reçues, période en cache
+read_period("cache/PDL_123.parquet", tz="Europe/Paris")   # (début, fin) ou None
+meter.reader = ParquetReader(path="cache/PDL_123.parquet")
+```
+
+- La **période en cache** `[début, fin[` est enregistrée dans les métadonnées du schéma Parquet
+  (`bstock.period`, deux horodatages ISO 8601 en UTC, relus dans le fuseau demandé) : un fichier par
+  série, sans manifeste à part. C'est la
+  période interrogée avec succès, pas l'étendue des données : un jour sans donnée à l'intérieur est un
+  vrai trou, il n'est pas redemandé.
+- Seul ce qui manque à la période en cache est demandé, de sorte qu'elle reste **d'un seul tenant** :
+  de `start` à son début, et de sa fin à `end` (une fenêtre disjointe est prolongée jusqu'à elle).
+  `chunk` limite la durée de chaque appel (API limitée à un an…) ; les tranches suivent le calendrier
+  du fuseau `tz`.
+- La période en cache **s'arrête un `timestep` après le dernier échantillon reçu** : les jours récents pas
+  encore publiés sont redemandés à la mise à jour suivante. Une fenêtre qui ne renvoie rien n'est pas
+  enregistrée (redemandée ensuite), sauf avant la période en cache, où la fenêtre interrogée est
+  enregistrée en entier. Dans une même mise à jour, une tranche vide suivie de données est couverte.
+- Les lignes reçues remplacent les lignes en cache de même horodatage (`combine_first`) ; les lignes
+  renvoyées par `fetch` hors de la fenêtre demandée sont ignorées. Écriture atomique (fichier temporaire renommé).
+- Si `fetch` lève une exception, ce qui a été reçu est enregistré, puis l'exception remonte : l'appelant
+  décide de continuer avec les autres compteurs (rapport d'erreurs par compteur côté projet).
+- `start >= end`, `timestep` ou `chunk` invalide : `InvalidArgumentError` ; données sans index avec
+  fuseau : `TimeSeriesError`.
+- bstock ne connaît aucune API : la fonction `fetch` (client, authentification, format) est au projet.
 
 ---
 
@@ -1321,6 +1380,7 @@ src/bstock/
   systems.py           # System, Generator, Heating/Cooling/DHWGenerator, Ventilation, SolarPV
   meters.py            # Meter, Channel, conventions tide
   readers.py           # DataReader, CsvReader, ParquetReader, registre
+  cache.py             # cache Parquet incrémental des séries d'une API (§6.6)
   io.py                # to_json/from_json, save/load, JSON Schema
   export.py            # to_dataframe, to_geodataframe, GeoPackage, GeoParquet (§9)
   display.py           # v3 : repr, tree() / TreeView, describe(), HTML (§14.1)
@@ -1340,7 +1400,7 @@ examples/              # exemples de bout en bout (bayonne, connectors, plots), 
 scripts/               # outils de maintenance (régénération de dpe_generators.csv)
 ```
 
-- **API publique** : `bstock.__all__`, plus les `__all__` des sous-modules documentés `bstock.io`,
+- **API publique** : `bstock.__all__`, plus les `__all__` des sous-modules documentés `bstock.cache`, `bstock.io`,
   `bstock.export`, `bstock.connectors`, `bstock.connectors.rnb`, `bstock.connectors.bdnb`,
   `bstock.connectors.dpe` et `bstock.connectors.cadastre`. Les `__all__` des autres modules ne listent que des noms réexportés par
   `bstock` ; leurs autres noms, et les modules préfixés par `_`, sont internes.

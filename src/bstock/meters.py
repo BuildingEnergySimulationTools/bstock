@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from typing import Annotated, Any, ClassVar
+from datetime import date, datetime
+from typing import Annotated, Any, ClassVar, Literal
 
 import pandas as pd
 from pydantic import (
@@ -256,3 +257,63 @@ class Meter(SourcedModel):
         self.data = selected
         assert self._data is not None
         return self._data
+
+    def coverage(
+        self,
+        *,
+        start: str | date | datetime | pd.Timestamp,
+        end: str | date | datetime | pd.Timestamp,
+        freq: Literal["YS", "MS"] | None = None,
+        tz: str = "Europe/Paris",
+    ) -> pd.DataFrame:
+        """Return the share of the expected time steps that have data, per period.
+
+        A time step is present when one of the channels has a value. The expected count is the
+        number of ``timestep`` steps from the period start, in the period time zone: a local day
+        counts once even across a daylight saving time change. Without ``timestep``, it is the
+        period length divided by the median gap between samples, rounded. Periods follow the
+        rules of :meth:`bstock.Selection.consumption` (SPEC §6.5).
+
+        Parameters
+        ----------
+        start, end
+            Window ``[start, end)``; naive values are read in ``tz``.
+        freq
+            ``"YS"`` (calendar years) or ``"MS"`` (months) to split the window; ``None``: one row.
+        tz
+            Time zone of the periods.
+
+        Returns
+        -------
+        pandas.DataFrame
+            Indexed by period start (``period``): ``present`` (time steps with data),
+            ``expected`` (time steps in the period) and ``coverage`` (``present / expected``,
+            at most 1).
+
+        Raises
+        ------
+        TimeSeriesError
+            If the data is not in memory (call :meth:`load_data`), or the time step is unknown
+            (no ``timestep`` and fewer than two samples).
+        InvalidArgumentError
+            If ``start >= end`` or ``freq`` is not ``"YS"``, ``"MS"`` or ``None``.
+        """
+        from bstock.consumption import _periods
+
+        if self._data is None:
+            raise TimeSeriesError(f"meter {self.id!r} has no data in memory: call load_data()")
+        times = self._data.index[self._data.notna().any(axis=1)]
+        gap = None if len(times) < 2 else pd.Series(times).diff().median()
+        if self.timestep is None and gap is None:
+            raise TimeSeriesError(f"meter {self.id!r}: unknown time step")
+        rows = []
+        for first, last in _periods(start, end, freq, tz):
+            present = int(((times >= first) & (times < last)).sum())
+            if self.timestep is not None:
+                steps = pd.date_range(first, last, freq=self.timestep, inclusive="left")
+                expected = max(1, len(steps))
+            else:
+                expected = max(1, round((last - first) / gap))
+            rows.append((first, present, expected, min(1.0, present / expected)))
+        frame = pd.DataFrame(rows, columns=["period", "present", "expected", "coverage"])
+        return frame.set_index("period")

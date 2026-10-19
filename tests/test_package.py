@@ -48,6 +48,7 @@ def test_public_api_is_explicit():
 
 
 PUBLIC_SUBMODULES = {
+    "bstock.cache",
     "bstock.io",
     "bstock.export",
     "bstock.connectors",

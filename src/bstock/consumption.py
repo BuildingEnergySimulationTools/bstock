@@ -281,7 +281,9 @@ class _Calculator:
     def _energies(self, meter: Meter) -> list[tuple[float, float]] | None:
         channel = _energy_channel(meter)
         if channel is None:
-            self.notes.append(f"meter {meter.id!r} has no 'energy' or 'index' channel: ignored")
+            if meter.energy_type is not None:
+                # a sensor (no energy type, e.g. a temperature) is not an energy meter: no note
+                self.notes.append(f"meter {meter.id!r} has no 'energy' or 'index' channel: ignored")
             return None
         if channel.unit not in ENERGY_UNITS:
             raise TimeSeriesError(
@@ -327,8 +329,11 @@ def _energy_channel(meter: Meter) -> Channel | None:
 def _timestep(meter: Meter, series: pd.Series) -> pd.Timedelta | None:
     """Return the nominal time step of the meter, else the median gap of its data."""
     if meter.timestep is not None:
+        offset = pd.tseries.frequencies.to_offset(meter.timestep)
+        if isinstance(offset, pd.offsets.Day):  # a calendar day since pandas 3, not a Timedelta
+            return pd.Timedelta(days=offset.n)
         try:
-            return pd.Timedelta(pd.tseries.frequencies.to_offset(meter.timestep))
+            return pd.Timedelta(offset)
         except ValueError:
             pass  # calendar offsets such as "MS" have no fixed duration
     if len(series) < 2:

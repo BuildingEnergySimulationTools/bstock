@@ -103,6 +103,22 @@ def test_power_channel_is_not_integrated(park):
         assert park.select().consumption(**YEAR).empty
 
 
+def test_sensor_without_energy_type_is_ignored_silently(park):
+    add_meter(park, "t", ["b1"], 20.0, channel="temperature", unit="°C", energy_type=None)
+    add_meter(park, "m", ["b1"], 1.0)
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        frame = park.select().consumption(**YEAR)
+    assert frame["meters"].tolist() == [["m"]]
+
+
+def test_daily_coverage_uses_the_timestep_with_a_single_sample(park):
+    index = pd.DatetimeIndex(["2024-06-01"]).tz_localize("Europe/Paris")
+    add_meter(park, "m", ["b1"], 5.0, index=index)
+    row = park.select().consumption(**YEAR).iloc[0]
+    assert row.coverage == pytest.approx(1 / DAYS_2024)
+
+
 def test_index_channel_gives_last_minus_first_reading(park):
     index = pd.date_range("2024-01-01", "2024-12-31", freq="MS", tz="Europe/Paris")
     add_meter(park, "m", ["b1"], [100.0 * i for i in range(12)], channel="index", index=index)
