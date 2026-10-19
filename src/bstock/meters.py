@@ -350,11 +350,12 @@ def _period_bounds(
     last = last.tz_localize(tz) if last.tzinfo is None else last.tz_convert(tz)
     if first >= last:
         raise InvalidArgumentError(f"start ({first}) must be before end ({last})")
-    inner: list[pd.Timestamp] = []
+    bounds = pd.DatetimeIndex([first, last])
     if freq is not None:
         try:
             offset = pd.tseries.frequencies.to_offset(freq)
         except ValueError as error:
             raise InvalidArgumentError(f"invalid freq {freq!r}: {error}") from error
-        inner = [t for t in pd.date_range(first, last, freq=offset) if first < t < last]
-    return pd.DatetimeIndex([first, *inner, last])
+        inner = pd.date_range(first, last, freq=offset)
+        bounds = bounds.append(inner[(inner > first) & (inner < last)]).sort_values()
+    return bounds

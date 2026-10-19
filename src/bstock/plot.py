@@ -16,6 +16,7 @@ from collections.abc import Sequence
 from enum import Enum
 from typing import TYPE_CHECKING, Any, Literal
 
+import numpy as np
 import pandas as pd
 
 from bstock._deps import require
@@ -618,16 +619,18 @@ class SelectionPlot:
             end = last if end is None else end
         frames = [m.coverage(start=start, end=end, freq=freq, tz=tz) for m in plotted]
         periods = [_x_label(t) for t in frames[0].index]
-        z = [(f["coverage"] * 100).to_list() for f in frames]
-        steps = [list(zip(f["present"], f["expected"], strict=True)) for f in frames]
-        labels = [
-            f"{m.name or ''} · {_plain_value(m.energy_type) or 'no energy type'}".strip(" ·")
-            for m in plotted
-        ]
-        customdata = [
-            [[label, present, expected] for present, expected in row]
-            for label, row in zip(labels, steps, strict=True)
-        ]
+        # numpy arrays: plotly validates nested lists cell by cell (100 times slower)
+        z = np.vstack([f["coverage"].to_numpy() * 100 for f in frames])
+        steps = np.stack(
+            [np.column_stack([f["present"], f["expected"]]) for f in frames]
+        )  # (meters, periods, 2)
+        labels = np.array(
+            [
+                f"{m.name or ''} · {_plain_value(m.energy_type) or 'no energy type'}".strip(" ·")
+                for m in plotted
+            ],
+            dtype=object,
+        )
         fig.add_trace(
             go.Heatmap(
                 x=periods,
@@ -637,16 +640,17 @@ class SelectionPlot:
                 zmax=100,
                 colorscale=_colorscale(SEQUENTIAL),
                 colorbar={"title": {"text": "%"}, "ticksuffix": " %"},
-                customdata=customdata,
+                hovertext=np.repeat(labels[:, None], z.shape[1], axis=1),
+                customdata=steps,
                 hovertemplate=(
-                    "%{y} %{customdata[0]}<br>%{x}: %{z:.0f} %"
-                    " (%{customdata[1]} / %{customdata[2]} steps)<extra></extra>"
+                    "%{y} %{hovertext}<br>%{x}: %{z:.0f} %"
+                    " (%{customdata[0]} / %{customdata[1]} steps)<extra></extra>"
                 ),
                 xgap=0,
                 ygap=1,
             )
         )
-        mean = sum(sum(row) for row in z) / sum(len(row) for row in z)
+        mean = float(z.mean())
         subtitle = f"{len(plotted)} meters · mean coverage {mean:.0f} % · periods of {freq}"
         _style(fig, "Data coverage", subtitle, value_axis=None)
         fig.update_yaxes(autorange="reversed", automargin=True, type="category")
