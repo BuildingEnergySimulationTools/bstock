@@ -256,6 +256,55 @@ def test_consumption_by_end_use_and_per_month(park):
 
 
 @requires_plotly
+def test_consumption_horizontal_puts_entities_on_y(park):
+    fig = park.select(entity="site").plot.consumption(**YEAR, orientation="h")
+    assert trace_names(fig) == ["natural_gas", "electricity"]
+    assert {trace.orientation for trace in fig.data} == {"h"}
+    assert list(fig.data[0].y) == ["s0", "s1"]
+    assert list(fig.data[0].x) == [366, 366]
+    assert fig.layout.barmode == "relative"
+    assert fig.layout.xaxis.title.text == "Energy (kWh)"
+    assert fig.layout.yaxis.autorange == "reversed"  # first entity on top
+
+
+@requires_plotly
+def test_horizontal_height_grows_with_the_rows(park):
+    small = park.select(entity="site").plot.consumption(**YEAR, orientation="h")
+    assert small.layout.height == 400
+    monthly = park.select(entity="site").plot.consumption(**YEAR, orientation="h", freq="MS")
+    assert len(monthly.data[0].y) == 12
+
+
+@requires_plotly
+def test_consumption_sorted_by_total(park):
+    days = park["s1-natural_gas"].data.index
+    extra = park.add_meter(
+        Meter(
+            id="s1-extra",
+            scope=["s1"],
+            energy_type="electricity",
+            channels=[Channel(name="energy", unit="kWh")],
+        )
+    )
+    extra.data = pd.DataFrame({"energy": 5.0}, index=days)
+    fig = park.select(entity="site").plot.consumption(**YEAR, orientation="h", sort=True)
+    assert list(fig.data[0].y) == ["s1", "s0"]  # s1: 6 kWh a day, s0: 2
+
+
+@requires_plotly
+def test_consumption_refuses_another_orientation(park):
+    with pytest.raises(InvalidArgumentError, match="orientation"):
+        park.select().plot.consumption(**YEAR, orientation="horizontal")
+
+
+@requires_plotly
+def test_intensity_horizontal(park):
+    fig = park.select(entity="site").plot.intensity(**YEAR, orientation="h", sort=True)
+    assert list(fig.data[0].y) == ["s0", "s1"]  # 366/600 > 366/900
+    assert fig.layout.xaxis.title.text == "Intensity (kWh/m²)"
+
+
+@requires_plotly
 def test_consumption_refuses_another_stack(park):
     with pytest.raises(InvalidArgumentError):
         park.select().plot.consumption(**YEAR, by="entity")

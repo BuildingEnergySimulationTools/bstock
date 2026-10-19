@@ -402,6 +402,8 @@ class SelectionPlot:
         breakdown: bool = False,
         split: str | None = None,
         load_data: bool = False,
+        orientation: Literal["v", "h"] = "v",
+        sort: bool = False,
     ) -> Figure:
         """Plot the measured consumption in kWh (stacked bars).
 
@@ -414,6 +416,12 @@ class SelectionPlot:
             ``breakdown=True`` to split the head meters by end use).
         tz, breakdown, split, load_data
             See :meth:`Selection.consumption`.
+        orientation
+            ``"v"``: vertical bars; ``"h"``: horizontal bars, one row per entity (or period)
+            from top to bottom, the figure height growing with the number of rows.
+        sort
+            Order the bars by total, largest first (left, or top); otherwise in selection
+            order.
 
         Returns
         -------
@@ -425,12 +433,13 @@ class SelectionPlot:
         Raises
         ------
         InvalidArgumentError
-            If ``by`` is invalid, or as :meth:`Selection.consumption`.
+            If ``by`` or ``orientation`` is invalid, or as :meth:`Selection.consumption`.
         MissingDependencyError
             If plotly is not installed.
         """
         go = _plotly()
         _check_stack(by)
+        _check_orientation(orientation)
         frame = self._selection.consumption(
             start=start,
             end=end,
@@ -445,11 +454,13 @@ class SelectionPlot:
         table = frame.pivot_table(
             index=x, columns=by, values="energy", aggfunc="sum", sort=False, dropna=False
         )
+        table = _sorted(table) if sort else table
         fig = go.Figure()
-        _stacked_bars(go, fig, table, "%{y:,.0f} kWh")
+        names = None if freq else self._names(table.index)
+        _stacked_bars(go, fig, table, ",.0f", " kWh", orientation, names)
         subtitle = _coverage_subtitle(frame)
-        _style(fig, f"Consumption per {by.replace('_', ' ')}", subtitle, y_title="Energy (kWh)")
-        fig.update_layout(barmode="relative")
+        title = f"Consumption per {by.replace('_', ' ')}"
+        _style_bars(fig, title, subtitle, "Energy (kWh)", orientation, len(table))
         return fig
 
     def intensity(
@@ -464,6 +475,8 @@ class SelectionPlot:
         breakdown: bool = False,
         split: str | None = None,
         load_data: bool = False,
+        orientation: Literal["v", "h"] = "v",
+        sort: bool = False,
     ) -> Figure:
         """Plot the consumption per unit of area, stacked by energy (bars).
 
@@ -471,6 +484,8 @@ class SelectionPlot:
         ----------
         start, end, area, prefer, freq, tz, breakdown, split, load_data
             See :meth:`Selection.intensity`.
+        orientation, sort
+            See :meth:`consumption`.
 
         Returns
         -------
@@ -480,10 +495,13 @@ class SelectionPlot:
 
         Raises
         ------
+        InvalidArgumentError
+            If ``orientation`` is invalid, or as :meth:`Selection.intensity`.
         MissingDependencyError
             If plotly is not installed.
         """
         go = _plotly()
+        _check_orientation(orientation)
         frame = self._selection.intensity(
             start=start,
             end=end,
@@ -513,13 +531,25 @@ class SelectionPlot:
                 aggfunc="sum",
                 sort=False,
             )
+        table = _sorted(table) if sort else table
         fig = go.Figure()
-        _stacked_bars(go, fig, table, "%{y:,.1f} kWh/" + unit)
+        names = None if freq else self._names(table.index)
+        _stacked_bars(go, fig, table, ",.1f", f" kWh/{unit}", orientation, names)
         located = frame["entity"].nunique()
         subtitle = f"{located} entities with a {area} · {_coverage_subtitle(frame)}"
-        _style(fig, f"Consumption per {area}", subtitle, y_title=f"Intensity (kWh/{unit})")
-        fig.update_layout(barmode="relative")
+        title = f"Consumption per {area}"
+        _style_bars(fig, title, subtitle, f"Intensity (kWh/{unit})", orientation, len(table))
         return fig
+
+    def _names(self, labels: pd.Index) -> list[str]:
+        """Return the name of each entity label (empty for a joined label or a nameless one)."""
+        park = self._selection.park
+        names = []
+        for label in labels:
+            entity = park.get(label) if isinstance(label, str) else None
+            name = getattr(entity, "name", None)
+            names.append("" if name is None else str(name))
+        return names
 
 
 # --- helpers -------------------------------------------------------------------------------------
@@ -584,8 +614,20 @@ def _style(
     fig.update_traces(marker_line={"color": _SURFACE, "width": 1}, selector={"type": "bar"})
 
 
-def _stacked_bars(go: Any, fig: Any, table: pd.DataFrame, value_format: str) -> None:
-    """Add one bar trace per column of ``table`` (categories), folded past the palette."""
+def _stacked_bars(
+    go: Any,
+    fig: Any,
+    table: pd.DataFrame,
+    number_format: str,
+    unit: str,
+    orientation: str = "v",
+    names: list[str] | None = None,
+) -> None:
+    """Add one bar trace per column of ``table`` (categories), folded past the palette.
+
+    The rows of ``table`` are the bars (on x, or on y when ``orientation="h"``); ``names``, one
+    per row, are shown on hover after the row label.
+    """
     columns = [c for c in table.columns if table[c].notna().any()]
     names = [
         "(none)" if c is None or (isinstance(c, float) and math.isnan(c)) else c for c in columns
@@ -597,17 +639,58 @@ def _stacked_bars(go: Any, fig: Any, table: pd.DataFrame, value_format: str) -> 
     if folded:
         folded_columns = [c for n, c in zip(names, columns, strict=True) if n in folded]
         series[OTHER] = table[folded_columns].sum(axis=1, min_count=1)
-    x = [_x_label(i) for i in table.index]
+    labels = [_x_label(i) for i in table.index]
+    horizontal = orientation == "h"
+    label_axis, value_axis = ("y", "x") if horizontal else ("x", "y")
+    named = names is not None and any(names)
+    hover = (
+        "%{"
+        + label_axis
+        + "}"
+        + (" %{customdata}" if named else "")
+        + ": %{"
+        + value_axis
+        + ":"
+        + number_format
+        + "}"
+        + unit
+    )
     for i, (name, values) in enumerate(series.items()):
+        coordinates = {label_axis: labels, value_axis: values.to_numpy()}
         fig.add_trace(
             go.Bar(
-                x=x,
-                y=values.to_numpy(),
+                **coordinates,
+                orientation=orientation,
+                customdata=names if named else None,
                 name=str(name),
                 marker_color=CATEGORICAL[i] if name != OTHER else OTHER_COLOR,
-                hovertemplate="%{x}: " + value_format + "<extra>" + str(name) + "</extra>",
+                hovertemplate=hover + "<extra>" + str(name) + "</extra>",
             )
         )
+
+
+ROW_HEIGHT = 18
+"""px per bar of a horizontal bar chart, which grows with its rows."""
+MIN_HEIGHT = 400
+
+
+def _style_bars(
+    fig: Any, title: str, subtitle: str | None, value_title: str, orientation: str, rows: int
+) -> None:
+    """Style a stacked bar chart; a horizontal one reads top down and grows with its rows."""
+    if orientation == "h":
+        _style(fig, title, subtitle, x_title=value_title, value_axis="x")
+        fig.update_yaxes(autorange="reversed", automargin=True)
+        fig.update_layout(height=max(MIN_HEIGHT, ROW_HEIGHT * rows + 150))
+    else:
+        _style(fig, title, subtitle, y_title=value_title)
+    fig.update_layout(barmode="relative")
+
+
+def _sorted(table: pd.DataFrame) -> pd.DataFrame:
+    """Rows of ``table`` by decreasing total (stable for ties)."""
+    totals = table.sum(axis=1, min_count=1).fillna(float("-inf"))
+    return table.loc[totals.sort_values(ascending=False, kind="stable").index]
 
 
 def _fold(names: Sequence[Any], limit: int) -> tuple[list[Any], list[Any]]:
@@ -838,6 +921,11 @@ def _check_field(selection: Selection, name: str) -> None:
         known.update(entity.sourced_fields())
     if name not in known:
         raise UnknownFieldError(f"{name!r} is not a field of the {selection.entity}s")
+
+
+def _check_orientation(orientation: str) -> None:
+    if orientation not in ("v", "h"):
+        raise InvalidArgumentError(f"orientation must be 'v' or 'h', not {orientation!r}")
 
 
 def _check_stack(by: str) -> None:

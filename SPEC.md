@@ -1753,8 +1753,8 @@ On la personnalise ensuite avec `fig.update_layout(...)`.
 | `plot.aggregate(field, *, by=None, prefer="buildings")` | Barres de `total` par site (ou par groupe `by`), avec la couverture au survol | §14.3 |
 | `plot.distribution(field, *, bins=None)` | Histogramme pour un nombre ; barres de fréquence pour une enum ou une chaîne | Valeurs effectives |
 | `plot.map(*, geometry="point", color=None)` | Carte sur fond OpenStreetMap (sans clé d'API) : points `lat` / `lon`, emprises `footprint` (GeoJSON WGS84, sans l'extra `[geo]`) ou les deux (`geometry="both"` : emprises plus un marqueur par entité, pour les retrouver sur une carte dézoomée ; mêmes couleurs, une seule légende), colorés par un attribut | Valeurs effectives |
-| `plot.consumption(*, start, end, freq=None, by="energy_type", tz, breakdown, split, load_data)` | Barres empilées de la consommation (kWh) par entité, empilées par énergie (`by="energy_type"`) ou par usage (`by="end_use"`) ; une barre par période avec `freq` | §6.5 |
-| `plot.intensity(*, start, end, area="heated_area", prefer, freq=None, tz, breakdown, split, load_data)` | Barres du kWh/m² par entité, empilées par énergie | §6.5 |
+| `plot.consumption(*, start, end, freq=None, by="energy_type", tz, breakdown, split, load_data, orientation="v", sort=False)` | Barres empilées de la consommation (kWh) par entité, empilées par énergie (`by="energy_type"`) ou par usage (`by="end_use"`) ; une barre par période avec `freq` ; `orientation="h"` : barres horizontales, une ligne par entité ; `sort=True` : par total décroissant | §6.5 |
+| `plot.intensity(*, start, end, area="heated_area", prefer, freq=None, tz, breakdown, split, load_data, orientation="v", sort=False)` | Barres du kWh/m² par entité, empilées par énergie ; mêmes `orientation` et `sort` | §6.5 |
 
 Une entité sans valeur n'est pas tracée, et le titre indique la couverture (« 34 / 42 bâtiments »). Les
 unités des champs (métadonnée `unit`) étiquettent les axes.
@@ -1774,6 +1774,10 @@ Précisions (implémentation 0.8.0) :
   une sélection de sites, des sites imbriqués se recouvrent). `plot.intensity(freq=...)` : par période,
   énergie des lignes qui ont une surface divisée par la somme de leurs surfaces (indicateur de la
   sélection, pas somme de ratios).
+- Barres horizontales (`orientation="h"`, ajout 2026-10-19) : entités (ou périodes) sur l'axe y, lues de
+  haut en bas (la première, ou la plus grosse avec `sort=True`, en haut), valeurs sur l'axe x avec la
+  grille ; hauteur de 18 px par barre (400 px au moins), pour des centaines de sites ; le survol
+  ajoute le nom de l'entité à son id. Une autre valeur d'`orientation` lève `InvalidArgumentError`.
 - `plot.distribution` d'un attribut liste ou dict lève `InvalidArgumentError` ; un attribut inconnu lève
   `UnknownFieldError`, comme `color=` de `plot.map`.
 
