@@ -605,6 +605,32 @@ def select(
     return Selection(park, entity, [e.id for e in entities if all(test(e) for test in tests)])
 
 
+def select_ids(park: BuildingPark, ids: Iterable[str]) -> Selection:
+    """Return the sites or the buildings ``ids`` as a selection; see ``BuildingPark.__getitem__``.
+
+    Raises
+    ------
+    UnknownIdError
+        If ids are not sites or buildings of the park (all of them listed).
+    InvalidArgumentError
+        If ``ids`` is empty, contains a non-string or mixes sites and buildings.
+    """
+    wanted = _id_list(ids, "the ids")
+    if not wanted:
+        raise InvalidArgumentError(
+            "cannot infer the entity type of an empty list of ids; "
+            "use park.select(id__in=[], entity=...)"
+        )
+    faulty = [i for i in wanted if not isinstance(park.get(i), Site | Building)]
+    if faulty:
+        raise UnknownIdError(f"not sites or buildings of the park: {_unique(faulty)}")
+    types = {"site" if isinstance(park.get(i), Site) else "building" for i in wanted}
+    if len(types) > 1:
+        raise InvalidArgumentError("the ids mix sites and buildings; a selection never mixes them")
+    entity_type = types.pop()
+    return Selection(park, entity_type, _tree_order(park, entity_type, set(wanted)))
+
+
 def check_entity_type(entity: str) -> None:
     """Check that ``entity`` is ``"building"`` or ``"site"``.
 
@@ -635,11 +661,44 @@ def _compile(
             raise InvalidArgumentError(f"the predicate must be callable, not {predicate!r}")
         tests.append(lambda entity: bool(predicate(entity)))
     for key, value in criteria.items():
-        if key in STRUCTURE_CRITERIA:
+        if key == "id" or key.startswith("id__"):
+            tests.append(_id_test(park, entity_type, key, value))
+        elif key in STRUCTURE_CRITERIA:
             tests.append(_structure_test(park, entity_type, key, value))
         else:
             tests.append(_value_test(park, entity_type, key, value))
     return tests
+
+
+def _id_test(park: BuildingPark, entity_type: str, key: str, value: Any) -> _Test:
+    if key == "id":
+        if not isinstance(value, str):
+            raise InvalidArgumentError(f"id expects a string, not {value!r}")
+        wanted = [value]
+    elif key == "id__in":
+        if isinstance(value, str) or not hasattr(value, "__iter__"):
+            raise InvalidArgumentError(f"id__in expects a list of ids, not {value!r}")
+        wanted = _id_list(value, key)
+    else:
+        raise InvalidArgumentError(f"{key!r}: id only accepts id=... and id__in=[...]")
+    cls = _ENTITY_CLASSES[entity_type]
+    faulty = [i for i in wanted if not isinstance(park.get(i), cls)]
+    if faulty:
+        raise UnknownIdError(f"not {entity_type}s of the park: {_unique(faulty)}")
+    allowed = set(wanted)
+    return lambda entity: entity.id in allowed
+
+
+def _id_list(ids: Iterable[Any], what: str) -> list[str]:
+    wanted = list(ids)
+    wrong = [i for i in wanted if not isinstance(i, str)]
+    if wrong:
+        raise InvalidArgumentError(f"{what} must be strings, not {wrong!r}")
+    return wanted
+
+
+def _unique(ids: list[str]) -> list[str]:
+    return list(dict.fromkeys(ids))
 
 
 def _value_test(park: BuildingPark, entity_type: str, key: str, value: Any) -> _Test:

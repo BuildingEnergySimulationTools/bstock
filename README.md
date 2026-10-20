@@ -104,6 +104,8 @@ sel = sel.filter(heated_area__isnull=False)                         # narrow it 
 park.select(within="school-A") - park.select(has_rnb_id=True)     # set operations: | & -
 park.select(lambda b: (b.height or 0) > 10, has_system="heating")  # any predicate, structure criteria
 park.select(entity="site", parent=None)                              # top-level sites
+park[["b1", "b2"]]                                                   # a list of ids: a selection
+park.select(id__in=ids, entity="site", has_meter=True)               # ids combined with criteria
 
 len(sel), list(sel), sel.ids
 sel.to_dataframe(provenance=True)      # the rows of the selected buildings
@@ -111,7 +113,8 @@ sel.tree(fields=["construction_year"]) # the selected buildings and their sites
 ```
 
 Operators: `__in`, `__lt`, `__le`, `__gt`, `__ge`, `__isnull`, `__contains`. Structure criteria:
-`within`, `parent`, `has_rnb_id`, `has_meter`, `has_system`. A selection is a snapshot of ids: select
+`within`, `parent`, `has_rnb_id`, `has_meter`, `has_system`. `park[ids]` takes any iterable of ids
+(list, tuple, set, `pd.Index`) of sites or of buildings. A selection is a snapshot of ids: select
 again after changing the park.
 
 ## Analysing a selection

@@ -183,6 +183,114 @@ def test_misused_operators_are_refused(park, criteria, match):
         park.select(**criteria)
 
 
+# --- selection by ids ---------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("criteria", "expected"),
+    [
+        ({"id": "b2"}, ("b2",)),
+        ({"id__in": ["b4", "b1", "b3"]}, ("b3", "b1", "b4")),
+        ({"id__in": ["b1", "b2", "b5"], "construction_year": 1990}, ("b2",)),
+        ({"id__in": ["b1", "b4"], "within": "gs"}, ("b1",)),
+        ({"id__in": []}, ()),
+    ],
+)
+def test_id_criteria(park, criteria, expected):
+    assert park.select(**criteria).ids == expected
+
+
+def test_id_criteria_on_sites(park):
+    assert park.select(id__in=("other", "gs"), entity="site").ids == ("gs", "other")
+
+
+def test_id_criterion_filters_a_selection(park):
+    assert park.select(within="gs").filter(id__in={"b1", "b4"}).ids == ("b1",)
+
+
+@pytest.mark.parametrize(
+    ("criteria", "entity"),
+    [
+        ({"id": "nope"}, "building"),
+        ({"id__in": ["b1", "nope", "gs", "m"]}, "building"),
+        ({"id__in": ["gs", "b1"]}, "site"),
+    ],
+)
+def test_id_criteria_refuse_ids_of_another_type_or_absent(park, criteria, entity):
+    with pytest.raises(UnknownIdError):
+        park.select(entity=entity, **criteria)
+
+
+def test_id_criteria_list_every_faulty_id(park):
+    with pytest.raises(UnknownIdError, match=r"\['nope', 'gs', 'm'\]"):
+        park.select(id__in=["b1", "nope", "gs", "m", "nope"])
+
+
+@pytest.mark.parametrize(
+    ("criteria", "match"),
+    [
+        ({"id__lt": "b2"}, "id only accepts"),
+        ({"id__isnull": False}, "id only accepts"),
+        ({"id__in": "b1"}, "list of ids"),
+        ({"id": ["b1"]}, "string"),
+        ({"id__in": ["b1", 3]}, "strings"),
+    ],
+)
+def test_misused_id_criteria_are_refused(park, criteria, match):
+    with pytest.raises(InvalidArgumentError, match=match):
+        park.select(**criteria)
+
+
+@pytest.mark.parametrize(
+    "ids",
+    [["b4", "b1"], ("b4", "b1"), {"b4", "b1"}, pd.Index(["b4", "b1"]), iter(["b4", "b1"])],
+    ids=["list", "tuple", "set", "index", "iterator"],
+)
+def test_getitem_with_ids_returns_a_selection_of_buildings(park, ids):
+    selection = park[ids]
+    assert isinstance(selection, Selection)
+    assert (selection.entity, selection.ids) == ("building", ("b1", "b4"))
+
+
+def test_getitem_with_ids_of_sites(park):
+    selection = park[["other", "group"]]
+    assert (selection.entity, selection.ids) == ("site", ("group", "other"))
+
+
+def test_getitem_ignores_duplicates_and_follows_the_tree_order(park):
+    assert park[["b5", "b2", "b5", "b1"]].ids == ("b5", "b1", "b2")
+
+
+def test_getitem_with_one_id_still_returns_the_entity(park):
+    assert park["b1"] is park.get("b1")
+
+
+def test_getitem_refuses_a_mix_of_sites_and_buildings(park):
+    with pytest.raises(InvalidArgumentError, match="mix"):
+        park[["gs", "b1"]]
+
+
+def test_getitem_refuses_an_empty_list(park):
+    with pytest.raises(InvalidArgumentError, match="empty"):
+        park[[]]
+
+
+@pytest.mark.parametrize("faulty", [["nope"], ["m"], ["heating-gs"]])
+def test_getitem_refuses_ids_that_are_not_sites_or_buildings(park, faulty):
+    with pytest.raises(UnknownIdError, match=faulty[0]):
+        park[["b1", *faulty]]
+
+
+def test_getitem_lists_every_faulty_id(park):
+    with pytest.raises(UnknownIdError, match=r"\['nope', 'm'\]"):
+        park[["nope", "b1", "m", "nope"]]
+
+
+def test_getitem_refuses_non_string_ids(park):
+    with pytest.raises(InvalidArgumentError, match="strings"):
+        park[["b1", 2]]
+
+
 def test_filter_narrows_a_selection(park):
     narrowed = park.select(usage="tertiary").filter(heated_area__isnull=False)
     assert (narrowed.entity, narrowed.ids) == ("building", ("b3", "b1"))

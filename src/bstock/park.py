@@ -44,7 +44,7 @@ from bstock.exceptions import (
 )
 from bstock.meters import Meter, _missing_data
 from bstock.provenance import SourcePriority
-from bstock.selection import EntityType, Predicate, Selection, select
+from bstock.selection import EntityType, Predicate, Selection, select, select_ids
 from bstock.site import Site, build_children
 from bstock.systems import System
 
@@ -322,12 +322,41 @@ class BuildingPark(BaseModel):
             return entity
         raise UnknownIdError(f"{entity_id!r} is a {type(entity).__name__}, not a {cls.__name__}")
 
-    def __getitem__(self, entity_id: str) -> Entity:
-        """Return the entity ``entity_id``; raise :class:`UnknownIdError` if there is none."""
+    @overload
+    def __getitem__(self, key: str) -> Entity: ...
+
+    @overload
+    def __getitem__(self, key: Iterable[str]) -> Selection: ...
+
+    def __getitem__(self, key: str | Iterable[str]) -> Entity | Selection:
+        """Return the entity ``key``, or the selection of the sites or buildings ``key``.
+
+        Parameters
+        ----------
+        key
+            An id, or an iterable of ids that is not a string (list, tuple, set,
+            ``pandas.Index``…): all sites or all buildings (SPEC §14.2).
+
+        Returns
+        -------
+        Site, Building, System, Meter or Selection
+            The entity; for an iterable, a :class:`Selection` whose entity type is deduced from
+            the ids, without duplicates, in the order of the park tree.
+
+        Raises
+        ------
+        UnknownIdError
+            If an id is not in the park, or, in an iterable, is not a site or a building (all
+            of them listed).
+        InvalidArgumentError
+            If the iterable is empty, contains a non-string or mixes sites and buildings.
+        """
+        if not isinstance(key, str) and isinstance(key, Iterable):
+            return select_ids(self, key)
         try:
-            return self._index[entity_id]
+            return self._index[key]
         except KeyError:
-            raise UnknownIdError(entity_id) from None
+            raise UnknownIdError(key) from None
 
     def __contains__(self, entity_id: object) -> bool:
         return entity_id in self._index
@@ -389,7 +418,8 @@ class BuildingPark(BaseModel):
             ``"building"`` or ``"site"``: the type of the selected entities; a selection never
             mixes them.
         **criteria
-            Value criteria on a sourced field (project ones included), ``rnb_id``, the BDNB
+            ``id=v`` or ``id__in=[...]`` (ids of ``entity`` type in the park). Value
+            criteria on a sourced field (project ones included), ``rnb_id``, the BDNB
             ids or ``dpe_ids``: ``attr=v`` (equality; an enum accepts its value), ``attr__in``,
             ``attr__family`` (an enum value or its more precise variants, see
             :meth:`~bstock.enums.GeneratorTechnology.variants`), ``attr__lt``, ``attr__le``,
@@ -414,7 +444,8 @@ class BuildingPark(BaseModel):
             If ``entity`` is neither ``"building"`` nor ``"site"``, an operator does not apply to
             the value or a criterion to ``entity``, or an enum value is invalid.
         UnknownIdError
-            If ``within`` or ``parent`` is not a site of the park.
+            If ``within`` or ``parent`` is not a site of the park, or ids of ``id`` /
+            ``id__in`` are not ``entity`` of the park (all of them listed).
         """
         return select(self, predicate, entity=entity, **criteria)
 

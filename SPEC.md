@@ -18,6 +18,9 @@
 > **0.11.0** (interview du 2026-10-20) : mesures — un `Meter` désigne toute mesure, kWh ou °C
 > (§6.1) ; filtres `quantity` / `sub_bloc` et `load_data` tolérant (§6.4) ; `sel.meters`,
 > `sel.timeseries` (§14.2) ; arbre des compteurs enrichi (§14.1). Compatible.
+>
+> **0.12.0** (2026-10-20) : sélection par ids, `park[[...]]` et critères `id` / `id__in`
+> (§14.2). Compatible.
 
 ---
 
@@ -1452,6 +1455,7 @@ scripts/               # outils de maintenance (régénération de dpe_generator
 | API (0.9.0) | Relecture de l'API publique : hiérarchie protégée, readers, verbes, vocabulaire, signatures des rapports, `None` refusé (renommages ci-dessous) ; format de fichier v2 |
 | API (0.10.0) | Fin de la relecture : connecteurs, familles d'enums, secteurs renommés, production PV négative, noms internes et typage (changements ci-dessous) ; format de fichier v3 |
 | Mesures (0.11.0) | Une seule notion de mesure (§6.1) : filtres `quantity` / `sub_bloc` et `load_data` tolérant aux compteurs sans reader (§6.4), `sel.meters` et `sel.timeseries` (§14.2), lignes de compteur enrichies dans l'arbre (§14.1). Ajouts compatibles, format de fichier inchangé |
+| Ids (0.12.0) | Sélection par ids : `park[[...]]` renvoie une `Selection`, critères `id` / `id__in` (§14.2). Ajouts compatibles |
 
 Noms dépréciés en 0.2.0, **retirés en 0.4.0** (v3.a) :
 
@@ -1614,6 +1618,26 @@ autre valeur lève `InvalidArgumentError`. Les systèmes et les compteurs ne se 
 existent déjà (`iter_systems(kind)`, `timeseries(...)`), et `sel.meters` / `sel.timeseries(...)`
 donnent les compteurs d'une sélection.
 
+**Sélection par ids** (0.12.0). L'id est l'identifiant principal d'une entité, unique dans tout le parc.
+Une liste d'ids donne une `Selection`, pas un sous-parc : une entité n'a qu'un parc et qu'un parent, et
+un sous-parc copierait les entités et couperait les compteurs partagés.
+
+```python
+park["063-ABOB"]                         # l'entité (inchangé)
+park[["063-ABOB", "063-ADCB"]]           # Selection(entity='site', 2 entities)
+park[administrations.ids]                # tout itérable d'ids : liste, tuple, set, pd.Index
+park.select(id__in=ids, activity="Education", entity="site")   # combiné à d'autres critères
+```
+
+`park[ids]`, avec un itérable d'ids qui n'est pas une chaîne :
+- le type est déduit des ids : que des sites → `entity="site"`, que des bâtiments → `"building"` ;
+  un mélange de sites et de bâtiments lève `InvalidArgumentError` ;
+- un id absent du parc, ou celui d'une entité qui n'est ni un site ni un bâtiment (système, compteur),
+  lève `UnknownIdError`, qui liste tous les ids fautifs ;
+- une liste vide lève `InvalidArgumentError` (type indéterminé : `park.select(id__in=[], entity=...)`
+  donne une sélection vide) ;
+- les doublons sont ignorés ; la sélection suit l'ordre de l'arbre, pas celui de la liste.
+
 **`Selection`** :
 - C'est un **instantané** : elle retient les ids et le parc au moment de sa création. Elle se parcourt
   dans l'ordre de `park.iter_buildings()` / `iter_sites()`, qui est aussi celui de `to_dataframe()`
@@ -1657,14 +1681,15 @@ effective**, héritage compris : un bâtiment qui hérite `usage="tertiary"` de 
 | `attr__lt`, `__le`, `__gt`, `__ge` | Comparaison |
 | `attr__isnull=True / False` | Valeur absente / présente |
 | `attr__contains=v` | Attribut liste (`sub_usages`, `dpe_ids`) qui contient `v` |
+| `id=v`, `id__in=[...]` | Entité dont l'id est `v` / dans la liste. Un id absent du parc ou d'un autre type que `entity` lève `UnknownIdError` (tous listés) ; un autre opérateur sur `id` lève `InvalidArgumentError` |
 | `within=site` | Dans le sous-arbre du site (objet ou id), à toute profondeur. Pour `entity="site"`, il s'agit des descendants stricts |
 | `parent=site` | Parent direct égal à `site` ; `parent=None` désigne le premier niveau |
 | `has_rnb_id=True / False` | Bâtiments seulement |
 | `has_meter=True / False` | `find_meters()` non vide / vide |
 | `has_system="heating"` (ou `True`) | Bâtiment : au moins un système de ce `kind` qui le dessert, systèmes partagés compris (`find_serving_systems`). Site : au moins un système propre |
 
-- Les attributs utilisables sont les attributs sourcés de la classe (y compris ceux du projet), `rnb_id`,
-  les ids BDNB et `dpe_ids`.
+- Les attributs utilisables sont les attributs sourcés de la classe (y compris ceux du projet), `id`,
+  `rnb_id`, les ids BDNB et `dpe_ids`.
 - Un attribut inconnu lève `UnknownFieldError`. Un opérateur inconnu, un opérateur mal employé
   (`__contains` sur une valeur qui n'est pas une liste, `__isnull` sans booléen, comparaison de types
   incompatibles), une valeur d'enum invalide (`usage="education"`) ou un critère de structure inadapté au

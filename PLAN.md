@@ -9,7 +9,8 @@ Sommaire : [v1](#v1--terminée) (terminée, 0.1.0 puis ajustements d'API en 0.2.
 [v2](#v2--connecteurs-emprise-et-exports) (terminée, 0.3.0) ·
 [v3](#v3--lisibilité-sélection-analyse-consommations-graphiques) (terminée, 0.8.0) ·
 [relecture de l'API](#relecture-de-lapi-090) (0.9.0 et 0.10.0) ·
-[mesures](#mesures--sélection-extraction-et-arbre-0110) (0.11.0)
+[mesures](#mesures--sélection-extraction-et-arbre-0110) (0.11.0) ·
+[sélection par ids](#sélection-par-ids-0120) (0.12.0)
 
 ---
 
@@ -451,3 +452,23 @@ Ajouts compatibles, format de fichier inchangé.
       capteur, compteur chargé, sans scope)
 - [x] Tutoriel et exemples : énergie et températures d'une même sélection
 - [x] Finalisation 0.11.0 : statut et note de version dans la SPEC, version et tag
+
+---
+
+# Sélection par ids (0.12.0)
+
+Besoin remonté par gestrack (2026-10-20) : passer d'une liste d'ids (blocs d'un Plumber tide, `sel.ids`)
+à une sélection, sans prédicat `lambda s: s.id in ids`. Décisions : une liste d'ids donne une
+`Selection`, pas un sous-parc ; id inconnu ou d'un autre type → `UnknownIdError` ; mélange sites /
+bâtiments → `InvalidArgumentError`. Ajouts compatibles.
+
+- [x] SPEC : §14.2 (`park[[...]]`, critères `id` / `id__in`), §12, statut
+- [x] Critères `id` et `id__in` dans `select` / `filter` (`selection._compile`) ; ids contrôlés à la
+      création : absents ou d'un autre type que `entity` → `UnknownIdError` (tous listés) ; autres
+      opérateurs sur `id` → `InvalidArgumentError` ; tests (combinaison avec d'autres critères,
+      `filter`, liste vide)
+- [x] `BuildingPark.__getitem__` : itérable non chaîne → `Selection` (type déduit ; mélange et liste
+      vide → `InvalidArgumentError` ; ids fautifs → `UnknownIdError`) ; typage (`@overload`) ; tests
+      (sites, bâtiments, tuple / set / `pd.Index`, doublons, ordre de l'arbre, id de compteur)
+- [x] Tutoriel : liste d'ids issue de tide → sélection → `timeseries`
+- [x] Finalisation 0.12.0 : statut et note de version dans la SPEC, version et tag
