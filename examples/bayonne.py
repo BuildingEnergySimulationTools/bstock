@@ -5,8 +5,9 @@ It shows the typical project workflow:
 1. project subclasses adding client attributes;
 2. a project reader loading the client inventory;
 3. provenance: several sources for one value, inheritance from a BDNB group site;
-4. shared systems, envelope computations and a meter read from a CSV file;
-5. a tide-ready time series, then a self-contained park directory reloaded with the project classes.
+4. shared systems, envelope computations, a meter read from a CSV file and a temperature sensor;
+5. tide-ready time series (energy and temperatures of a site), then a self-contained park
+   directory reloaded with the project classes.
 
 Run it with ``python examples/bayonne.py [output_directory]``.
 """
@@ -188,9 +189,31 @@ def main(output: Path) -> BuildingPark:
         )
         meter.data = pd.DataFrame({"energy": daily}, index=days)
 
+    # A classroom temperature sensor: a meter without energy type, its role in sub_bloc.
+    hours = pd.date_range("2024-01-01", "2024-12-31 23:00", freq="h", tz="Europe/Paris")
+    sensor = park.add_meter(
+        Meter(
+            id="T_salle_1",
+            name="Salle 1",
+            scope=["site-ecole-A"],
+            sub_bloc="ambiance",
+            timestep="1h",
+            channels=[Channel(name="temperature", unit="°C")],
+        )
+    )
+    temperatures = [19 + 2 * math.sin(2 * math.pi * (h.hour - 9) / 24) for h in hours]
+    sensor.data = pd.DataFrame({"temperature": temperatures}, index=hours)
+
     print(park.tree(systems=True, meters=True))
     frame = park.timeseries(load_data=True)
     print(f"Time series ready for tide: {list(frame.columns)}, {len(frame)} rows")
+
+    # Energy and temperatures of school A (its whole subtree) in one DataFrame; the electricity
+    # meter only has a power channel, so it is left out.
+    school = park.select(lambda site: site.id == "site-ecole-A", entity="site")
+    print(f"Meters of school A: {[m.id for m in school.meters]}")
+    measures = school.timeseries(quantity=["energy", "temperature"], tz="Europe/Paris")
+    print(f"Energy and temperatures of school A: {list(measures.columns)}")
 
     # 2024 consumption, the hot water sub-meter splitting the gas; the electricity meter measures
     # power, which bstock does not integrate (tide's job): it is ignored with a NoDataWarning.

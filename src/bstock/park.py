@@ -42,7 +42,7 @@ from bstock.exceptions import (
     NoDataWarning,
     UnknownIdError,
 )
-from bstock.meters import Meter
+from bstock.meters import Meter, _missing_data
 from bstock.provenance import SourcePriority
 from bstock.selection import EntityType, Predicate, Selection, select
 from bstock.site import Site, build_children
@@ -626,6 +626,8 @@ class BuildingPark(BaseModel):
         *,
         end_use: EndUse | str | Iterable[EndUse | str] | None = None,
         energy_type: EnergyType | str | Iterable[EnergyType | str] | None = None,
+        quantity: str | Iterable[str] | None = None,
+        sub_bloc: str | Iterable[str] | None = None,
         meters: Iterable[Meter | str] | None = None,
         buildings: Iterable[Building | str] | None = None,
         sites: Iterable[Site | str] | None = None,
@@ -634,18 +636,28 @@ class BuildingPark(BaseModel):
     ) -> pd.DataFrame:
         """Assemble the data of several meters in one DataFrame, ready for ``tide.Plumber``.
 
+        Every filter takes a value or a list; filters combine with AND.
+
         Parameters
         ----------
         end_use, energy_type
-            Keep the meters with one of these end uses / energy types.
+            Keep the energy meters with one of these end uses / energy types. Sensors (no
+            energy type, no end use) are left out.
+        quantity
+            Channel names (``"energy"``, ``"temperature"``...): keep the meters having one of
+            these channels, and only the columns of these channels. ``None``: every column.
+        sub_bloc
+            Keep the meters whose effective ``sub_bloc`` tag (:meth:`Meter.tide_tags`) is one of
+            these: the end use of an energy meter, the role of a sensor (``"ambiance"``...).
         meters
             Keep these meters (objects or ids).
         buildings, sites
             Keep the meters whose scope contains one of these entities or one of their own
             systems.
         load_data
-            Call :meth:`Meter.load_data` on the selected meters that have no data in memory. Without
-            it, such meters are skipped with a :class:`NoDataWarning`.
+            Call :meth:`Meter.load_data` on the selected meters that have no data in memory and
+            have a reader. A meter left without data (no reader, or no ``load_data``) is skipped
+            with a :class:`NoDataWarning`.
         tz
             Time zone of the result.
 
@@ -653,16 +665,28 @@ class BuildingPark(BaseModel):
         -------
         pandas.DataFrame
             Outer join of the meter data, in tide column format, without resampling.
+
+        Raises
+        ------
+        DataReadError
+            If the reader of a meter fails.
         """
-        selected = self._select_meters(end_use, energy_type, meters, buildings, sites)
+        selected = self._select_meters(
+            end_use, energy_type, quantity, sub_bloc, meters, buildings, sites
+        )
+        quantities = None if quantity is None else _as_set(quantity, str)
         frames: list[pd.DataFrame] = []
         for meter in selected:
-            if meter.data is None and load_data:
-                meter.load_data()
-            if meter.data is None:
-                warnings.warn(f"meter {meter.id!r} has no data", NoDataWarning, stacklevel=2)
+            note = _missing_data(meter, load_data)
+            if note is not None:
+                warnings.warn(note, NoDataWarning, stacklevel=2)
                 continue
-            frames.append(meter.data.tz_convert(tz))
+            assert meter.data is not None
+            frame = meter.data
+            if quantities is not None:
+                columns = meter.tide_columns()
+                frame = frame[[columns[c.name] for c in meter.channels if c.name in quantities]]
+            frames.append(frame.tz_convert(tz))
         if not frames:
             return pd.DataFrame(index=pd.DatetimeIndex([], tz=tz))
         # column names start with the meter id, so they are unique across meters
@@ -672,6 +696,8 @@ class BuildingPark(BaseModel):
         self,
         end_use: Any,
         energy_type: Any,
+        quantity: str | Iterable[str] | None,
+        sub_bloc: str | Iterable[str] | None,
         meters: Iterable[Meter | str] | None,
         buildings: Iterable[Building | str] | None,
         sites: Iterable[Site | str] | None,
@@ -680,6 +706,12 @@ class BuildingPark(BaseModel):
         if meters is not None:
             wanted = {m if isinstance(m, str) else m.id for m in meters}
             selected = [m for m in selected if m.id in wanted]
+        if quantity is not None:
+            quantities = _as_set(quantity, str)
+            selected = [m for m in selected if any(c.name in quantities for c in m.channels)]
+        if sub_bloc is not None:
+            sub_blocs = _as_set(sub_bloc, str)
+            selected = [m for m in selected if m.tide_tags()[1] in sub_blocs]
         if end_use is not None:
             end_uses = _as_set(end_use, EndUse)
             selected = [m for m in selected if m.end_use in end_uses]

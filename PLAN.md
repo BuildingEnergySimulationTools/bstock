@@ -8,7 +8,8 @@ Règles (voir `CLAUDE.md`) :
 Sommaire : [v1](#v1--terminée) (terminée, 0.1.0 puis ajustements d'API en 0.2.0) ·
 [v2](#v2--connecteurs-emprise-et-exports) (terminée, 0.3.0) ·
 [v3](#v3--lisibilité-sélection-analyse-consommations-graphiques) (terminée, 0.8.0) ·
-[relecture de l'API](#relecture-de-lapi-090) (0.9.0 et 0.10.0)
+[relecture de l'API](#relecture-de-lapi-090) (0.9.0 et 0.10.0) ·
+[mesures](#mesures--sélection-extraction-et-arbre-0110) (0.11.0)
 
 ---
 
@@ -422,3 +423,31 @@ avec sa mise à jour de la SPEC (§12 : liste des renommages). Rupture nette : n
 - [x] Petits points : `dpe.enrich` exporté (test de complétude des `__all__`), noms internes préfixés,
       `ClassMismatchError`, typage de `park`, `find_meters`, `to_geodataframe`
 - [x] Finalisation 0.10.0 : statut et note de version dans la SPEC, version et tag
+
+---
+
+# Mesures : sélection, extraction et arbre (0.11.0)
+
+Besoin remonté par gestrack (Bordeaux Métropole, interview du 2026-10-20) : une mesure, kWh ou °C, se
+sélectionne, s'extrait et s'affiche comme les autres, sans distinguer compteur et capteur. Décisions :
+`Meter` garde son nom et désigne toute mesure (pas de classe `Sensor`) ; le rôle d'un capteur reste dans
+`sub_bloc` ; tous les canaux sont montrés (pas de canal principal / auxiliaire) ; une sélection de sites
+retient les compteurs de son sous-arbre (règle de §6.5) ; compteurs dans l'arbre sur demande seulement.
+Ajouts compatibles, format de fichier inchangé.
+
+- [x] SPEC : §6.1 (Meter = toute mesure), §6.4 (filtres `quantity` / `sub_bloc`, `load_data` tolérant),
+      §6.5 (renvoi), §14.1 (lignes de compteur enrichies), §14.2 (`sel.meters`, `sel.timeseries`), §12
+- [x] `load_data=True` tolérant aux compteurs sans reader (`NoDataWarning`, un par compteur) dans
+      `timeseries`, `consumption`, `intensity` et les graphiques ; un reader qui échoue lève toujours
+      `DataReadError` ; tests : sélection mêlant compteurs avec et sans reader
+- [x] Filtres `quantity` et `sub_bloc` de `park.timeseries` (colonnes restreintes aux canaux demandés,
+      valeur ou liste) ; tests : gaz à 4 canaux + capteur °C, filtre par canal, par `sub_bloc`,
+      combinaison avec `energy_type` (exclut les capteurs)
+- [x] `Selection.meters` : règle de rattachement de §6.5 factorisée (extraite de `consumption._rows`,
+      réutilisée par `consumption`) ; tests : sites (sous-arbre, groupe), bâtiments (sites ancêtres),
+      scope sur un système, compteur multi-sites sans doublon
+- [x] `Selection.timeseries` (délègue à `park.timeseries` sur `sel.meters`) ; tests
+- [x] Arbre : lignes de compteur enrichies, texte et HTML ; tests de rendu (élec, gaz multi-canal,
+      capteur, compteur chargé, sans scope)
+- [x] Tutoriel et exemples : énergie et températures d'une même sélection
+- [x] Finalisation 0.11.0 : statut et note de version dans la SPEC, version et tag

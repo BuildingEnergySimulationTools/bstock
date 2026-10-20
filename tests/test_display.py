@@ -66,8 +66,74 @@ def test_tree_shows_systems_and_meters_under_their_owner(park):
     park.add_meter(Meter(id="pdl", scope=["heating-ch"], channels=[Channel(name="e", unit="kWh")]))
     park.add_meter(Meter(id="spare", channels=[Channel(name="e", unit="kWh")]))
     lines = park.tree(systems=True, meters=True).lines()
-    assert lines[2:4] == ["│   ├── [heating] heating-ch  Chaufferie", "│   ├── [meter] pdl"]
-    assert lines[-1] == "└── [meter] spare  (no scope)"
+    assert lines[2:4] == ["│   ├── [heating] heating-ch  Chaufferie", "│   ├── [meter] pdl  e kWh"]
+    assert lines[-1] == "└── [meter] spare  e kWh  (no scope)"
+
+
+GAS = [("energy", "kWh"), ("volume", "m³"), ("thermal_coefficient", "kWh/m³"), ("duration", "d")]
+
+
+@pytest.mark.parametrize(
+    ("meter", "label"),
+    [
+        (
+            Meter(
+                id="16119970862110",
+                scope=["annex"],
+                name="Mairie",
+                energy_type="electricity",
+                end_use="total",
+                timestep="30min",
+                channels=[Channel(name="energy", unit="Wh")],
+            ),
+            "[meter] 16119970862110  Mairie  electricity total  energy Wh  30min",
+        ),
+        (
+            Meter(
+                id="4205",
+                scope=["annex"],
+                name="Mairie",
+                energy_type="natural_gas",
+                end_use="total",
+                channels=[Channel(name=n, unit=u) for n, u in GAS],
+            ),
+            "[meter] 4205  Mairie  natural_gas total  "
+            "energy kWh, volume m³, thermal_coefficient kWh/m³, duration d",
+        ),
+        (
+            Meter(
+                id="T1",
+                scope=["annex"],
+                name="Salle de réunion",
+                sub_bloc="ambiance",
+                timestep="1h",
+                channels=[Channel(name="temperature", unit="°C")],
+            ),
+            "[meter] T1  Salle de réunion  ambiance  temperature °C  1h",
+        ),
+        (
+            Meter(id="bare", scope=["annex"], channels=[Channel(name="index", unit="kWh")]),
+            "[meter] bare  index kWh",
+        ),
+    ],
+)
+def test_meter_line_says_what_is_measured(park, meter, label):
+    park.add_meter(meter)
+    assert park.tree(meters=True).lines()[-1] == f"    └── {label}"
+    assert label in park.tree(meters=True)._repr_html_().replace("&#x27;", "'")
+
+
+def test_meter_line_marks_loaded_data(park):
+    meter = park.add_meter(
+        Meter(id="t", scope=["annex"], sub_bloc="ambiance", channels=[Channel(name="t", unit="°C")])
+    )
+    meter.data = pd.DataFrame({"t": [20.0]}, index=pd.DatetimeIndex(["2024-01-01"], tz="UTC"))
+    assert park.tree(meters=True).lines()[-1] == "    └── [meter] t  ambiance  t °C · loaded"
+
+
+def test_meter_without_scope_ends_the_tree(park):
+    park.add_meter(Meter(id="spare", energy_type="wood", channels=[Channel(name="v", unit="L")]))
+    assert park.tree(meters=True).lines()[-1] == "└── [meter] spare  wood  v L  (no scope)"
 
 
 def test_tree_hides_systems_and_meters_by_default(park):

@@ -26,6 +26,7 @@ from bstock.exceptions import (
     TimeSeriesError,
     UnknownFieldError,
 )
+from bstock.meters import _missing_data
 from bstock.site import Site
 from bstock.systems import System
 
@@ -181,14 +182,22 @@ def _owners(park: BuildingPark, meter: Meter) -> list[Owner]:
     return list({id(o): o for o in owners}.values())
 
 
-def _rows(selection: Selection) -> Iterable[tuple[str, list[Owner], Meter]]:
-    """Yield ``(entity label, entities covered, meter)`` for each head or production meter."""
+def _attached(
+    selection: Selection, meters: Iterable[Meter]
+) -> Iterable[tuple[str, list[Owner], Meter]]:
+    """Yield ``(entity label, entities covered, meter)`` for the meters of the selection.
+
+    The attachment rule of SPEC §6.5: a system counts as its owner; in a selection of
+    buildings, a meter is kept when one of its owners is a selected building or one of their
+    ancestor sites, and its label joins its owners; in a selection of sites, when one of its
+    owners is in the subtree of a selected site, which is its label (once per site).
+    """
     park = selection.park
-    heads = [m for m in park.meters if (m.parent_meter is None or _produces(m)) and m.scope]
+    scoped = [m for m in meters if m.scope]
     entities = selection._entities()
     if selection.entity == "building":
         relevant = {b.id for b in entities} | {s.id for b in entities for s in b._ancestor_sites()}
-        for meter in heads:
+        for meter in scoped:
             owners = _owners(park, meter)
             if any(o.id in relevant for o in owners):
                 yield "+".join(o.id for o in owners), owners, meter
@@ -199,9 +208,21 @@ def _rows(selection: Selection) -> Iterable[tuple[str, list[Owner], Meter]]:
             *(s.id for s in site.iter_sites()),
             *(b.id for b in site.iter_buildings()),
         }
-        for meter in heads:
+        for meter in scoped:
             if any(o.id in subtree for o in _owners(park, meter)):
                 yield site.id, [site], meter
+
+
+def _selection_meters(selection: Selection) -> list[Meter]:
+    """Return the meters of the selection, in park order; see :attr:`Selection.meters`."""
+    kept = {meter.id for _, _, meter in _attached(selection, selection.park.meters)}
+    return [m for m in selection.park.meters if m.id in kept]
+
+
+def _rows(selection: Selection) -> Iterable[tuple[str, list[Owner], Meter]]:
+    """Yield ``(entity label, entities covered, meter)`` for each head or production meter."""
+    heads = [m for m in selection.park.meters if m.parent_meter is None or _produces(m)]
+    return _attached(selection, heads)
 
 
 class _Calculator:
@@ -290,11 +311,11 @@ class _Calculator:
                 f"meter {meter.id!r}: unit {channel.unit!r} is not an energy unit "
                 f"({', '.join(ENERGY_UNITS)})"
             )
-        if meter.data is None and self.load_data:
-            meter.load_data()
-        if meter.data is None:
-            self.notes.append(f"meter {meter.id!r} has no data in memory: ignored")
+        note = _missing_data(meter, self.load_data)
+        if note is not None:
+            self.notes.append(f"{note}: ignored")
             return None
+        assert meter.data is not None
         series = (
             meter.data[meter.tide_columns()[channel.name]].dropna() * ENERGY_UNITS[channel.unit]
         )

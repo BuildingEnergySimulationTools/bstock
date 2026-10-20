@@ -21,6 +21,7 @@ import pandas as pd
 
 from bstock._deps import require
 from bstock.exceptions import InvalidArgumentError, NoDataWarning, UnknownFieldError
+from bstock.meters import _missing_data
 
 if TYPE_CHECKING:
     from plotly.graph_objects import Figure
@@ -581,8 +582,8 @@ class SelectionPlot:
         meters
             Keep these meters (objects or ids).
         load_data
-            Call :meth:`bstock.Meter.load_data` on the meters without data in memory; without
-            it, they are skipped with a :class:`NoDataWarning`.
+            Call :meth:`bstock.Meter.load_data` on the meters without data in memory that have
+            a reader. A meter left without data is skipped with a :class:`NoDataWarning`.
 
         Returns
         -------
@@ -602,10 +603,9 @@ class SelectionPlot:
         candidates = _measuring_meters(self._selection, energy_type, unit, meters)
         plotted = []
         for meter in candidates:
-            if meter.data is None and load_data:
-                meter.load_data()
-            if meter.data is None:
-                warnings.warn(f"meter {meter.id!r} has no data", NoDataWarning, stacklevel=2)
+            note = _missing_data(meter, load_data)
+            if note is not None:
+                warnings.warn(note, NoDataWarning, stacklevel=2)
                 continue
             plotted.append(meter)
         plotted.sort(key=lambda m: (_plain_value(m.energy_type) or "", m.id))
@@ -1056,28 +1056,10 @@ def _measuring_meters(
     meters: Sequence[Meter | str] | None,
 ) -> list[Meter]:
     """Return the meters of the park measuring the selection, filtered (SPEC §14.5)."""
-    from bstock.consumption import _owners
-
-    park = selection.park
-    entities = selection._entities()
-    if selection.entity == "building":
-        relevant = {b.id for b in entities} | {s.id for b in entities for s in b._ancestor_sites()}
-    else:
-        relevant = {
-            i
-            for site in entities
-            for i in (
-                site.id,
-                *(s.id for s in site.iter_sites()),
-                *(b.id for b in site.iter_buildings()),
-            )
-        }
     energies, units = _as_set(energy_type), _as_set(unit)
     wanted = None if meters is None else {m if isinstance(m, str) else m.id for m in meters}
     kept = []
-    for meter in park.meters:
-        if not meter.scope or not any(o.id in relevant for o in _owners(park, meter)):
-            continue
+    for meter in selection.meters:
         if wanted is not None and meter.id not in wanted:
             continue
         if energies is not None and _plain_value(meter.energy_type) not in energies:

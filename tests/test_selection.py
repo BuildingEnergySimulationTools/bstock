@@ -1,9 +1,11 @@
+import pandas as pd
 import pytest
 
 from bstock.building import Building
 from bstock.enums import BuildingUsage, GeneratorTechnology
 from bstock.exceptions import (
     InvalidArgumentError,
+    NoDataWarning,
     UnknownFieldError,
     UnknownIdError,
     UnknownKindError,
@@ -285,3 +287,114 @@ def test_equality_stays_strict(heated_park):
 def test_family_criterion_needs_an_enum_field(heated_park):
     with pytest.raises(InvalidArgumentError, match="enum fields"):
         heated_park.select(construction_year__family=1970)
+
+
+# --- measures ---------------------------------------------------------------------------------
+
+
+def add_sensor(park, meter_id, scope, temperatures=(19.0, 20.0)):
+    meter = park.add_meter(
+        Meter(
+            id=meter_id,
+            scope=scope,
+            sub_bloc="ambiance",
+            channels=[Channel(name="temperature", unit="°C")],
+        )
+    )
+    index = pd.date_range("2024-01-01", periods=len(temperatures), freq="h", tz="UTC")
+    meter.data = pd.DataFrame({"temperature": list(temperatures)}, index=index)
+    return meter
+
+
+@pytest.fixture
+def metered(park):
+    """The park, with meters on gs, group, b1, b4, the boiler of gs, gs + other, and b5."""
+    for meter_id, scope in [
+        ("m-gs", ["gs"]),
+        ("m-group", ["group"]),
+        ("m-boiler", ["heating-gs"]),
+        ("m-shared", ["gs", "other"]),
+        ("m-b4", ["b4"]),
+        ("m-b5", ["pv-b5"]),
+    ]:
+        park.add_meter(
+            Meter(
+                id=meter_id,
+                scope=scope,
+                energy_type="electricity",
+                channels=[Channel(name="energy", unit="kWh")],
+            )
+        )
+    park.add_meter(
+        Meter(
+            id="m-sub",
+            scope=["b1"],
+            parent_meter="m-group",
+            channels=[Channel(name="energy", unit="kWh")],
+        )
+    )
+    add_sensor(park, "t-b1", ["b1"])
+    park.add_meter(Meter(id="spare", channels=[Channel(name="e", unit="kWh")]))
+    return park
+
+
+@pytest.mark.parametrize(
+    ("entity", "ids", "expected"),
+    [
+        ("site", ["group"], ["m-group", "m-sub", "t-b1"]),
+        ("site", None, ["m", "m-gs", "m-group", "m-boiler", "m-shared", "m-b4", "m-sub", "t-b1"]),
+        ("site", ["other"], ["m-shared", "m-b4"]),
+        # buildings: their meters and those of their ancestor sites
+        (
+            "building",
+            ["b1", "b3"],
+            ["m", "m-gs", "m-group", "m-boiler", "m-shared", "m-sub", "t-b1"],
+        ),
+        ("building", ["b5"], ["m-b5"]),  # a meter of a system counts for its owner
+    ],
+)
+def test_meters_follow_the_attachment_rule(metered, entity, ids, expected):
+    selection = metered.select(lambda e: ids is None or e.id in ids, entity=entity)
+    assert [m.id for m in selection.meters] == expected
+
+
+def test_meters_of_a_site_group_gather_its_sub_sites(metered):
+    sel = metered.select(lambda s: s.id == "gs", entity="site")
+    assert [m.id for m in metered["gs"].find_meters()] == ["m-gs", "m-boiler", "m-shared"]
+    assert {"m-group", "m-sub", "t-b1", "m"} <= {m.id for m in sel.meters}
+
+
+def test_a_meter_of_several_sites_appears_once(metered):
+    ids = [m.id for m in metered.select(entity="site").meters]
+    assert ids.count("m-shared") == 1
+
+
+def test_selection_timeseries_is_restricted_to_its_meters(metered):
+    add_sensor(metered, "t-b4", ["b4"])
+    sel = metered.select(lambda b: b.id == "b1")
+    frame = sel.timeseries(quantity="temperature")
+    assert list(frame.columns) == ["t-b1_temperature__°C__b1__ambiance"]
+
+
+def test_selection_timeseries_mixes_energy_and_temperatures(metered):
+    metered["m-sub"].data = pd.DataFrame(
+        {"energy": [1.0]}, index=pd.DatetimeIndex(["2024-01-01"], tz="UTC")
+    )
+    sel = metered.select(lambda b: b.id == "b1")
+    with pytest.warns(NoDataWarning) as record:
+        frame = sel.timeseries(quantity=["energy", "temperature"], sub_bloc=["other", "ambiance"])
+    assert list(frame.columns) == [
+        "m-sub_energy__kWh__b1__other",
+        "t-b1_temperature__°C__b1__ambiance",
+    ]
+    # the electricity meters of gs, group and the boiler have no data
+    assert {str(w.message).split("'")[1] for w in record} == {
+        "m-gs",
+        "m-group",
+        "m-boiler",
+        "m-shared",
+    }
+
+
+def test_selection_without_meters_gives_an_empty_frame(park):
+    assert park.select(lambda b: b.id == "b2").timeseries().empty

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable, Iterator, Sequence
+from collections.abc import Callable, Iterable, Iterator, Sequence
 from datetime import date, datetime
 from enum import Enum
 from typing import TYPE_CHECKING, Any, Literal
@@ -20,6 +20,8 @@ from bstock.exceptions import (
 from bstock.site import Site
 
 if TYPE_CHECKING:
+    from bstock.enums import EndUse, EnergyType
+    from bstock.meters import Meter
     from bstock.park import BuildingPark
     from bstock.plot import SelectionPlot
 
@@ -310,6 +312,67 @@ class Selection:
 
         return conflicts(self, fields=fields, rtol=rtol)
 
+    # --- measures -----------------------------------------------------------------------------
+
+    @property
+    def meters(self) -> list[Meter]:
+        """The meters of the selection, without duplicates, in the order of ``park.meters``.
+
+        The attachment rule of :meth:`consumption` (SPEC §6.5): a meter whose scope entity (a
+        system counts as its owner) is in the subtree of a selected site; for a selection of
+        buildings, a selected building or one of its ancestor sites. Sub-meters and sensors are
+        included. Unlike ``entity.find_meters()``, a site gathers the meters of its sub-sites
+        and buildings.
+        """
+        from bstock.consumption import _selection_meters  # circular import
+
+        return _selection_meters(self)
+
+    def timeseries(
+        self,
+        *,
+        end_use: EndUse | str | Iterable[EndUse | str] | None = None,
+        energy_type: EnergyType | str | Iterable[EnergyType | str] | None = None,
+        quantity: str | Iterable[str] | None = None,
+        sub_bloc: str | Iterable[str] | None = None,
+        load_data: bool = False,
+        tz: str = "UTC",
+    ) -> pd.DataFrame:
+        """Assemble the data of the meters of the selection (:attr:`meters`) in one DataFrame.
+
+        This is :meth:`BuildingPark.timeseries` restricted to :attr:`meters`, e.g. energy and
+        temperatures together with ``quantity=["energy", "temperature"]``.
+
+        Parameters
+        ----------
+        end_use, energy_type, quantity, sub_bloc, load_data, tz
+            As :meth:`BuildingPark.timeseries`.
+
+        Returns
+        -------
+        pandas.DataFrame
+            Outer join of the meter data, in tide column format, without resampling.
+
+        Raises
+        ------
+        DataReadError
+            If the reader of a meter fails.
+
+        Warns
+        -----
+        NoDataWarning
+            For a selected meter left without data.
+        """
+        return self._park.timeseries(
+            end_use=end_use,
+            energy_type=energy_type,
+            quantity=quantity,
+            sub_bloc=sub_bloc,
+            meters=self.meters,
+            load_data=load_data,
+            tz=tz,
+        )
+
     # --- measured consumption -----------------------------------------------------------------
 
     def consumption(
@@ -350,7 +413,9 @@ class Selection:
             several buildings between the selected buildings they cover; these lines have
             ``estimated=True``. Selections of buildings only.
         load_data
-            Load the data of the meters that have none in memory.
+            Load the data of the meters that have none in memory and have a reader. A meter
+            left without data is ignored with a :class:`NoDataWarning`; a reader that fails
+            raises :class:`DataReadError`.
 
         Returns
         -------
@@ -372,6 +437,8 @@ class Selection:
         TimeSeriesError
             If an energy channel has another unit than Wh, kWh, MWh or GWh, or a sub-meter
             measures another energy than its head meter.
+        DataReadError
+            If the reader of a meter fails.
 
         Warns
         -----

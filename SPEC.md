@@ -14,6 +14,10 @@
 > **0.10.0** : fin de la relecture de l'API : connecteurs (§8), familles d'enums et secteurs renommés
 > (§3.9), production PV négative dans les bilans (§6.5), format de fichier v3 (§7). Version
 > incompatible, sans alias ni migration ; changements listés au §12.
+>
+> **0.11.0** (interview du 2026-10-20) : mesures — un `Meter` désigne toute mesure, kWh ou °C
+> (§6.1) ; filtres `quantity` / `sub_bloc` et `load_data` tolérant (§6.4) ; `sel.meters`,
+> `sel.timeseries` (§14.2) ; arbre des compteurs enrichi (§14.1). Compatible.
 
 ---
 
@@ -694,11 +698,14 @@ park.add_meter(Meter(id="T_salle_1", scope=["site-ecole-A"], timestep="1h", sub_
                      channels=[Channel(name="temperature", unit="°C")]))
 ```
 
-**Capteur** (température, hygrométrie…) : un `Meter` **sans `energy_type`**, avec un canal de la grandeur
-mesurée (`temperature`, °C). Le modèle, `timeseries`, `save` / `load` l'acceptent tels quels ;
-`consumption` l'ignore sans avertissement (ce n'est pas un compteur d'énergie, §6.5). `sub_bloc` peut
-porter son rôle (ex. `ambiance`), sinon `other`. Vérifié le 2026-10-19 : pas de grandeur mesurée
-explicite à ajouter.
+**Une seule notion de mesure.** Un `Meter` désigne **toute mesure** rattachée au parc : compteur
+d'énergie, sous-compteur ou capteur (température, hygrométrie…). Il n'y a pas de classe `Sensor` :
+kWh et °C se sélectionnent, s'extraient et s'affichent de la même façon (§6.4, §14.1, §14.2).
+
+**Capteur** : un `Meter` **sans `energy_type`**, avec un canal de la grandeur mesurée (`temperature`,
+°C). Le modèle, `timeseries`, `save` / `load` l'acceptent tels quels ; `consumption` l'ignore sans
+avertissement (ce n'est pas un compteur d'énergie, §6.5). Son rôle (`ambiance`, `reseau`, `outdoor`…)
+est porté par `sub_bloc`, sinon `other` ; il se filtre avec `sub_bloc=` (§6.4).
 
 ### 6.2 Lecture des données (readers)
 
@@ -777,12 +784,26 @@ Plumber(df).show()
 
 - Les index sont convertis dans un fuseau unique (`tz="UTC"` par défaut, paramétrable), puis unis
   (outer join), sans rééchantillonnage : c'est le rôle de tide.
-- `load_data=True` appelle `load_data()` sur les compteurs dont `data` est vide.
-- Filtres : `end_use`, `energy_type`, `meters` (ids), `buildings` / `sites` (ids ou objets). Un filtre sur
-  des bâtiments retient les compteurs dont le `scope` contient ces bâtiments ou leurs systèmes propres.
+- `load_data=True` appelle `load_data()` sur les compteurs dont `data` est vide et qui ont un `reader`.
+  Un compteur **sans reader** (mesures jamais téléchargées, échec d'API…) est ignoré avec un
+  `NoDataWarning`, comme un compteur sans données ; un reader qui échoue (fichier absent ou corrompu)
+  lève toujours `DataReadError`. Même règle partout où `load_data=True` existe : `consumption`,
+  `intensity` (§6.5) et les graphiques (§14.5).
+- Filtres : `end_use`, `energy_type`, `quantity`, `sub_bloc`, `meters` (ids), `buildings` / `sites` (ids
+  ou objets). Un filtre sur des bâtiments retient les compteurs dont le `scope` contient ces bâtiments ou
+  leurs systèmes propres. Chaque filtre accepte une valeur ou une liste.
+  - `quantity` : nom(s) de canal (`"energy"`, `"temperature"`…). Retient les compteurs qui ont au moins
+    un de ces canaux, et **seulement les colonnes de ces canaux**. Sans `quantity`, toutes les colonnes
+    (un compteur de gaz : `energy`, `volume`, `thermal_coefficient`, `duration`).
+  - `sub_bloc` : tag effectif (`meter.tide_tags()[1]`) : usage d'un compteur d'énergie (`total`,
+    `heating`…) ou rôle d'un capteur (`ambiance`…).
+  - `energy_type` et `end_use` ne retiennent que des compteurs d'énergie : ils excluent les capteurs.
+    Énergie et températures ensemble : `quantity=["energy", "temperature"]`.
 - Les noms de colonnes commencent par l'id du compteur : ils sont donc uniques dans le parc.
 - Un compteur sélectionné sans données en mémoire (et sans `load_data=True`) est ignoré avec un
   `NoDataWarning`.
+- Pour une sélection de sites ou de bâtiments, `sel.timeseries(...)` (§14.2) applique les mêmes filtres
+  aux compteurs de la sélection (sous-arbre compris).
 - `entité.find_meters()` renvoie les compteurs dont le `scope` contient l'entité ou un de ses systèmes
   propres (`park["id"].find_meters()` à partir d'un id).
 
@@ -835,7 +856,8 @@ index, la couverture va du premier au dernier relevé. Il n'y a **jamais d'extra
 - Sélection de sites : on retient les compteurs dont un porteur est dans le sous-arbre d'un site
   sélectionné.
 - Un compteur sans données en mémoire est ignoré avec un `NoDataWarning`, sauf avec `load_data=True`
-  (comme `timeseries`, §6.4).
+  et un reader (comme `timeseries`, §6.4).
+- Cette règle de rattachement définit aussi `sel.meters` (§14.2).
 
 **Lignes.**
 - Sélection de bâtiments : une ligne au niveau du `scope` de chaque compteur. Il n'y a **pas de
@@ -1429,6 +1451,7 @@ scripts/               # outils de maintenance (régénération de dpe_generator
 | v3.e (0.8.0) | Graphiques plotly : `sel.plot.*` (§14.5) |
 | API (0.9.0) | Relecture de l'API publique : hiérarchie protégée, readers, verbes, vocabulaire, signatures des rapports, `None` refusé (renommages ci-dessous) ; format de fichier v2 |
 | API (0.10.0) | Fin de la relecture : connecteurs, familles d'enums, secteurs renommés, production PV négative, noms internes et typage (changements ci-dessous) ; format de fichier v3 |
+| Mesures (0.11.0) | Une seule notion de mesure (§6.1) : filtres `quantity` / `sub_bloc` et `load_data` tolérant aux compteurs sans reader (§6.4), `sel.meters` et `sel.timeseries` (§14.2), lignes de compteur enrichies dans l'arbre (§14.1). Ajouts compatibles, format de fichier inchangé |
 
 Noms dépréciés en 0.2.0, **retirés en 0.4.0** (v3.a) :
 
@@ -1547,7 +1570,16 @@ lignes du texte et `truncated(max_lines)` le texte coupé, comme dans le repr.
   avec leur unité. Un champ inconnu lève `UnknownFieldError`.
 - `systems=True` ajoute les systèmes propres sous leur porteur (`[heating] id  name`). `meters=True`
   ajoute les compteurs sous chaque porteur de leur `scope` (un compteur à plusieurs porteurs apparaît
-  plusieurs fois).
+  plusieurs fois ; sans scope, en fin d'arbre). Les compteurs ne sont montrés que sur demande. Une ligne
+  par compteur, qui dit ce qui est mesuré, champs vides omis :
+  `[meter] <id>  <name>  <energy_type> <end_use ou sub_bloc>  <canal unité, …>  <timestep>`, suivi de
+  ` · loaded` si des données sont en mémoire. Exemples :
+  ```
+  ├── [meter] 16119970862110  Mairie  electricity total  energy Wh  30min
+  ├── [meter] 4205  Mairie  natural_gas total  energy kWh, volume m³, thermal_coefficient kWh/m³, duration d
+  └── [meter] 0018B2100000B7A9_0  Salle de réunion  ambiance  temperature °C  1h · loaded
+  ```
+  Le HTML (ci-dessous) reprend les mêmes libellés.
 - `max_depth=n` coupe l'arbre au niveau `n` (1 = premier niveau). Un nœud coupé indique ce qu'il
   contient (`… 5 buildings`).
 
@@ -1579,7 +1611,8 @@ sel.to_dataframe(provenance=True); sel.tree(fields=["usage"])
 sélection contient toutes les entités du type `entity` : `park.select()` est le point d'entrée des analyses
 sur tout le parc. `entity` vaut `"building"` ou `"site"` : une sélection ne mélange jamais les deux. Une
 autre valeur lève `InvalidArgumentError`. Les systèmes et les compteurs ne se sélectionnent pas : leurs filtres
-existent déjà (`iter_systems(kind)`, `timeseries(...)`).
+existent déjà (`iter_systems(kind)`, `timeseries(...)`), et `sel.meters` / `sel.timeseries(...)`
+donnent les compteurs d'une sélection.
 
 **`Selection`** :
 - C'est un **instantané** : elle retient les ids et le parc au moment de sa création. Elle se parcourt
@@ -1597,6 +1630,20 @@ existent déjà (`iter_systems(kind)`, `timeseries(...)`).
   son sous-arbre, ou tous ses bâtiments dans une sélection de sites, qui ne montre pas les bâtiments ;
   l'en-tête est le repr de la sélection suivi du parc), `aggregate`, `completeness`, `provenance`,
   `conflicts` (§14.3, §14.4), `consumption`, `intensity` (§6.5) et l'accesseur `plot` (§14.5).
+- **Mesures** :
+  - `sel.meters` (propriété) : liste des compteurs de la sélection, sans doublon, dans l'ordre de
+    `park.meters`, selon la règle de rattachement de §6.5 (« Compteurs retenus ») : sous-arbre d'un
+    site sélectionné ; pour des bâtiments, ces bâtiments et leurs sites ancêtres ; un système est ramené
+    à son porteur. Les capteurs en font partie. À la différence de `entity.find_meters()` (entité exacte),
+    un groupe de sites ramène les compteurs de ses sites.
+  - `sel.timeseries(*, end_use=None, energy_type=None, quantity=None, sub_bloc=None, load_data=False,
+    tz="UTC")` : `park.timeseries` (§6.4) restreint à `sel.meters`. Exemple, énergie et températures
+    des sites d'une activité :
+    ```python
+    sel = park.select(activity="Administration", entity="site")
+    df = sel.timeseries(quantity=["energy", "temperature"], load_data=True)
+    ambiance = sel.timeseries(quantity="temperature", sub_bloc="ambiance", load_data=True)
+    ```
 - Repr sur une ligne : `Selection(entity='building', 42 entities)`. En HTML, c'est l'arbre de la sélection.
 
 **Critères.** Tous les critères se combinent par ET, et le prédicat aussi. Ils portent sur la **valeur

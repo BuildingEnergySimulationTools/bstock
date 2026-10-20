@@ -359,3 +359,19 @@ def _period_bounds(
         inner = pd.date_range(first, last, freq=offset)
         bounds = bounds.append(inner[(inner > first) & (inner < last)]).sort_values()
     return bounds
+
+
+def _missing_data(meter: Meter, load_data: bool) -> str | None:
+    """Load the data of ``meter`` if asked and it has a reader; say why it has none, if so.
+
+    A meter without reader is not an error (SPEC §6.4): the caller skips it with a
+    :class:`~bstock.exceptions.NoDataWarning`. A reader that fails still raises
+    :class:`~bstock.exceptions.DataReadError`.
+    """
+    if meter.data is None and load_data and meter.reader is not None:
+        meter.load_data()
+    if meter.data is not None:
+        return None
+    if load_data:
+        return f"meter {meter.id!r} has no data and no reader"
+    return f"meter {meter.id!r} has no data in memory"

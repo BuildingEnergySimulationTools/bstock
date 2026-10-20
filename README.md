@@ -131,6 +131,25 @@ A site may have its own value (a DPE of the whole block) and its buildings their
 shows both and never adds them up. Missing values are never estimated, the `coverage` shows them.
 Project fields declared `sourced(..., extensive=True)` are aggregated too.
 
+## Measures of a selection
+
+A `Meter` is any measure: energy meter, sub-meter or sensor. A sensor has no `energy_type`, a
+channel of the measured quantity, and its role in `sub_bloc`:
+
+```python
+park.add_meter(Meter(id="T_room_1", scope=["school-A"], sub_bloc="ambiance", timestep="1h",
+                     channels=[Channel(name="temperature", unit="°C")]))
+
+sites = park.select(entity="site", parent=None)
+sites.meters                            # meters of their subtrees, sensors and sub-meters included
+sites.timeseries(quantity=["energy", "temperature"], load_data=True)  # only these channels
+sites.timeseries(quantity="temperature", sub_bloc="ambiance")         # role of the sensors
+park.tree(meters=True)                  # [meter] T_room_1  ambiance  temperature °C  1h
+```
+
+`load_data=True` skips the meters without reader with a `NoDataWarning`; a failing reader raises
+`DataReadError`.
+
 ## Measured consumption
 
 ```python

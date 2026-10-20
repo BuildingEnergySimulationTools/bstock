@@ -274,6 +274,15 @@ def test_load_data_reads_the_meter_source(park, tmp_path):
     assert frame.energy.iloc[0] == 10
 
 
+def test_load_data_skips_a_meter_without_reader(park):
+    add_meter(park, "read", ["b1"])
+    park.add_meter(Meter(id="unread", scope=["b2"], channels=[Channel(name="energy", unit="kWh")]))
+    with pytest.warns(NoDataWarning, match="'unread' has no data and no reader") as record:
+        frame = park.select().consumption(**YEAR, load_data=True)
+    assert len(record) == 1
+    assert frame.entity.tolist() == ["b1"]
+
+
 @pytest.mark.parametrize(
     ("kwargs", "error"),
     [

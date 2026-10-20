@@ -412,6 +412,16 @@ def test_coverage_skips_meters_without_data(park):
 
 
 @requires_plotly
+def test_coverage_with_load_data_skips_meters_without_reader(park):
+    park["s0-electricity"].data = None
+    with pytest.warns(NoDataWarning, match="'s0-electricity' has no data and no reader"):
+        fig = park.select(entity="site").plot.coverage(
+            start="2024-01-01", end="2024-01-03", load_data=True
+        )
+    assert "s0-electricity" not in list(heatmap(fig).y)
+
+
+@requires_plotly
 def test_coverage_of_mixed_time_steps(park):
     sensor = park.add_meter(
         Meter(

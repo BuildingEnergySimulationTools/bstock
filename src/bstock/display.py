@@ -291,7 +291,18 @@ def _system_label(system: System) -> str:
 
 
 def _meter_label(meter: Meter) -> str:
-    return f"[meter] {_id_and_name(meter)}"
+    """Return what a meter measures: energy and end use (or role), channels, time step."""
+    measured = " ".join(
+        str(_plain(v)) for v in (meter.energy_type, meter.end_use or meter.sub_bloc) if v
+    )
+    channels = ", ".join(f"{c.name} {c.unit}" for c in meter.channels)
+    parts = [f"[meter] {_id_and_name(meter)}", measured, channels, meter.timestep or ""]
+    label = "  ".join(part for part in parts if part)
+    return label if meter.data is None else f"{label} · loaded"
+
+
+def _plain(value: Any) -> Any:
+    return value.value if isinstance(value, Enum) else value
 
 
 def _plural(count: int, word: str) -> str:

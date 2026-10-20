@@ -623,3 +623,93 @@ def test_coverage_of_hourly_data_per_day():
 def test_coverage_refuses_an_invalid_freq():
     with pytest.raises(InvalidArgumentError, match="freq"):
         daily_meter(["2024-01-01"]).coverage(start="2024-01-01", end="2024-02-01", freq="bad")
+
+
+# --- measures: channels, roles, tolerant load_data ------------------------------------------------
+
+GAS_CHANNELS = [
+    ("energy", "kWh"),
+    ("volume", "m³"),
+    ("thermal_coefficient", "kWh/m³"),
+    ("duration", "d"),
+]
+
+
+@pytest.fixture
+def measured(park):
+    """Park with a gas meter of 4 channels (heating) and an ambient temperature sensor."""
+    gas = park.add_meter(
+        Meter(
+            id="gas",
+            scope=["boiler"],
+            energy_type="natural_gas",
+            end_use="heating",
+            channels=[Channel(name=n, unit=u) for n, u in GAS_CHANNELS],
+        )
+    )
+    gas.data = hourly(**{n: [1.0, 2.0, 3.0] for n, _ in GAS_CHANNELS})
+    sensor = park.add_meter(
+        Meter(
+            id="t",
+            scope=[RNB_A],
+            sub_bloc="ambiance",
+            channels=[Channel(name="temperature", unit="°C")],
+        )
+    )
+    sensor.data = hourly(temperature=[19.0, 20.0, 21.0])
+    return park
+
+
+def test_timeseries_keeps_every_channel_without_quantity(measured):
+    assert measured.timeseries().shape[1] == 5
+
+
+@pytest.mark.parametrize(
+    ("quantity", "expected"),
+    [
+        ("energy", ["gas_energy__kWh__boiler__heating"]),
+        ("temperature", [f"t_temperature__°C__{RNB_A}__ambiance"]),
+        (
+            ["energy", "temperature"],
+            ["gas_energy__kWh__boiler__heating", f"t_temperature__°C__{RNB_A}__ambiance"],
+        ),
+        ("power", []),
+    ],
+)
+def test_quantity_keeps_only_the_columns_of_these_channels(measured, quantity, expected):
+    assert list(measured.timeseries(quantity=quantity).columns) == expected
+
+
+@pytest.mark.parametrize(
+    ("sub_bloc", "expected"),
+    [("ambiance", ["t"]), ("heating", ["gas"]), (["ambiance", "heating"], ["gas", "t"])],
+)
+def test_sub_bloc_filters_on_the_effective_tag(measured, sub_bloc, expected):
+    columns = measured.timeseries(sub_bloc=sub_bloc, quantity=["energy", "temperature"]).columns
+    assert [c.split("_", 1)[0] for c in columns] == expected
+
+
+@pytest.mark.parametrize("criterion", [{"energy_type": "natural_gas"}, {"end_use": "heating"}])
+def test_energy_filters_leave_the_sensors_out(measured, criterion):
+    columns = measured.timeseries(**criterion, quantity=["energy", "temperature"]).columns
+    assert list(columns) == ["gas_energy__kWh__boiler__heating"]
+
+
+def test_load_data_skips_a_meter_without_reader(park, tmp_path):
+    hourly(energy=[1.0, 2.0, 3.0]).to_parquet(tmp_path / "m.parquet")
+    park.add_meter(
+        make_meter("read", ["site-A"], reader=ParquetReader(path=str(tmp_path / "m.parquet")))
+    )
+    park.add_meter(make_meter("unread", ["site-A"]))
+    with pytest.warns(NoDataWarning, match="'unread' has no data and no reader") as record:
+        df = park.timeseries(load_data=True)
+    assert len(record) == 1
+    assert list(df.columns) == ["read_energy__kWh__site-A__total"]
+
+
+def test_load_data_still_raises_when_a_reader_fails(park, tmp_path):
+    park.add_meter(
+        make_meter("m", ["site-A"], reader=ParquetReader(path=str(tmp_path / "missing.parquet")))
+    )
+    with pytest.raises(DataReadError):
+        park.timeseries(load_data=True)

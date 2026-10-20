@@ -209,9 +209,33 @@ for meter_id, scope, end_use, parent, daily in (
     )
     meter.data = pd.DataFrame({"energy": daily}, index=days)
 
+
+# %% a classroom temperature sensor: a meter without energy type, its role in sub_bloc
+hours = pd.date_range("2024-01-01", "2024-12-31 23:00", freq="h", tz="Europe/Paris")
+sensor = park.add_meter(
+    Meter(
+        id="T_salle_1",
+        name="Salle 1",
+        scope=["site-ecole-A"],
+        sub_bloc="ambiance",
+        timestep="1h",
+        channels=[Channel(name="temperature", unit="°C")],
+    )
+)
+temperatures = [19 + 2 * math.sin(2 * math.pi * (h.hour - 9) / 24) for h in hours]
+sensor.data = pd.DataFrame({"temperature": temperatures}, index=hours)
+
 print(park.tree(systems=True, meters=True))
 frame = park.timeseries(load_data=True)  # columns follow the tide convention
 frame.dropna(how="all").head(24)
+
+
+# %% energy and temperatures of school A (its whole subtree) in one DataFrame
+# The electricity meter only has a power channel, so it is left out.
+school = park.select(lambda site: site.id == "site-ecole-A", entity="site")
+print(f"Meters of school A: {[m.id for m in school.meters]}")
+measures = school.timeseries(quantity=["energy", "temperature"], tz="Europe/Paris")
+measures.loc["2024-01-15"].head(24)
 
 
 # %% 2024 consumption, the hot water sub-meter splitting the gas
