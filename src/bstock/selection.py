@@ -546,8 +546,10 @@ class Selection:
         """Return the tree of the selected entities and of their ancestor sites.
 
         The parameters are those of :meth:`BuildingPark.tree`. A site shows the number of
-        selected buildings below it; in a selection of sites, buildings are not shown and a
-        site shows the number of all its buildings.
+        selected buildings below it. A selection of sites also shows the subtree of each
+        selected site (its sub-sites and, with ``meters``, their meters) but not the buildings:
+        a site shows the number of all its buildings, and the meters of its buildings (and of
+        their systems), so that the tree shows every meter of :attr:`meters` (SPEC §14.1).
 
         Returns
         -------
@@ -555,8 +557,12 @@ class Selection:
             The tree; ``str()`` gives the text and Jupyter shows it as HTML.
         """
         shown = set(self._ids)
+        gathering: set[str] = set()
         for entity in self._entities():
             shown.update(site.id for site in entity._ancestor_sites())
+            if isinstance(entity, Site):
+                gathering.update([entity.id, *(s.id for s in entity.iter_sites())])
+        shown |= gathering
         return build_tree(
             self._park,
             systems=systems,
@@ -564,6 +570,7 @@ class Selection:
             max_depth=max_depth,
             fields=fields,
             shown=shown,
+            gathering=gathering,
             header=f"{self!r} of {type(self._park).__name__} {self._park.name!r}",
         )
 

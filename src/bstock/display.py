@@ -139,13 +139,15 @@ def build_tree(
     max_depth: int | None = None,
     fields: str | Sequence[str] | None = None,
     shown: Collection[str] | None = None,
+    gathering: Collection[str] = (),
     header: str | None = None,
 ) -> TreeView:
     """Build the tree of a park or a site; see :meth:`bstock.BuildingPark.tree`.
 
     ``shown`` restricts the sites and buildings to these ids (``None``: all); the building count
-    of a site then counts the shown buildings, or all of them if no building is shown. ``header``
-    replaces the first line of a park tree.
+    of a site then counts the shown buildings, or all of them if no building is shown. The sites
+    of ``gathering`` also show the meters of their hidden direct buildings (and of their
+    systems). ``header`` replaces the first line of a park tree.
     """
     from bstock.park import BuildingPark
 
@@ -161,6 +163,7 @@ def build_tree(
         max_depth=max_depth,
         fields=fields,
         shown=None if shown is None else set(shown),
+        gathering=set(gathering),
     )
     if isinstance(root, BuildingPark):
         nodes = builder.children(root, depth=1)
@@ -184,6 +187,7 @@ class _TreeBuilder:
         max_depth: int | None,
         fields: list[str],
         shown: set[str] | None,
+        gathering: set[str],
     ) -> None:
         self.park = park
         self.systems = systems
@@ -191,6 +195,7 @@ class _TreeBuilder:
         self.max_depth = max_depth
         self.fields = fields
         self.shown = shown
+        self.gathering = gathering
 
     def sites(self, container: BuildingPark | Site) -> list[Site]:
         """Return the shown direct sub-sites of ``container``."""
@@ -226,10 +231,25 @@ class _TreeBuilder:
             if self.systems:
                 nodes.extend(_Node(_system_label(s)) for s in entity.iter_systems())
             if self.meters and self.park is not None:
-                nodes.extend(_Node(_meter_label(m)) for m in self.park._meters_for(entity))
+                nodes.extend(_Node(_meter_label(m)) for m in self.entity_meters(entity))
         if isinstance(entity, Site):
             nodes.extend(self.children(entity, depth))
         return nodes
+
+    def entity_meters(self, entity: Site | Building) -> list[Meter]:
+        """Return the meters shown below ``entity``, once each, in park order.
+
+        Those of ``entity`` and of its own systems; for a site of ``gathering``, also those of its
+        hidden direct buildings and of their systems.
+        """
+        from bstock.site import Site
+
+        assert self.park is not None
+        owners: list[Site | Building] = [entity]
+        if isinstance(entity, Site) and entity.id in self.gathering:
+            owners.extend(b for b in entity.buildings if not self._is_shown(b))
+        ids = {o.id for o in owners} | {s.id for o in owners for s in o.iter_systems()}
+        return [m for m in self.park.meters if ids & set(m.scope)]
 
     def label(self, entity: Site | Building) -> str:
         """Return the line of ``entity``: kind, id, name, building count and ``fields``."""

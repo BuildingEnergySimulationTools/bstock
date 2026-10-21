@@ -148,6 +148,7 @@ sites.meters                            # meters of their subtrees, sensors and 
 sites.timeseries(quantity=["energy", "temperature"], load_data=True)  # only these channels
 sites.timeseries(quantity="temperature", sub_bloc="ambiance")         # role of the sensors
 park.tree(meters=True)                  # [meter] T_room_1  ambiance  temperature °C  1h
+sites.tree(meters=True)                 # where they come from: sub-sites and every meter
 ```
 
 `load_data=True` skips the meters without reader with a `NoDataWarning`; a failing reader raises

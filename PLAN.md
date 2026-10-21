@@ -12,7 +12,7 @@ Sommaire : [v1](#v1--terminée) (terminée, 0.1.0 puis ajustements d'API en 0.2.
 [mesures](#mesures--sélection-extraction-et-arbre-0110) (0.11.0) ·
 [sélection par ids](#sélection-par-ids-0120) (0.12.0) ·
 [tags et données en mémoire](#tags-tide-et-données-en-mémoire-0130) (0.13.0) ·
-[arbre d'une sélection](#arbre-dune-sélection-de-sites-0140) (0.14.0, à faire)
+[arbre d'une sélection](#arbre-dune-sélection-de-sites-0140) (0.14.0)
 
 ---
 
@@ -511,15 +511,15 @@ sélection de bâtiments inchangée. Affichage seulement, compatible.
 
 - [x] SPEC : §14.1 (compteurs dans l'arbre d'une sélection), §14.2 (`tree` d'une sélection de sites),
       §12
-- [ ] `Selection.tree` : pour `entity="site"`, ajouter à `shown` les sous-sites de chaque site
+- [x] `Selection.tree` : pour `entity="site"`, ajouter à `shown` les sous-sites de chaque site
       sélectionné (`site.iter_sites()` récursif) ; `display._TreeBuilder.content` : pour un site,
       ajouter les compteurs des bâtiments masqués de son sous-arbre direct (et de leurs systèmes)
       qui ne sont pas déjà montrés sous lui
-- [ ] Tests : sélection d'un groupe → sous-sites et leurs compteurs visibles, bâtiments masqués ;
+- [x] Tests : sélection d'un groupe → sous-sites et leurs compteurs visibles, bâtiments masqués ;
       compteur partagé par deux sous-sites → montré sous chacun ; compteur sur un bâtiment → montré
       sous son site ; sélection d'un sous-site → frères masqués ; `max_depth` coupe toujours ;
       sélection de bâtiments inchangée ; compteurs de l'arbre = `sel.meters` ; HTML cohérent avec le
       texte
-- [ ] Exemple / tutoriel : `park[blocs].tree(meters=True)` sur des blocs (groupe de sites)
-- [ ] Finalisation 0.14.0 : statut et note de version dans la SPEC, version et tag ; signaler à
+- [x] Exemple / tutoriel : `park[blocs].tree(meters=True)` sur des blocs (groupe de sites)
+- [x] Finalisation 0.14.0 : statut et note de version dans la SPEC, version et tag ; signaler à
       gestrack (`scripts/work.py` : `gas_sites.tree(meters=True)` montre alors les compteurs)

@@ -361,6 +361,91 @@ def test_site_selection_tree_counts_every_building(park):
     ]
 
 
+@pytest.fixture
+def grouped():
+    """zone > grp > s1 > b1 (boiler), grp > s2 > b2 ; zone > s3 > b3 ; meters on each level."""
+    park = BuildingPark(name="P")
+    zone = park.new_site("zone")
+    group = park.new_site("grp", parent=zone)
+    for site, building, parent in [("s1", "b1", group), ("s2", "b2", group), ("s3", "b3", zone)]:
+        park.new_site(site, parent=parent)
+        park.new_building(id=building, parent=site)
+    park.add_system(HeatingGenerator(id="boiler"), owner="b1")
+    scopes = {
+        "m-s1": ["s1"],
+        "m-shared": ["s1", "s2"],
+        "m-b2": ["b2"],
+        "m-boiler": ["boiler"],
+        "m-b1-s1": ["b1", "s1"],
+        "m-s3": ["s3"],
+    }
+    for meter_id, scope in scopes.items():
+        park.add_meter(Meter(id=meter_id, scope=scope, channels=[Channel(name="e", unit="kWh")]))
+    return park
+
+
+def tree_meters(tree):
+    return [line.split("[meter] ")[1].split()[0] for line in tree.lines() if "[meter]" in line]
+
+
+def test_site_selection_tree_shows_sub_sites_and_their_meters(grouped):
+    assert grouped.select(entity="site", id="grp").tree(meters=True).lines() == [
+        "Selection(entity='site', 1 entity) of BuildingPark 'P'",
+        "└── [site] zone  (3 buildings)",
+        "    └── [site] grp  (2 buildings)",
+        "        ├── [site] s1  (1 building)",
+        "        │   ├── [meter] m-s1  e kWh",
+        "        │   ├── [meter] m-shared  e kWh",
+        "        │   ├── [meter] m-boiler  e kWh",
+        "        │   └── [meter] m-b1-s1  e kWh",
+        "        └── [site] s2  (1 building)",
+        "            ├── [meter] m-shared  e kWh",
+        "            └── [meter] m-b2  e kWh",
+    ]
+
+
+def test_site_selection_tree_hides_sibling_sites(grouped):
+    lines = grouped.select(entity="site", id="s1").tree(meters=True).lines()
+    assert not any("s2" in line or "s3" in line for line in lines)
+    assert tree_meters(grouped.select(entity="site", id="s1").tree(meters=True)) == [
+        "m-s1",
+        "m-shared",
+        "m-boiler",
+        "m-b1-s1",
+    ]
+
+
+def test_site_selection_tree_is_cut_by_max_depth(grouped):
+    assert grouped.select(entity="site", id="grp").tree(meters=True, max_depth=2).lines()[-1] == (
+        "        └── … 2 sites"
+    )
+
+
+def test_site_selection_tree_shows_the_meters_of_the_selection(grouped):
+    selection = grouped.select(entity="site", id__in=["s1", "s2"])
+    assert set(tree_meters(selection.tree(meters=True))) == {m.id for m in selection.meters}
+
+
+def test_site_selection_tree_html_shows_the_same_meters(grouped):
+    tree = grouped.select(entity="site", id="grp").tree(meters=True)
+    html = tree._repr_html_()
+    assert [m for m in grouped.meters if f"[meter] {m.id}" in html] == [
+        m for m in grouped.meters if m.id in tree_meters(tree)
+    ]
+
+
+def test_building_selection_tree_hides_meters_of_other_buildings(grouped):
+    assert grouped.select(id="b2").tree(meters=True).lines() == [
+        "Selection(entity='building', 1 entity) of BuildingPark 'P'",
+        "└── [site] zone  (1 building)",
+        "    └── [site] grp  (1 building)",
+        "        └── [site] s2  (1 building)",
+        "            ├── [meter] m-shared  e kWh",
+        "            └── [building] b2",
+        "                └── [meter] m-b2  e kWh",
+    ]
+
+
 def test_repr_is_one_line_and_html_is_the_tree(park):
     selection = park.select(has_rnb_id=True)
     assert repr(selection) == "Selection(entity='building', 1 entity)"

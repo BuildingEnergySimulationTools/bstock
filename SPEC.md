@@ -24,6 +24,9 @@
 >
 > **0.13.0** (2026-10-21) : les colonnes des données en mémoire suivent les tags tide d'un
 > compteur quand ils changent (§6.4). Compatible.
+>
+> **0.14.0** (2026-10-21) : l'arbre d'une sélection de sites montre le sous-arbre des sites
+> sélectionnés et les compteurs de `sel.meters` (§14.1, §14.2). Affichage seulement, compatible.
 
 ---
 
@@ -1466,6 +1469,7 @@ scripts/               # outils de maintenance (régénération de dpe_generator
 | Mesures (0.11.0) | Une seule notion de mesure (§6.1) : filtres `quantity` / `sub_bloc` et `load_data` tolérant aux compteurs sans reader (§6.4), `sel.meters` et `sel.timeseries` (§14.2), lignes de compteur enrichies dans l'arbre (§14.1). Ajouts compatibles, format de fichier inchangé |
 | Ids (0.12.0) | Sélection par ids : `park[[...]]` renvoie une `Selection`, critères `id` / `id__in` (§14.2). Ajouts compatibles |
 | Tags (0.13.0) | Colonnes des données en mémoire renommées quand les tags tide d'un compteur changent (§6.4). Correctif compatible |
+| Arbre (0.14.0) | L'arbre d'une sélection de sites montre le sous-arbre des sites sélectionnés et tous les compteurs de `sel.meters` (§14.1, §14.2). Affichage seulement, compatible |
 
 Noms dépréciés en 0.2.0, **retirés en 0.4.0** (v3.a) :
 
@@ -1584,7 +1588,12 @@ lignes du texte et `truncated(max_lines)` le texte coupé, comme dans le repr.
   avec leur unité. Un champ inconnu lève `UnknownFieldError`.
 - `systems=True` ajoute les systèmes propres sous leur porteur (`[heating] id  name`). `meters=True`
   ajoute les compteurs sous chaque porteur de leur `scope` (un compteur à plusieurs porteurs apparaît
-  plusieurs fois ; sans scope, en fin d'arbre). Les compteurs ne sont montrés que sur demande. Une ligne
+  plusieurs fois ; sans scope, en fin d'arbre). Dans l'arbre d'une sélection (§14.2), un compteur
+  apparaît sous ses porteurs montrés ; dans une sélection de sites, un compteur porté par un bâtiment
+  (masqué) d'un site sélectionné ou d'un de ses sous-sites, ou par un système de ce bâtiment, apparaît
+  sous ce site, une seule fois par site. L'arbre montre ainsi tous les compteurs de `sel.meters` (et,
+  comme avant, ceux des sites ancêtres). Dans une sélection de bâtiments, les compteurs des bâtiments
+  non sélectionnés ne sont pas montrés. Les compteurs ne sont montrés que sur demande. Une ligne
   par compteur, qui dit ce qui est mesuré, champs vides omis :
   `[meter] <id>  <name>  <energy_type> <end_use ou sub_bloc>  <canal unité, …>  <timestep>`, suivi de
   ` · loaded` si des données sont en mémoire. Exemples :
@@ -1660,9 +1669,12 @@ park.select(id__in=ids, activity="Education", entity="site")   # combiné à d'a
   avoir le même parc et le même `kind` (`InvalidArgumentError` sinon). Le résultat suit le même ordre.
 - Propriétés `park`, `kind` et `ids` (tuple) ; `len(sel)`, `list(sel)`, `"id" in sel` ou `entité in sel`.
 - Méthodes : `to_dataframe(provenance=False)` (§9, restreint aux entités sélectionnées), `tree(...)`
-  (§14.1 : entités sélectionnées et leurs sites ancêtres ; un site compte les bâtiments sélectionnés de
-  son sous-arbre, ou tous ses bâtiments dans une sélection de sites, qui ne montre pas les bâtiments ;
-  l'en-tête est le repr de la sélection suivi du parc), `aggregate`, `completeness`, `provenance`,
+  (§14.1 : entités sélectionnées et leurs sites ancêtres ; dans une sélection de sites, aussi le
+  sous-arbre de chaque site sélectionné, c'est-à-dire ses sous-sites et, avec `meters=True`, leurs
+  compteurs, comme `sel.meters` : l'arbre montre d'où viennent les mesures de la sélection. Une
+  sélection de sites ne montre pas les bâtiments, et un site y compte tous ses bâtiments. Dans une
+  sélection de bâtiments, un site compte les bâtiments sélectionnés de son sous-arbre. L'en-tête est le
+  repr de la sélection suivi du parc), `aggregate`, `completeness`, `provenance`,
   `conflicts` (§14.3, §14.4), `consumption`, `intensity` (§6.5) et l'accesseur `plot` (§14.5).
 - **Mesures** :
   - `sel.meters` (propriété) : liste des compteurs de la sélection, sans doublon, dans l'ordre de
