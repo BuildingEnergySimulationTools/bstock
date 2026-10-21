@@ -10,7 +10,9 @@ Sommaire : [v1](#v1--terminée) (terminée, 0.1.0 puis ajustements d'API en 0.2.
 [v3](#v3--lisibilité-sélection-analyse-consommations-graphiques) (terminée, 0.8.0) ·
 [relecture de l'API](#relecture-de-lapi-090) (0.9.0 et 0.10.0) ·
 [mesures](#mesures--sélection-extraction-et-arbre-0110) (0.11.0) ·
-[sélection par ids](#sélection-par-ids-0120) (0.12.0)
+[sélection par ids](#sélection-par-ids-0120) (0.12.0) ·
+[tags et données en mémoire](#tags-tide-et-données-en-mémoire-0130) (0.13.0) ·
+[arbre d'une sélection](#arbre-dune-sélection-de-sites-0140) (0.14.0, à faire)
 
 ---
 
@@ -472,3 +474,52 @@ bâtiments → `InvalidArgumentError`. Ajouts compatibles.
       (sites, bâtiments, tuple / set / `pd.Index`, doublons, ordre de l'arbre, id de compteur)
 - [x] Tutoriel : liste d'ids issue de tide → sélection → `timeseries`
 - [x] Finalisation 0.12.0 : statut et note de version dans la SPEC, version et tag
+
+---
+
+# Tags tide et données en mémoire (0.13.0)
+
+Bug remonté par gestrack (2026-10-20) : après `meter.data` chargé, changer `meter.bloc` /
+`meter.sub_bloc` (gestrack les pose selon l'arbre du parc) laisse les colonnes sous les anciens noms ;
+`consumption` lève alors `KeyError: '<id>_energy__Wh__<nouveau bloc>__<nouveau sub_bloc>'`.
+Contournement côté gestrack (`model.set_tide_tags` renomme lui-même), à retirer ensuite.
+
+- [x] SPEC : §6.4 (colonnes renommées quand les tags changent), §12, statut
+- [x] `Meter.__setattr__` : si `bloc`, `sub_bloc`, `scope` ou `end_use` change `tide_tags()` et que
+      `data` est en mémoire, renommer ses colonnes (anciens noms → nouveaux, par canal) ; `end_use`
+      est un champ sourcé : couvrir aussi `set` / `unset` (hook de `SourcedModel` ou recalcul paresseux
+      des noms à la lecture de `data`, au choix de l'implémentation)
+      → fait par renommage paresseux à la lecture de `data` (couvre aussi un changement de
+      priorité des sources)
+- [x] Tests : données chargées puis changement de `bloc`, de `sub_bloc`, de `scope` (bloc dérivé),
+      de `end_use` (sub_bloc dérivé) → `timeseries` et `consumption` fonctionnent, valeurs inchangées ;
+      sans données : rien ; tag invalide : erreur sans renommage partiel
+- [x] Finalisation 0.13.0 : statut et note de version dans la SPEC, version et tag ; signaler à
+      gestrack le retrait du contournement dans `set_tide_tags`
+
+---
+
+# Arbre d'une sélection de sites (0.14.0)
+
+Remonté par gestrack (2026-10-21) : l'arbre d'une sélection de blocs (groupes, périmètres) masque les
+sites membres et leurs compteurs (seuls les sites sélectionnés et leurs ancêtres sont montrés), alors que
+`sel.meters` et `sel.timeseries` les retiennent : l'arbre et les mesures se contredisent. Décisions :
+une sélection de sites montre le sous-arbre de chaque site sélectionné (sous-sites, compteurs avec
+`meters=True`), sans les bâtiments ; les compteurs portés par un bâtiment masqué apparaissent sous le
+site montré le plus proche ; pas de nouveau paramètre (`max_depth` suffit pour un arbre court) ;
+sélection de bâtiments inchangée. Affichage seulement, compatible.
+
+- [x] SPEC : §14.1 (compteurs dans l'arbre d'une sélection), §14.2 (`tree` d'une sélection de sites),
+      §12
+- [ ] `Selection.tree` : pour `entity="site"`, ajouter à `shown` les sous-sites de chaque site
+      sélectionné (`site.iter_sites()` récursif) ; `display._TreeBuilder.content` : pour un site,
+      ajouter les compteurs des bâtiments masqués de son sous-arbre direct (et de leurs systèmes)
+      qui ne sont pas déjà montrés sous lui
+- [ ] Tests : sélection d'un groupe → sous-sites et leurs compteurs visibles, bâtiments masqués ;
+      compteur partagé par deux sous-sites → montré sous chacun ; compteur sur un bâtiment → montré
+      sous son site ; sélection d'un sous-site → frères masqués ; `max_depth` coupe toujours ;
+      sélection de bâtiments inchangée ; compteurs de l'arbre = `sel.meters` ; HTML cohérent avec le
+      texte
+- [ ] Exemple / tutoriel : `park[blocs].tree(meters=True)` sur des blocs (groupe de sites)
+- [ ] Finalisation 0.14.0 : statut et note de version dans la SPEC, version et tag ; signaler à
+      gestrack (`scripts/work.py` : `gas_sites.tree(meters=True)` montre alors les compteurs)

@@ -713,3 +713,60 @@ def test_load_data_still_raises_when_a_reader_fails(park, tmp_path):
     )
     with pytest.raises(DataReadError):
         park.timeseries(load_data=True)
+
+
+# --- tags changed with data in memory (0.13.0) ------------------------------------------------
+
+
+def loaded_meter(park):
+    meter = park.add_meter(
+        make_meter("m", ["site-A"], end_use=None, energy_type="electricity", timestep="1h")
+    )
+    meter.data = hourly(energy=[1.0, 2.0, 3.0])
+    return meter
+
+
+@pytest.mark.parametrize(
+    ("change", "column"),
+    [
+        (lambda m: setattr(m, "bloc", "zone"), "m_energy__kWh__zone__other"),
+        (lambda m: setattr(m, "sub_bloc", "lights"), "m_energy__kWh__site-A__lights"),
+        (lambda m: setattr(m, "scope", [RNB_A]), f"m_energy__kWh__{RNB_A}__other"),
+        (lambda m: setattr(m, "scope", [RNB_A, RNB_B]), "m_energy__kWh__m__other"),
+        (lambda m: setattr(m, "end_use", "heating"), "m_energy__kWh__site-A__heating"),
+        (lambda m: m.set("end_use", "heating", source="bdnb"), "m_energy__kWh__site-A__heating"),
+    ],
+)
+def test_data_columns_follow_changed_tags(park, change, column):
+    meter = loaded_meter(park)
+    change(meter)
+    assert list(meter.data.columns) == [column]
+    assert list(park.timeseries().columns) == [column]
+    assert meter.data[column].tolist() == [1.0, 2.0, 3.0]
+
+
+def test_data_columns_follow_unset_end_use(park):
+    meter = loaded_meter(park)
+    meter.set("end_use", "heating", source="bdnb")
+    meter.unset("end_use")
+    assert list(meter.data.columns) == ["m_energy__kWh__site-A__other"]
+
+
+def test_consumption_works_after_tags_changed(park):
+    meter = loaded_meter(park)
+    meter.bloc, meter.sub_bloc = "zone", "lights"
+    frame = park.select().consumption(start="2024-01-01", end="2024-01-02", tz="UTC")
+    assert frame.energy.sum() == pytest.approx(6.0)
+
+
+def test_changing_tags_without_data_keeps_no_data(park):
+    meter = park.add_meter(make_meter("m", ["site-A"]))
+    meter.bloc = "zone"
+    assert meter.data is None
+
+
+def test_invalid_tag_leaves_data_columns_unchanged(park):
+    meter = loaded_meter(park)
+    with pytest.raises(ValidationError):
+        meter.bloc = "a__b"
+    assert list(meter.data.columns) == ["m_energy__kWh__site-A__other"]

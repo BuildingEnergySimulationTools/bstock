@@ -21,6 +21,9 @@
 >
 > **0.12.0** (2026-10-20) : sélection par ids, `park[[...]]` et critères `id` / `id__in`
 > (§14.2). Compatible.
+>
+> **0.13.0** (2026-10-21) : les colonnes des données en mémoire suivent les tags tide d'un
+> compteur quand ils changent (§6.4). Compatible.
 
 ---
 
@@ -776,6 +779,12 @@ Les colonnes suivent le format tide `name__unit__bloc__sub_bloc` :
 
 `Meter(bloc=..., sub_bloc=...)` surcharge ces valeurs ; `meter.tide_tags()` renvoie le couple effectif et `meter.tide_columns()` les noms de colonnes par canal. Exemple : `PDL_123_power__W__site-ecole-A__total`.
 
+**Tags modifiés avec des données en mémoire** (0.13.0). Les colonnes de `meter.data` suivent toujours les
+tags effectifs : quand une affectation change `tide_tags()` (`bloc`, `sub_bloc`, ou `scope` / `end_use`
+quand le tag en est dérivé), les colonnes déjà en mémoire sont renommées, sans relecture du reader. Sans
+données en mémoire, rien à faire. Avant 0.13.0, les colonnes gardaient les anciens noms et
+`consumption` / `timeseries` levaient `KeyError`.
+
 `park.timeseries(...)` assemble un DataFrame unique à partir de plusieurs compteurs, directement utilisable
 par tide :
 
@@ -1456,6 +1465,7 @@ scripts/               # outils de maintenance (régénération de dpe_generator
 | API (0.10.0) | Fin de la relecture : connecteurs, familles d'enums, secteurs renommés, production PV négative, noms internes et typage (changements ci-dessous) ; format de fichier v3 |
 | Mesures (0.11.0) | Une seule notion de mesure (§6.1) : filtres `quantity` / `sub_bloc` et `load_data` tolérant aux compteurs sans reader (§6.4), `sel.meters` et `sel.timeseries` (§14.2), lignes de compteur enrichies dans l'arbre (§14.1). Ajouts compatibles, format de fichier inchangé |
 | Ids (0.12.0) | Sélection par ids : `park[[...]]` renvoie une `Selection`, critères `id` / `id__in` (§14.2). Ajouts compatibles |
+| Tags (0.13.0) | Colonnes des données en mémoire renommées quand les tags tide d'un compteur changent (§6.4). Correctif compatible |
 
 Noms dépréciés en 0.2.0, **retirés en 0.4.0** (v3.a) :
 

@@ -140,6 +140,8 @@ class Meter(SourcedModel):
     )
 
     _data: pd.DataFrame | None = PrivateAttr(default=None)
+    # Tide tags of the columns of ``_data``, to rename them when the tags change.
+    _data_tags: tuple[str, str] | None = PrivateAttr(default=None)
 
     _repr_fields: ClassVar[tuple[str, ...]] = ("name", "energy_type", "end_use")
 
@@ -201,7 +203,10 @@ class Meter(SourcedModel):
         These are the columns of :attr:`data`; ``Channel.column`` is the column read in the raw
         data.
         """
-        bloc, sub_bloc = self.tide_tags()
+        return self._tide_columns(*self.tide_tags())
+
+    def _tide_columns(self, bloc: str, sub_bloc: str) -> dict[str, str]:
+        """Return the tide column name of each channel with the tags ``bloc`` and ``sub_bloc``."""
         return {
             c.name: tide_column(f"{self.id}_{c.name}", c.unit, bloc, sub_bloc)
             for c in self.channels
@@ -211,7 +216,18 @@ class Meter(SourcedModel):
 
     @property
     def data(self) -> pd.DataFrame | None:
-        """The data in memory, or ``None`` if it has not been loaded or set."""
+        """The data in memory, or ``None`` if it has not been loaded or set.
+
+        Its columns follow the current tide tags: when :meth:`tide_tags` has changed since the
+        data was set (``bloc``, ``sub_bloc``, ``scope`` or ``end_use``), they are renamed
+        (SPEC §6.4).
+        """
+        tags = self.tide_tags()
+        if self._data is not None and self._data_tags is not None and tags != self._data_tags:
+            old = self._tide_columns(*self._data_tags)
+            new = self._tide_columns(*tags)
+            self._data = self._data.rename(columns={old[name]: new[name] for name in new})
+            self._data_tags = tags
         return self._data
 
     @data.setter
@@ -219,9 +235,11 @@ class Meter(SourcedModel):
         """Set the data; columns are named by channel name or already in tide format."""
         if frame is None:
             self._data = None
+            self._data_tags = None
             return
         frame = _ensure_time_index(frame)
-        names = self.tide_columns()
+        tags = self.tide_tags()
+        names = self._tide_columns(*tags)
         renamed = frame.rename(columns=names)
         expected = list(names.values())
         missing = [c for c in expected if c not in renamed.columns]
@@ -230,6 +248,7 @@ class Meter(SourcedModel):
                 f"meter {self.id!r}: missing columns {missing} (got {list(frame.columns)})"
             )
         self._data = renamed[expected]
+        self._data_tags = tags
 
     def load_data(self) -> pd.DataFrame:
         """Read the data from ``reader``, keep it in :attr:`data` and return it.
